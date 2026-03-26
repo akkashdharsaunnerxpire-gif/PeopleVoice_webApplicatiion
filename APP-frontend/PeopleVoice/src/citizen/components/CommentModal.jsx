@@ -50,7 +50,7 @@ const CommentModal = ({
   citizenId,
   postOwnerId,
   district,
-  setDisplayedIssues, // now used to update parent
+  setDisplayedIssues, // used to update parent feed
   isDark: propIsDark,
 }) => {
   const { isDark: contextIsDark } = useTheme();
@@ -103,6 +103,52 @@ const CommentModal = ({
 
   const allImages = images?.length > 0 ? images : [];
 
+  // Update parent's comment count and comments list
+  const updateParentCommentCount = (newComment, isAdding = true) => {
+    if (!setDisplayedIssues) return;
+
+    setDisplayedIssues((prevIssues) =>
+      prevIssues.map((issue) => {
+        if (issue._id !== issueId) return issue;
+
+        let updatedComments = [...issue.comments];
+        let commentCount = issue.comments?.length || 0;
+
+        if (isAdding) {
+          updatedComments.push(newComment);
+          commentCount += 1;
+        } else {
+          // For delete, we remove the comment and its replies
+          // But we'll handle that in deleteComment
+        }
+
+        return {
+          ...issue,
+          comments: updatedComments,
+          commentCount: commentCount, // ensure commentCount is updated
+        };
+      })
+    );
+  };
+
+  // Update parent's comment like (for persistence)
+  const updateParentCommentLike = (commentId, newLikes) => {
+    if (!setDisplayedIssues) return;
+
+    setDisplayedIssues((prevIssues) =>
+      prevIssues.map((issue) => {
+        if (issue._id !== issueId) return issue;
+        const updatedComments = issue.comments.map((comment) => {
+          if (comment._id === commentId) {
+            return { ...comment, likes: newLikes };
+          }
+          return comment;
+        });
+        return { ...issue, comments: updatedComments };
+      })
+    );
+  };
+
   // Add comment
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
@@ -147,6 +193,12 @@ const CommentModal = ({
       return [...prev, optimisticComment];
     });
 
+    // Update parent optimistically
+    if (!isReply) {
+      // Only update parent comment count for root comments (replies are counted in parent but not as separate comments)
+      // We'll update the parent's comment count only after server success to avoid overcounting
+    }
+
     try {
       const res = await fetch(`${APIURL}/issues/${issueId}/comment`, {
         method: "POST",
@@ -157,6 +209,7 @@ const CommentModal = ({
       const data = await res.json();
       if (!data.success) throw new Error("Failed to post");
 
+      // Replace temp id with real id
       setLocalComments((prev) => {
         const replaceIdRecursively = (comments) => {
           return comments.map((c) => {
@@ -171,6 +224,27 @@ const CommentModal = ({
         };
         return replaceIdRecursively(prev);
       });
+
+      // Update parent issue's comments and comment count
+      if (setDisplayedIssues) {
+        setDisplayedIssues((prevIssues) =>
+          prevIssues.map((issue) => {
+            if (issue._id !== issueId) return issue;
+            // Get the actual new comment from server
+            const newComment = data.newComment;
+            // If it's a reply, we might not want to increment comment count? But the backend stores all comments in flat array, so we should.
+            // For simplicity, we'll update the parent's comments list with the new comment.
+            // But the parent may not need the full comments list; we just need comment count.
+            // We'll increment comment count and push the new comment.
+            const updatedComments = [...issue.comments, newComment];
+            return {
+              ...issue,
+              comments: updatedComments,
+              commentCount: updatedComments.length,
+            };
+          })
+        );
+      }
 
       setReplyTo(null);
       setTimeout(
@@ -192,25 +266,6 @@ const CommentModal = ({
 
   const cancelReply = () => {
     setReplyTo(null);
-  };
-
-  // Update parent issue's comment likes (for persistence)
-  const updateParentCommentLike = (commentId, newLikes) => {
-    if (!setDisplayedIssues) return;
-
-    setDisplayedIssues((prevIssues) =>
-      prevIssues.map((issue) => {
-        if (issue._id !== issueId) return issue;
-        // Update the comment in the flat comments array (assuming backend returns flat list)
-        const updatedComments = issue.comments.map((comment) => {
-          if (comment._id === commentId) {
-            return { ...comment, likes: newLikes };
-          }
-          return comment;
-        });
-        return { ...issue, comments: updatedComments };
-      })
-    );
   };
 
   // Like/Unlike with revert and parent update
@@ -264,7 +319,7 @@ const CommentModal = ({
         updateParentCommentLike(commentId, data.likes);
       }
 
-      // Optionally sync local state with server's data (optional, but safe)
+      // Optionally sync local state with server's data
       setLocalComments((prev) => {
         const syncLike = (comments) => {
           return comments.map((c) => {
@@ -286,7 +341,6 @@ const CommentModal = ({
         const revertLike = (comments) => {
           return comments.map((c) => {
             if (c._id === commentId) {
-              // Restore previous state
               return previousComment;
             }
             if (c.replies?.length) {
@@ -301,7 +355,7 @@ const CommentModal = ({
     }
   };
 
-  // Delete comment (with revert on failure)
+  // Delete comment (with revert on failure and parent update)
   const deleteComment = async (commentId) => {
     if (!window.confirm("Delete this comment?")) return;
 
@@ -321,6 +375,24 @@ const CommentModal = ({
     setLocalComments((prev) => removeCommentRecursively(prev));
     setActiveMenuCommentId(null);
 
+    // Optimistically update parent comment count
+    if (setDisplayedIssues) {
+      setDisplayedIssues((prevIssues) =>
+        prevIssues.map((issue) => {
+          if (issue._id !== issueId) return issue;
+          // Remove comment from parent's comments array
+          const updatedComments = issue.comments.filter(
+            (c) => c._id !== commentId
+          );
+          return {
+            ...issue,
+            comments: updatedComments,
+            commentCount: updatedComments.length,
+          };
+        })
+      );
+    }
+
     try {
       const res = await fetch(`${APIURL}/issues/${issueId}/comment/${commentId}`, {
         method: "DELETE",
@@ -332,12 +404,26 @@ const CommentModal = ({
       if (!data.success) throw new Error(data.message || "Delete failed");
     } catch (err) {
       console.error("Delete failed:", err);
+      // Revert local state
       setLocalComments(previousComments);
+      // Revert parent state
+      if (setDisplayedIssues) {
+        setDisplayedIssues((prevIssues) =>
+          prevIssues.map((issue) => {
+            if (issue._id !== issueId) return issue;
+            return {
+              ...issue,
+              comments: initialComments, // revert to original comments
+              commentCount: initialComments.length,
+            };
+          })
+        );
+      }
       alert("Could not delete comment. Try again.");
     }
   };
 
-  // Render comment with Instagram‑style reply toggle
+  // Render comment (same as before)
   const renderComment = (comment, level = 0) => {
     const isLiked = comment.likes?.includes(citizenId);
     const isOwnComment = comment.citizenId === citizenId;
