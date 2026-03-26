@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams, useOutletContext } from "react-router-dom";
+import {
+  useSearchParams,
+  useOutletContext,
+  useLocation,
+} from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Filter, X, AlertCircle } from "lucide-react";
 import { useUserValues } from "../../Context/UserValuesContext";
@@ -17,6 +21,9 @@ import { useTheme } from "../../Context/ThemeContext";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const APIURL = `${BACKEND_URL}/api`;
 
+// =============================
+// Helper Components
+// =============================
 const SmallSpinner = ({ size = "md", isDark }) => {
   const sizeClasses = {
     sm: "h-4 w-4 border-2",
@@ -36,7 +43,6 @@ const SmallSpinner = ({ size = "md", isDark }) => {
   );
 };
 
-// Skeleton card component for initial loading
 const SkeletonIssueCard = ({ isDark }) => {
   return (
     <div
@@ -48,36 +54,24 @@ const SkeletonIssueCard = ({ isDark }) => {
     >
       <div className="flex items-start gap-4">
         <div
-          className={`h-12 w-12 rounded-full ${
-            isDark ? "bg-violet-800/50" : "bg-gray-200"
-          }`}
+          className={`h-12 w-12 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
         />
         <div className="flex-1">
           <div
-            className={`h-5 w-3/4 rounded ${
-              isDark ? "bg-violet-800/50" : "bg-gray-200"
-            } mb-3`}
+            className={`h-5 w-3/4 rounded ${isDark ? "bg-violet-800/50" : "bg-gray-200"} mb-3`}
           />
           <div
-            className={`h-4 w-1/2 rounded ${
-              isDark ? "bg-violet-800/50" : "bg-gray-200"
-            } mb-4`}
+            className={`h-4 w-1/2 rounded ${isDark ? "bg-violet-800/50" : "bg-gray-200"} mb-4`}
           />
           <div
-            className={`h-20 w-full rounded-lg ${
-              isDark ? "bg-violet-800/50" : "bg-gray-200"
-            }`}
+            className={`h-20 w-full rounded-lg ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
           />
           <div className="flex gap-4 mt-4">
             <div
-              className={`h-8 w-16 rounded-full ${
-                isDark ? "bg-violet-800/50" : "bg-gray-200"
-              }`}
+              className={`h-8 w-16 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
             />
             <div
-              className={`h-8 w-16 rounded-full ${
-                isDark ? "bg-violet-800/50" : "bg-gray-200"
-              }`}
+              className={`h-8 w-16 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
             />
           </div>
         </div>
@@ -86,39 +80,86 @@ const SkeletonIssueCard = ({ isDark }) => {
   );
 };
 
+// =============================
+// Main Component
+// =============================
 const Feed = () => {
   const { setCommentModalData } = useOutletContext();
   const [searchParams] = useSearchParams();
-  const { setDisplayedIssues } = useUserValues();
+  const location = useLocation();
   const { isDark } = useTheme();
   const theme = isDark ? themeColors.dark : themeColors.light;
 
+  // Filters state
   const [district, setDistrict] = useState(DISTRICTS[0]);
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
   const [status, setStatus] = useState(STATUSES[0]);
   const [sortBy, setSortBy] = useState(SORT_OPTIONS[0]);
   const [onlyWithImages, setOnlyWithImages] = useState(false);
   const [onlyMyIssues, setOnlyMyIssues] = useState(false);
-
   const [refreshing, setRefreshing] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [error, setError] = useState(null);
-  const isFetchingRef = useRef(false);
 
-  const [issues, setIssues] = useState([]);
+  // Pagination and data
+  const { displayedIssues, setDisplayedIssues } = useUserValues();
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const pageRef = useRef(1);
-
-  const ITEMS_PER_PAGE = 5;
-  const bottomObserverRef = useRef(null);
+  const isFetchingRef = useRef(false);
   const abortControllerRef = useRef(null);
   const filterTimeout = useRef(null);
+  const bottomObserverRef = useRef(null);
+  const scrollRestoredRef = useRef(false);
+  const initialDataLoaded = useRef(false); // 👈 new flag to prevent duplicate filter fetch on mount
+
+  const ITEMS_PER_PAGE = 5;
   const citizenId = localStorage.getItem("citizenId") || "CID-XXXX";
 
-  // Helper to ensure every issue has a numeric likeCount
+  // =============================
+  // Scroll Restoration Helpers
+  // =============================
+  const saveScrollPosition = useCallback(() => {
+    const scrollKey = `feedScroll_${location.pathname}`;
+    sessionStorage.setItem(scrollKey, window.scrollY);
+  }, [location.pathname]);
+
+  const restoreScrollPosition = useCallback(() => {
+    const scrollKey = `feedScroll_${location.pathname}`;
+    const saved = sessionStorage.getItem(scrollKey);
+    if (saved) {
+      window.scrollTo(0, parseInt(saved, 10));
+    }
+  }, [location.pathname]);
+
+  // Save scroll on unmount
+  useEffect(() => {
+    return () => {
+      saveScrollPosition();
+    };
+  }, [saveScrollPosition]);
+
+  // Debounced scroll saving
+  useEffect(() => {
+    let timeoutId;
+    const handleScroll = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        saveScrollPosition();
+      }, 100);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [saveScrollPosition]);
+
+  // =============================
+  // Normalisation & Data Fetching
+  // =============================
   const normalizeIssue = (issue) => ({
     ...issue,
     likeCount: issue.likeCount ?? issue.likes?.length ?? 0,
@@ -126,9 +167,19 @@ const Feed = () => {
 
   const fetchIssues = useCallback(
     async (pageNum, append = false) => {
+      if (append && isFetchingRef.current) return;
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      isFetchingRef.current = true;
+
       try {
-        if (!append) setLoading(true);
-        setError(null);
+        if (!append) {
+          setLoading(true);
+          setError(null);
+        } else {
+          setLoadingMore(true);
+        }
 
         const params = new URLSearchParams({
           page: pageNum,
@@ -138,11 +189,14 @@ const Feed = () => {
         if (district !== DISTRICTS[0]) params.append("district", district);
         if (department !== DEPARTMENTS[0]) params.append("department", department);
         if (status !== STATUSES[0]) params.append("status", status);
-        if (sortBy !== SORT_OPTIONS[0]) params.append("sortBy", sortBy);
+        if (sortBy !== SORT_OPTIONS[0])
+          params.append("sortBy", sortBy.toLowerCase().replace(" ", ""));
         if (onlyWithImages) params.append("onlyWithImages", true);
         if (onlyMyIssues) params.append("citizenId", citizenId);
 
-        const res = await fetch(`${APIURL}/issues?${params.toString()}`);
+        const res = await fetch(`${APIURL}/issues?${params.toString()}`, {
+          signal: controller.signal,
+        });
         const data = await res.json();
 
         if (!data.success) throw new Error(data.message);
@@ -151,37 +205,131 @@ const Feed = () => {
         const newIssues = rawIssues.map(normalizeIssue);
 
         if (append) {
-          setIssues((prev) => {
+          setDisplayedIssues((prev) => {
             const existingIds = new Set(prev.map((i) => i._id));
-            return [...prev, ...newIssues.filter((i) => !existingIds.has(i._id))];
+            const uniqueNew = newIssues.filter((i) => !existingIds.has(i._id));
+            return [...prev, ...uniqueNew];
           });
+          setHasMore(data.hasMore);
+          pageRef.current = pageNum;
+          setPage(pageNum);
         } else {
-          setIssues(newIssues);
+          setDisplayedIssues(newIssues);
+          setHasMore(data.hasMore);
           pageRef.current = 1;
           setPage(1);
         }
-
-        setHasMore(data.hasMore);
       } catch (err) {
-        setError(err.message);
-        if (!append) {
-          setIssues([]);
-          setHasMore(false);
+        if (err.name !== "AbortError") {
+          setError(err.message);
+          if (!append) {
+            setDisplayedIssues([]);
+            setHasMore(false);
+          }
         }
       } finally {
         if (!append) setLoading(false);
+        else setLoadingMore(false);
+        isFetchingRef.current = false;
+        abortControllerRef.current = null;
       }
     },
-    [district, department, status, sortBy, onlyWithImages, onlyMyIssues, citizenId]
+    [district, department, status, sortBy, onlyWithImages, onlyMyIssues, citizenId, setDisplayedIssues],
   );
 
+  // =============================
+  // Save feed data & filters to sessionStorage
+  // =============================
+  const saveFeedState = useCallback(() => {
+    const stateToSave = {
+      issues: displayedIssues,
+      page: pageRef.current,
+      filters: {
+        district,
+        department,
+        status,
+        sortBy,
+        onlyWithImages,
+        onlyMyIssues,
+      },
+    };
+    sessionStorage.setItem("feedData", JSON.stringify(stateToSave));
+  }, [displayedIssues, district, department, status, sortBy, onlyWithImages, onlyMyIssues]);
+
   useEffect(() => {
+    if (displayedIssues.length > 0) {
+      saveFeedState();
+    }
+  }, [displayedIssues, saveFeedState]);
+
+  // =============================
+  // Initial load & restoration
+  // =============================
+  useEffect(() => {
+    const savedStateStr = sessionStorage.getItem("feedData");
+    if (savedStateStr) {
+      try {
+        const savedState = JSON.parse(savedStateStr);
+        const savedFilters = savedState.filters;
+        const currentFilters = {
+          district,
+          department,
+          status,
+          sortBy,
+          onlyWithImages,
+          onlyMyIssues,
+        };
+        const filtersMatch = JSON.stringify(savedFilters) === JSON.stringify(currentFilters);
+        if (filtersMatch && savedState.issues?.length) {
+          setDisplayedIssues(savedState.issues);
+          setPage(savedState.page);
+          pageRef.current = savedState.page;
+          setHasMore(true);
+          scrollRestoredRef.current = false;
+          initialDataLoaded.current = true; // 👈 mark that we've loaded from cache
+          return;
+        } else {
+          sessionStorage.removeItem("feedData");
+        }
+      } catch (e) {
+        console.error("Failed to parse saved feed data", e);
+      }
+    }
+    // No cached data or filters don't match – fetch fresh
+    fetchIssues(1, false).then(() => {
+      initialDataLoaded.current = true; // 👈 mark that we've loaded from network
+    });
+  }, []); // runs only once on mount
+
+  // =============================
+  // Real-time Updates: New Issue Created
+  // =============================
+  useEffect(() => {
+    const handleNewIssue = (event) => {
+      const currentScroll = window.scrollY;
+      fetchIssues(1, false).then(() => {
+        window.scrollTo(0, currentScroll);
+      });
+    };
+
+    window.addEventListener("newIssueCreated", handleNewIssue);
+    return () => window.removeEventListener("newIssueCreated", handleNewIssue);
+  }, [fetchIssues]);
+
+  // =============================
+  // Filter Changes – fetch fresh data (but skip the initial mount)
+  // =============================
+  useEffect(() => {
+    // Skip the very first run (when component mounts) because data is already loaded
+    if (!initialDataLoaded.current) return;
+
     if (filterTimeout.current) clearTimeout(filterTimeout.current);
 
     filterTimeout.current = setTimeout(() => {
       pageRef.current = 1;
       setPage(1);
       setHasMore(true);
+      scrollRestoredRef.current = false;
       fetchIssues(1, false);
     }, 300);
 
@@ -198,44 +346,44 @@ const Feed = () => {
     fetchIssues,
   ]);
 
+  // =============================
+  // Scroll Restoration after Initial Load
+  // =============================
+  useEffect(() => {
+    if (!loading && displayedIssues.length > 0 && !scrollRestoredRef.current) {
+      setTimeout(() => {
+        restoreScrollPosition();
+        scrollRestoredRef.current = true;
+      }, 100);
+    }
+  }, [loading, displayedIssues, restoreScrollPosition]);
+
+  // =============================
+  // Infinite Scroll Observer
+  // =============================
   const loadMoreIssues = useCallback(async () => {
     if (isFetchingRef.current || loading || loadingMore || !hasMore) return;
-
-    isFetchingRef.current = true;
-    setLoadingMore(true);
-
     const nextPage = pageRef.current + 1;
-
     await fetchIssues(nextPage, true);
-
-    pageRef.current = nextPage;
-    setPage(nextPage);
-
-    setLoadingMore(false);
-    isFetchingRef.current = false;
   }, [hasMore, loading, loadingMore, fetchIssues]);
 
   useEffect(() => {
     const current = bottomObserverRef.current;
-
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          loadMoreIssues();
-        }
+        if (entries[0].isIntersecting) loadMoreIssues();
       },
-      {
-        rootMargin: "400px",
-      }
+      { rootMargin: "400px" },
     );
-
     if (current) observer.observe(current);
-
     return () => {
       if (current) observer.unobserve(current);
     };
   }, [loadMoreIssues]);
 
+  // =============================
+  // Helper Functions
+  // =============================
   const clearFilters = () => {
     setDistrict(DISTRICTS[0]);
     setDepartment(DEPARTMENTS[0]);
@@ -245,40 +393,31 @@ const Feed = () => {
     setOnlyMyIssues(false);
   };
 
-  // Robust like handler with correct count calculation
   const handleLike = useCallback(
     async (issueId) => {
       if (!citizenId) return;
 
-      // Get current issue before any updates
-      const currentIssue = issues.find((issue) => issue._id === issueId);
+      const currentIssue = displayedIssues.find(
+        (issue) => issue._id === issueId,
+      );
       if (!currentIssue) return;
 
-      const wasLiked = currentIssue.likes?.includes(citizenId);
-      // Always use likes array length as the source of truth for count
-      const currentLikeCount = currentIssue.likes?.length ?? 0;
-      const newLikeCount = wasLiked ? currentLikeCount - 1 : currentLikeCount + 1;
-
       // Optimistic update
-      setIssues((prev) =>
+      setDisplayedIssues((prev) =>
         prev.map((issue) => {
           if (issue._id !== issueId) return issue;
-
           const wasLiked = issue.likes?.includes(citizenId);
-
           const updatedLikes = wasLiked
             ? (issue.likes || []).filter((id) => id !== citizenId)
             : [...(issue.likes || []), citizenId];
-
           return {
             ...issue,
             likes: updatedLikes,
-            likeCount: updatedLikes.length, // 🔥 always derive
+            likeCount: updatedLikes.length,
           };
-        })
+        }),
       );
 
-      // Make API call
       try {
         const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
           method: "POST",
@@ -286,10 +425,8 @@ const Feed = () => {
           body: JSON.stringify({ citizenId }),
         });
         const data = await res.json();
-
         if (data.success) {
-          // Sync with server response
-          setIssues((prev) =>
+          setDisplayedIssues((prev) =>
             prev.map((issue) =>
               issue._id === issueId
                 ? {
@@ -297,36 +434,32 @@ const Feed = () => {
                     likes: data.likes,
                     likeCount: data.likeCount ?? data.likes.length,
                   }
-                : issue
-            )
+                : issue,
+            ),
           );
         } else {
-          // Revert optimistic update
-          setIssues((prev) =>
-            prev.map((issue) =>
-              issue._id === issueId ? currentIssue : issue
-            )
+          // Revert on failure
+          setDisplayedIssues((prev) =>
+            prev.map((issue) => (issue._id === issueId ? currentIssue : issue)),
           );
-          console.error("Like API failed:", data.message);
         }
       } catch (err) {
-        // Revert on network error
-        setIssues((prev) =>
-          prev.map((issue) =>
-            issue._id === issueId ? currentIssue : issue
-          )
+        setDisplayedIssues((prev) =>
+          prev.map((issue) => (issue._id === issueId ? currentIssue : issue)),
         );
-        console.error("Like network error:", err);
       }
     },
-    [citizenId, issues]
+    [citizenId, displayedIssues, setDisplayedIssues],
   );
 
+  // =============================
+  // Render
+  // =============================
   return (
     <div
       className={`min-h-screen transition-colors duration-700 ${theme.bg} pb-20`}
     >
-      {/* Mobile Fixed Filter Bar - always visible on mobile */}
+      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30">
         <div
           className={`backdrop-blur-xl border-b ${
@@ -348,7 +481,6 @@ const Feed = () => {
                 Public Reports
               </p>
             </div>
-
             <motion.button
               whileTap={{ scale: 0.92 }}
               onClick={() => setIsMobileFilterOpen(true)}
@@ -365,9 +497,8 @@ const Feed = () => {
         </div>
       </div>
 
-      {/* Main content with top padding for fixed filter bar */}
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row-reverse items-start justify-center gap-8 px-4 lg:pt-8 pt-20">
-        {/* Desktop Sidebar - sticky */}
+        {/* Desktop Filter Sidebar */}
         <aside className="hidden lg:block w-[340px] shrink-0 sticky top-8 z-20">
           <div
             className={`backdrop-blur-2xl border rounded-[2.5rem] p-6 shadow-xl transition-all duration-500 ${
@@ -395,10 +526,11 @@ const Feed = () => {
           </div>
         </aside>
 
+        {/* Main Feed */}
         <main className="flex-1 max-w-2xl w-full relative">
           <div className="space-y-6 pb-16">
-            {/* Initial loading with skeleton cards */}
-            {loading && issues.length === 0 ? (
+            {/* Loading State (first load) */}
+            {loading && displayedIssues.length === 0 ? (
               <div className="space-y-6">
                 {Array.from({ length: ITEMS_PER_PAGE }).map((_, idx) => (
                   <SkeletonIssueCard key={idx} isDark={isDark} />
@@ -427,7 +559,7 @@ const Feed = () => {
                   Try Again
                 </button>
               </div>
-            ) : issues.length === 0 ? (
+            ) : displayedIssues.length === 0 ? (
               <div
                 className={`text-center py-16 rounded-[2.5rem] border-2 border-dashed ${
                   isDark
@@ -447,7 +579,7 @@ const Feed = () => {
               </div>
             ) : (
               <AnimatePresence mode="popLayout">
-                {issues.map((issue, index) => (
+                {displayedIssues.map((issue, index) => (
                   <motion.div
                     key={issue._id}
                     layout
@@ -472,7 +604,7 @@ const Feed = () => {
               </AnimatePresence>
             )}
 
-            {/* Pagination loading indicator */}
+            {/* Infinite Scroll Trigger */}
             <div
               ref={bottomObserverRef}
               className="py-12 flex flex-col items-center justify-center gap-3"
@@ -493,7 +625,7 @@ const Feed = () => {
                   </span>
                 </motion.div>
               )}
-              {!loadingMore && !hasMore && issues.length > 0 && (
+              {!loadingMore && !hasMore && displayedIssues.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 0.3 }}
@@ -568,7 +700,6 @@ const Feed = () => {
                   />
                 </motion.button>
               </div>
-
               <div className="flex-1 overflow-y-auto p-5">
                 <FilterBar
                   isDark={isDark}
@@ -588,7 +719,6 @@ const Feed = () => {
                   compact={true}
                 />
               </div>
-
               <div
                 className={`p-5 border-t ${
                   isDark ? "border-violet-500/20" : "border-green-100"
