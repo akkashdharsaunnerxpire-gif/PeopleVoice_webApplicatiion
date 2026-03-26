@@ -50,7 +50,7 @@ const CommentModal = ({
   citizenId,
   postOwnerId,
   district,
-  setDisplayedIssues,
+  setDisplayedIssues, // now used to update parent
   isDark: propIsDark,
 }) => {
   const { isDark: contextIsDark } = useTheme();
@@ -194,75 +194,112 @@ const CommentModal = ({
     setReplyTo(null);
   };
 
-  // Like/Unlike
-  // Inside CommentModal component, replace toggleLike with:
+  // Update parent issue's comment likes (for persistence)
+  const updateParentCommentLike = (commentId, newLikes) => {
+    if (!setDisplayedIssues) return;
 
-const toggleLike = async (commentId) => {
-  // Find current comment before updating (for revert)
-  let previousComment = null;
-  const findComment = (comments) => {
-    for (let c of comments) {
-      if (c._id === commentId) return c;
-      if (c.replies?.length) {
-        const found = findComment(c.replies);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-  previousComment = findComment(localComments);
-
-  // Optimistic update
-  const updateLike = (comments) => {
-    return comments.map((c) => {
-      if (c._id === commentId) {
-        const alreadyLiked = c.likes?.includes(citizenId);
-        return {
-          ...c,
-          likes: alreadyLiked
-            ? c.likes.filter((id) => id !== citizenId)
-            : [...(c.likes || []), citizenId],
-        };
-      }
-      if (c.replies?.length) {
-        return { ...c, replies: updateLike(c.replies) };
-      }
-      return c;
-    });
-  };
-
-  setLocalComments((prev) => updateLike(prev));
-
-  try {
-    const res = await fetch(`${APIURL}/issues/${issueId}/comment/${commentId}/like`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ citizenId }),
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error("Like failed");
-    // Optionally sync with server response if needed
-  } catch (err) {
-    console.error(err);
-    // Revert optimistic update
-    setLocalComments((prev) => {
-      const revertLike = (comments) => {
-        return comments.map((c) => {
-          if (c._id === commentId) {
-            // Restore previous state
-            return previousComment;
+    setDisplayedIssues((prevIssues) =>
+      prevIssues.map((issue) => {
+        if (issue._id !== issueId) return issue;
+        // Update the comment in the flat comments array (assuming backend returns flat list)
+        const updatedComments = issue.comments.map((comment) => {
+          if (comment._id === commentId) {
+            return { ...comment, likes: newLikes };
           }
-          if (c.replies?.length) {
-            return { ...c, replies: revertLike(c.replies) };
-          }
-          return c;
+          return comment;
         });
-      };
-      return revertLike(prev);
-    });
-    alert("Failed to like comment");
-  }
-};
+        return { ...issue, comments: updatedComments };
+      })
+    );
+  };
+
+  // Like/Unlike with revert and parent update
+  const toggleLike = async (commentId) => {
+    // Find current comment before updating (for revert)
+    let previousComment = null;
+    const findComment = (comments) => {
+      for (let c of comments) {
+        if (c._id === commentId) return c;
+        if (c.replies?.length) {
+          const found = findComment(c.replies);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    previousComment = findComment(localComments);
+
+    // Optimistic update
+    const updateLike = (comments) => {
+      return comments.map((c) => {
+        if (c._id === commentId) {
+          const alreadyLiked = c.likes?.includes(citizenId);
+          return {
+            ...c,
+            likes: alreadyLiked
+              ? c.likes.filter((id) => id !== citizenId)
+              : [...(c.likes || []), citizenId],
+          };
+        }
+        if (c.replies?.length) {
+          return { ...c, replies: updateLike(c.replies) };
+        }
+        return c;
+      });
+    };
+
+    setLocalComments((prev) => updateLike(prev));
+
+    try {
+      const res = await fetch(`${APIURL}/issues/${issueId}/comment/${commentId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ citizenId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error("Like failed");
+
+      // Update parent with the server's new likes array
+      if (data.likes) {
+        updateParentCommentLike(commentId, data.likes);
+      }
+
+      // Optionally sync local state with server's data (optional, but safe)
+      setLocalComments((prev) => {
+        const syncLike = (comments) => {
+          return comments.map((c) => {
+            if (c._id === commentId && data.likes) {
+              return { ...c, likes: data.likes };
+            }
+            if (c.replies?.length) {
+              return { ...c, replies: syncLike(c.replies) };
+            }
+            return c;
+          });
+        };
+        return syncLike(prev);
+      });
+    } catch (err) {
+      console.error(err);
+      // Revert optimistic update
+      setLocalComments((prev) => {
+        const revertLike = (comments) => {
+          return comments.map((c) => {
+            if (c._id === commentId) {
+              // Restore previous state
+              return previousComment;
+            }
+            if (c.replies?.length) {
+              return { ...c, replies: revertLike(c.replies) };
+            }
+            return c;
+          });
+        };
+        return revertLike(prev);
+      });
+      alert("Failed to like comment");
+    }
+  };
 
   // Delete comment (with revert on failure)
   const deleteComment = async (commentId) => {
@@ -306,9 +343,6 @@ const toggleLike = async (commentId) => {
     const isOwnComment = comment.citizenId === citizenId;
     const isPostOwner = citizenId === postOwnerId;
     const canDelete = isOwnComment || isPostOwner;
-
-    // Uncomment for debugging:
-    // console.log({ commentId: comment._id, citizenId, postOwnerId, isOwnComment, isPostOwner, canDelete });
 
     const indent = level * 16;
     const hasReplies = (comment.replies?.length || 0) > 0;
