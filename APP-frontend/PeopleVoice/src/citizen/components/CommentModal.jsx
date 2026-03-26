@@ -195,37 +195,74 @@ const CommentModal = ({
   };
 
   // Like/Unlike
-  const toggleLike = async (commentId) => {
-    try {
-      const updateLike = (comments) => {
+  // Inside CommentModal component, replace toggleLike with:
+
+const toggleLike = async (commentId) => {
+  // Find current comment before updating (for revert)
+  let previousComment = null;
+  const findComment = (comments) => {
+    for (let c of comments) {
+      if (c._id === commentId) return c;
+      if (c.replies?.length) {
+        const found = findComment(c.replies);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  previousComment = findComment(localComments);
+
+  // Optimistic update
+  const updateLike = (comments) => {
+    return comments.map((c) => {
+      if (c._id === commentId) {
+        const alreadyLiked = c.likes?.includes(citizenId);
+        return {
+          ...c,
+          likes: alreadyLiked
+            ? c.likes.filter((id) => id !== citizenId)
+            : [...(c.likes || []), citizenId],
+        };
+      }
+      if (c.replies?.length) {
+        return { ...c, replies: updateLike(c.replies) };
+      }
+      return c;
+    });
+  };
+
+  setLocalComments((prev) => updateLike(prev));
+
+  try {
+    const res = await fetch(`${APIURL}/issues/${issueId}/comment/${commentId}/like`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ citizenId }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error("Like failed");
+    // Optionally sync with server response if needed
+  } catch (err) {
+    console.error(err);
+    // Revert optimistic update
+    setLocalComments((prev) => {
+      const revertLike = (comments) => {
         return comments.map((c) => {
           if (c._id === commentId) {
-            const alreadyLiked = c.likes?.includes(citizenId);
-            return {
-              ...c,
-              likes: alreadyLiked
-                ? c.likes.filter((id) => id !== citizenId)
-                : [...(c.likes || []), citizenId],
-            };
+            // Restore previous state
+            return previousComment;
           }
           if (c.replies?.length) {
-            return { ...c, replies: updateLike(c.replies) };
+            return { ...c, replies: revertLike(c.replies) };
           }
           return c;
         });
       };
-
-      setLocalComments((prev) => updateLike(prev));
-
-      await fetch(`${APIURL}/issues/${issueId}/comment/${commentId}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citizenId }),
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
+      return revertLike(prev);
+    });
+    alert("Failed to like comment");
+  }
+};
 
   // Delete comment (with revert on failure)
   const deleteComment = async (commentId) => {

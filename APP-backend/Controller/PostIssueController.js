@@ -26,7 +26,6 @@ exports.getAllIssues = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const filter = {};
-
     if (req.query.district && req.query.district !== "All")
       filter.district = req.query.district;
     if (req.query.department && req.query.department !== "All")
@@ -38,21 +37,16 @@ exports.getAllIssues = async (req, res) => {
       filter.images_data = { $exists: true, $ne: [] };
 
     let sortOption = { createdAt: -1 }; // default newest
-
     switch (req.query.sortBy) {
       case "oldest":
         sortOption = { createdAt: 1 };
         break;
-
       case "mostLiked":
         sortOption = { likeCount: -1 };
         break;
-
       case "mostCommented":
-        sortOption = { commentsCount: -1 }; // (see below fix)
+        sortOption = { commentsCount: -1 };
         break;
-
-      case "newest":
       default:
         sortOption = { createdAt: -1 };
     }
@@ -63,7 +57,9 @@ exports.getAllIssues = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .lean();
-    issues.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // ❌ REMOVED: issues.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
     res.json({
       success: true,
       page,
