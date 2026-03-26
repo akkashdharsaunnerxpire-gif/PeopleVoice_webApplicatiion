@@ -9,14 +9,13 @@ import {
   MapPin,
   Calendar,
   Tag,
-  User,
   Share2
 } from "lucide-react";
 import { useState } from "react";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
-const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
+const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
   const [index, setIndex] = useState(0);
   const [isUnsaving, setIsUnsaving] = useState(false);
   const [error, setError] = useState(null);
@@ -33,9 +32,7 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
     try {
       const res = await fetch(`${API_BASE}/api/saved/toggle`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           citizenId,
           issueId: post.issueId,
@@ -73,7 +70,7 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-0 md:p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <motion.div
@@ -81,7 +78,7 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: "spring", damping: 25 }}
-        className="bg-white dark:bg-gray-900 w-full max-w-5xl h-[90vh] flex flex-col md:flex-row rounded-2xl overflow-hidden shadow-2xl"
+        className="bg-white dark:bg-gray-900 w-full h-full md:h-[90vh] md:max-w-5xl md:rounded-2xl flex flex-col md:flex-row overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* LEFT IMAGE SECTION */}
@@ -146,15 +143,10 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
           )}
         </motion.div>
 
-        {/* RIGHT CONTENT */}
-        <motion.div 
-          initial={{ x: 20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="w-full md:w-[420px] flex flex-col bg-white dark:bg-gray-900"
-        >
-          {/* HEADER */}
-          <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-800">
+        {/* RIGHT CONTENT – SCROLLABLE + STICKY UNSAVE BUTTON */}
+        <div className="flex flex-col flex-1 md:w-[420px] h-full overflow-hidden">
+          {/* HEADER – Sticky */}
+          <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
                 {issue.district?.[0]?.toUpperCase() || "?"}
@@ -173,8 +165,8 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
             </motion.button>
           </div>
 
-          {/* BODY */}
-          <div className="p-5 overflow-y-auto flex-1 space-y-4">
+          {/* BODY – Scrollable content */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
             {/* Description */}
             <div className="space-y-2">
               <p className="text-gray-800 dark:text-gray-200 font-medium">
@@ -252,8 +244,8 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
             )}
           </div>
 
-          {/* ACTIONS */}
-          <div className="border-t dark:border-gray-800 px-5 py-4">
+          {/* ACTIONS – Sticky at bottom */}
+          <div className="border-t dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <motion.button
@@ -261,20 +253,33 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
                   whileTap={{ scale: 0.9 }}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                   title="Share"
+                  onClick={() => {
+                    const shareUrl = `${window.location.origin}/issue/${post.issueId}`;
+                    if (navigator.share) {
+                      navigator.share({
+                        title: issue.description_en,
+                        text: issue.description_en,
+                        url: shareUrl,
+                      }).catch(console.log);
+                    } else {
+                      navigator.clipboard.writeText(shareUrl);
+                      alert("Link copied!");
+                    }
+                  }}
                 >
                   <Share2 className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                 </motion.button>
               </div>
 
               <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleUnsave}
                 disabled={isUnsaving || !citizenId}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all
                   ${isUnsaving || !citizenId
                     ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
-                    : 'bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl'
+                    : 'bg-red-600 hover:bg-red-700 text-white shadow-lg'
                   }`}
               >
                 {isUnsaving ? (
@@ -291,7 +296,7 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave }) => {
               </motion.button>
             </div>
           </div>
-        </motion.div>
+        </div>
       </motion.div>
     </motion.div>
   );

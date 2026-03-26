@@ -2,11 +2,9 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bookmark,
-  Image as ImageIcon,
   Grid,
   List,
   Search,
-  Filter,
 } from "lucide-react";
 import SavedGridCard from "../components/SavedGridCard";
 import SavedPostModal from "../components/SavedPostModal";
@@ -24,7 +22,7 @@ const SavedIssues = () => {
   const [viewMode, setViewMode] = useState("grid");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDepartment, setFilterDepartment] = useState("all");
-  const [error, setError] = useState(null); // <-- added error state
+  const [error, setError] = useState(null);
 
   const { isDark } = useTheme();
 
@@ -58,12 +56,10 @@ const SavedIssues = () => {
     fetchSaved();
   }, [citizenId]);
 
-  /* ================= UNSAVE ================= */
+  /* ================= UNSAVE (optimistic UI update) ================= */
   const handleUnsave = (issueId) => {
     setSaved((prev) => prev.filter((p) => p.issueId !== issueId));
     setActivePost(null);
-    // Optionally refresh from server to be safe
-    // fetchSaved();
   };
 
   /* ================= FILTER SAVED ITEMS ================= */
@@ -120,7 +116,6 @@ const SavedIssues = () => {
     </div>
   );
 
-  // If not logged in
   if (!citizenId) {
     return (
       <motion.div
@@ -182,8 +177,8 @@ const SavedIssues = () => {
             </div>
           </div>
 
-          {/* View Toggle & Search */}
-          <div className="flex items-center gap-3">
+          {/* Responsive controls */}
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -254,7 +249,6 @@ const SavedIssues = () => {
           </div>
         </div>
 
-        {/* Error display */}
         {error && (
           <div className="mt-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg">
             {error}
@@ -328,7 +322,7 @@ const SavedIssues = () => {
         </motion.div>
       )}
 
-      {/* MODAL */}
+      {/* Modal */}
       <AnimatePresence>
         {activePost && (
           <SavedPostModal
