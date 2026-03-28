@@ -113,7 +113,7 @@ const Feed = () => {
   const filterTimeout = useRef(null);
   const bottomObserverRef = useRef(null);
   const scrollRestoredRef = useRef(false);
-  const initialDataLoaded = useRef(false); // 👈 new flag to prevent duplicate filter fetch on mount
+  const initialDataLoaded = useRef(false);
 
   const ITEMS_PER_PAGE = 5;
   const citizenId = localStorage.getItem("citizenId") || "CID-XXXX";
@@ -286,7 +286,7 @@ const Feed = () => {
           pageRef.current = savedState.page;
           setHasMore(true);
           scrollRestoredRef.current = false;
-          initialDataLoaded.current = true; // 👈 mark that we've loaded from cache
+          initialDataLoaded.current = true;
           return;
         } else {
           sessionStorage.removeItem("feedData");
@@ -297,7 +297,7 @@ const Feed = () => {
     }
     // No cached data or filters don't match – fetch fresh
     fetchIssues(1, false).then(() => {
-      initialDataLoaded.current = true; // 👈 mark that we've loaded from network
+      initialDataLoaded.current = true;
     });
   }, []); // runs only once on mount
 
@@ -317,10 +317,9 @@ const Feed = () => {
   }, [fetchIssues]);
 
   // =============================
-  // Filter Changes – fetch fresh data (but skip the initial mount)
+  // Filter Changes – fetch fresh data (skip initial mount)
   // =============================
   useEffect(() => {
-    // Skip the very first run (when component mounts) because data is already loaded
     if (!initialDataLoaded.current) return;
 
     if (filterTimeout.current) clearTimeout(filterTimeout.current);
@@ -497,7 +496,7 @@ const Feed = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row-reverse items-start justify-center gap-8 px-4 lg:pt-8 pt-20">
+      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row-reverse items-start justify-center gap-8 px-0 lg:px-4 pt-20 lg:pt-8">
         {/* Desktop Filter Sidebar */}
         <aside className="hidden lg:block w-[340px] shrink-0 sticky top-8 z-20">
           <div
@@ -528,7 +527,7 @@ const Feed = () => {
 
         {/* Main Feed */}
         <main className="flex-1 max-w-2xl w-full relative">
-          <div className="space-y-6 pb-16">
+          <div className="space-y-0 md:space-y-6 pb-16">
             {/* Loading State (first load) */}
             {loading && displayedIssues.length === 0 ? (
               <div className="space-y-6">
@@ -598,6 +597,7 @@ const Feed = () => {
                       onComment={() =>
                         setCommentModalData({ ...issue, setDisplayedIssues })
                       }
+                      fullWidthMobile={true} // 👈 enable Instagram style on mobile
                     />
                   </motion.div>
                 ))}

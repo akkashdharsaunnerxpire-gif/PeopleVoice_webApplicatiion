@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
-  Calendar,
   Tag,
   Share2,
   Flag,
@@ -23,10 +22,11 @@ import {
   Bookmark,
 } from "lucide-react";
 import { themeColors } from "./constants";
+import { useTheme } from "../../Context/ThemeContext";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
-const Toast = ({ message, type = "success", onClose }) => (
+const Toast = ({ message, type = "success" }) => (
   <motion.div
     initial={{ opacity: 0, y: 50 }}
     animate={{ opacity: 1, y: 0 }}
@@ -48,11 +48,16 @@ const IssueCard = ({
   onLike,
   onComment,
   onShare,
-  isDark,
+  fullWidthMobile = false, // 👈 new prop for Instagram style on mobile
 }) => {
+  const { isDark } = useTheme();
   const theme = isDark ? themeColors.dark : themeColors.light;
+
   const citizenId = localStorage.getItem("citizenId");
-  const username = `${issue.district?.toLowerCase() || "local"}_citizen`;
+
+  const username = issue.district
+    ? `${issue.district.toLowerCase().trim().replace(/\s+/g, "")}_citizen`
+    : "local_citizen";
 
   const [showMenu, setShowMenu] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -69,21 +74,17 @@ const IssueCard = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Refs for touch and double-tap handling
   const lastTapTime = useRef(0);
   const doubleTapTimer = useRef(null);
   const heartAnimationRef = useRef(null);
-  const cardRef = useRef(null);
   const menuRef = useRef(null);
   const savedTimerRef = useRef(null);
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
   const isDoubleTap = useRef(false);
-
-  // Debounce image transitions
   const isTransitioning = useRef(false);
 
-  // Preload all images to avoid loading delays during transitions
+  // Preload images
   useEffect(() => {
     images.forEach((url) => {
       const img = new Image();
@@ -96,9 +97,7 @@ const IssueCard = ({
     if (!citizenId || !issue._id) return;
     const checkSaved = async () => {
       try {
-        const res = await fetch(
-          `${API_BASE}/api/saved/check?citizenId=${citizenId}&issueId=${issue._id}`
-        );
+        const res = await fetch(`${API_BASE}/api/saved/check?citizenId=${citizenId}&issueId=${issue._id}`);
         const data = await res.json();
         if (data.success) setIsSaved(data.isSaved);
       } catch (error) {
@@ -108,7 +107,7 @@ const IssueCard = ({
     checkSaved();
   }, [citizenId, issue._id]);
 
-  // Cleanup timers
+  // Cleanup
   useEffect(() => {
     return () => {
       if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
@@ -122,12 +121,11 @@ const IssueCard = ({
     setShowMenu((prev) => !prev);
   };
 
-  // Share handler – no count increment, just share
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/issue/${issue._id}`;
     const shareData = {
-      title: 'Issue Report',
-      text: issue.description_en || 'Check out this issue',
+      title: "Issue Report",
+      text: issue.description_en || "Check out this issue",
       url: shareUrl,
     };
 
@@ -138,8 +136,8 @@ const IssueCard = ({
         setTimeout(() => setShowSavedToast(false), 2000);
         if (onShare) onShare();
       } catch (err) {
-        if (err.name !== 'AbortError' && err.name !== 'CanceledError') {
-          setErrorMessage('Share failed');
+        if (err.name !== "AbortError" && err.name !== "CanceledError") {
+          setErrorMessage("Share failed");
           setShowErrorToast(true);
           setTimeout(() => setShowErrorToast(false), 2000);
         }
@@ -149,8 +147,8 @@ const IssueCard = ({
         await navigator.clipboard.writeText(shareUrl);
         setShowSavedToast(true);
         setTimeout(() => setShowSavedToast(false), 2000);
-      } catch (clipboardErr) {
-        setErrorMessage('Failed to copy link');
+      } catch {
+        setErrorMessage("Failed to copy link");
         setShowErrorToast(true);
         setTimeout(() => setShowErrorToast(false), 2000);
       }
@@ -164,6 +162,7 @@ const IssueCard = ({
     setIsSaved(!previousSaved);
     setSaveMessage(!previousSaved ? "Saved" : "Removed");
     setShowSavedPopup(true);
+
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     savedTimerRef.current = setTimeout(() => setShowSavedPopup(false), 1500);
 
@@ -174,6 +173,7 @@ const IssueCard = ({
         body: JSON.stringify({ citizenId, issueId: issue._id }),
       });
       const data = await res.json();
+
       if (!data.success) {
         setIsSaved(previousSaved);
         setSaveMessage("Failed");
@@ -194,33 +194,14 @@ const IssueCard = ({
   };
 
   const menuItems = [
-    {
-      icon: Flag,
-      label: "Report",
-      action: () => {
+    { icon: Flag, label: "Report", action: () => { setShowMenu(false); alert("Thank you for reporting. We'll review this content."); } },
+    { icon: Share2, label: "Share to...", action: () => { setShowMenu(false); handleShare(); } },
+    { icon: LinkIcon, label: "Copy link", action: () => {
         setShowMenu(false);
-        alert("Thank you for reporting. We'll review this content.");
-      },
-    },
-    {
-      icon: Share2,
-      label: "Share to...",
-      action: () => {
-        setShowMenu(false);
-        handleShare();
-      },
-    },
-    {
-      icon: LinkIcon,
-      label: "Copy link",
-      action: () => {
-        setShowMenu(false);
-        navigator.clipboard.writeText(
-          `${window.location.origin}/issue/${issue._id}`
-        );
+        navigator.clipboard.writeText(`${window.location.origin}/issue/${issue._id}`);
         setShowSavedToast(true);
         setTimeout(() => setShowSavedToast(false), 2000);
-      },
+      }
     },
   ];
 
@@ -237,40 +218,26 @@ const IssueCard = ({
     `;
     document.body.appendChild(heart);
     heartAnimationRef.current = heart;
-    setTimeout(() => {
-      heart.remove();
-      heartAnimationRef.current = null;
-    }, 1000);
+    setTimeout(() => { heart.remove(); heartAnimationRef.current = null; }, 1000);
   }, []);
 
-  const handleTap = useCallback(
-    (e) => {
-      e.preventDefault();
-      const now = Date.now();
-      const timeDiff = now - lastTapTime.current;
-      const clientX = e.clientX || (e.touches && e.touches[0]?.clientX);
-      const clientY = e.clientY || (e.touches && e.touches[0]?.clientY);
+  const handleTap = useCallback((e) => {
+    e.preventDefault();
+    const now = Date.now();
+    const timeDiff = now - lastTapTime.current;
+    const clientX = e.clientX || (e.touches && e.touches[0]?.clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0]?.clientY);
 
-      if (timeDiff < 300 && timeDiff > 0) {
-        // Double tap detected
-        isDoubleTap.current = true;
-        showHeartAnimation(clientX, clientY);
-        if (!liked) {
-          onLike?.();
-        }
-        if (doubleTapTimer.current) {
-          clearTimeout(doubleTapTimer.current);
-          doubleTapTimer.current = null;
-        }
-      } else {
-        doubleTapTimer.current = setTimeout(() => {
-          isDoubleTap.current = false;
-        }, 300);
-      }
-      lastTapTime.current = now;
-    },
-    [liked, onLike, showHeartAnimation]
-  );
+    if (timeDiff < 300 && timeDiff > 0) {
+      isDoubleTap.current = true;
+      showHeartAnimation(clientX, clientY);
+      if (!liked) onLike?.();
+      if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
+    } else {
+      doubleTapTimer.current = setTimeout(() => { isDoubleTap.current = false; }, 300);
+    }
+    lastTapTime.current = now;
+  }, [liked, onLike, showHeartAnimation]);
 
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX;
@@ -291,38 +258,28 @@ const IssueCard = ({
 
     const diff = touchStartX.current - touchEndX.current;
     if (Math.abs(diff) > 60) {
-      if (diff > 0 && currentImageIndex < totalImages - 1) {
-        changeImage(currentImageIndex + 1);
-      } else if (diff < 0 && currentImageIndex > 0) {
-        changeImage(currentImageIndex - 1);
-      }
+      if (diff > 0 && currentImageIndex < totalImages - 1) changeImage(currentImageIndex + 1);
+      else if (diff < 0 && currentImageIndex > 0) changeImage(currentImageIndex - 1);
     }
     touchStartX.current = 0;
     touchEndX.current = 0;
   };
 
-  // Debounced image change
   const changeImage = (newIndex) => {
     if (isTransitioning.current) return;
     isTransitioning.current = true;
     setCurrentImageIndex(newIndex);
-    setTimeout(() => {
-      isTransitioning.current = false;
-    }, 200); // slightly longer than animation duration
+    setTimeout(() => { isTransitioning.current = false; }, 200);
   };
 
   const nextImage = (e) => {
     e.stopPropagation();
-    if (currentImageIndex < totalImages - 1 && !isTransitioning.current) {
-      changeImage(currentImageIndex + 1);
-    }
+    if (currentImageIndex < totalImages - 1 && !isTransitioning.current) changeImage(currentImageIndex + 1);
   };
 
   const prevImage = (e) => {
     e.stopPropagation();
-    if (currentImageIndex > 0 && !isTransitioning.current) {
-      changeImage(currentImageIndex - 1);
-    }
+    if (currentImageIndex > 0 && !isTransitioning.current) changeImage(currentImageIndex - 1);
   };
 
   const formatDate = (dateString) => {
@@ -330,14 +287,11 @@ const IssueCard = ({
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays}d ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-    return date.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   };
 
   const formatDistrictOnly = (location) => {
@@ -352,98 +306,60 @@ const IssueCard = ({
     if (issue.district) parts.push(issue.district);
     if (issue.state) parts.push(issue.state);
     if (issue.pincode) parts.push(issue.pincode);
-    if (parts.length === 0) return "Location not specified";
-    return parts.join(", ");
+    return parts.length === 0 ? "Location not specified" : parts.join(", ");
   };
 
-  const needsTruncation = (text, isTamil = false) => {
-    if (!text) return false;
-    const threshold = isTamil ? 50 : 60;
-    return text.length > threshold;
-  };
+  const needsTruncation = (text, isTamil = false) => !text ? false : text.length > (isTamil ? 50 : 60);
 
   const truncatedText = (text, isTamil = false) => {
     if (!text) return "";
     if (isExpanded) return text;
-    const maxLength = isTamil ? 50 : 60;
-    if (text.length > maxLength) return text.substring(0, maxLength) + "...";
-    return text;
+    const max = isTamil ? 50 : 60;
+    return text.length > max ? text.substring(0, max) + "..." : text;
   };
 
   const getStatusConfig = (status) => {
+    const normalized = (status || "").toLowerCase();
     if (isDark) {
-      switch (status) {
-        case "Resolved":
-        case "solved":
-          return {
-            bg: "bg-green-900/40",
-            text: "text-green-300",
-            border: "border-green-800",
-            icon: CheckCircle,
-            label: status === "solved" ? "Solved" : "Resolved",
-          };
-        case "In Progress":
-          return {
-            bg: "bg-yellow-900/40",
-            text: "text-yellow-300",
-            border: "border-yellow-800",
-            icon: Clock,
-            label: "In Progress",
-          };
-        default:
-          return {
-            bg: "bg-red-900/40",
-            text: "text-red-300",
-            border: "border-red-800",
-            icon: AlertCircle,
-            label: "Pending",
-          };
-      }
+      if (normalized === "resolved" || normalized === "solved")
+        return { bg: "bg-green-900/40", text: "text-green-300", border: "border-green-800", icon: CheckCircle, label: "Solved" };
+      if (normalized === "in progress")
+        return { bg: "bg-yellow-900/40", text: "text-yellow-300", border: "border-yellow-800", icon: Clock, label: "In Progress" };
+      return { bg: "bg-red-900/40", text: "text-red-300", border: "border-red-800", icon: AlertCircle, label: "Pending" };
     } else {
-      switch (status) {
-        case "Resolved":
-        case "solved":
-          return {
-            bg: "bg-green-100",
-            text: "text-green-700",
-            border: "border-green-300",
-            icon: CheckCircle,
-            label: status === "solved" ? "Solved" : "Resolved",
-          };
-        case "In Progress":
-          return {
-            bg: "bg-yellow-100",
-            text: "text-yellow-700",
-            border: "border-yellow-300",
-            icon: Clock,
-            label: "In Progress",
-          };
-        default:
-          return {
-            bg: "bg-red-100",
-            text: "text-red-700",
-            border: "border-red-300",
-            icon: AlertCircle,
-            label: "Pending",
-          };
-      }
+      if (normalized === "resolved" || normalized === "solved")
+        return { bg: "bg-green-100", text: "text-green-700", border: "border-green-300", icon: CheckCircle, label: "Solved" };
+      if (normalized === "in progress")
+        return { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-300", icon: Clock, label: "In Progress" };
+      return { bg: "bg-red-100", text: "text-red-700", border: "border-red-300", icon: AlertCircle, label: "Pending" };
     }
   };
 
   const statusConfig = getStatusConfig(issue.status);
   const StatusIcon = statusConfig.icon;
 
+  // Dynamic classes for Instagram-style on mobile
+  const cardClasses = `
+    overflow-hidden transition-all duration-300 
+    ${theme.cardBg} ${theme.cardBorder}
+    ${
+      fullWidthMobile
+        ? `rounded-none sm:rounded-2xl border-0 sm:border border-b sm:border-b-0 shadow-none sm:shadow-lg hover:shadow-none sm:hover:shadow-xl`
+        : `rounded-2xl border shadow-lg hover:shadow-xl`
+    }
+  `;
+
   return (
     <>
       <motion.article
-        ref={cardRef}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         whileHover={{ y: -2 }}
         transition={{ type: "spring", stiffness: 300 }}
-        className={`rounded-2xl shadow-lg border mb-3 overflow-hidden hover:shadow-xl transition-all duration-300 ${isDark ? theme.cardBg : "bg-white"} ${isDark ? "border-gray-800" : "border-gray-200"}`}
+        className={cardClasses}
       >
+        {/* Header */}
         <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3">
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             <motion.div
@@ -455,11 +371,7 @@ const IssueCard = ({
             <div className="min-w-0 flex-1">
               <p className={`font-semibold text-xs sm:text-sm flex items-center gap-1 truncate ${theme.text}`}>
                 <span className="truncate">{username}</span>
-                {issue.official && (
-                  <span className="text-[9px] sm:text-[10px] bg-blue-100 text-blue-600 px-1 py-0.5 rounded-full flex-shrink-0">
-                    Off
-                  </span>
-                )}
+                {issue.official && <span className="text-[9px] sm:text-[10px] bg-blue-100 text-blue-600 px-1 py-0.5 rounded-full">Off</span>}
               </p>
               <p className={`text-[10px] sm:text-xs flex items-center gap-0.5 ${theme.textMuted}`}>
                 <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />
@@ -471,9 +383,7 @@ const IssueCard = ({
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <motion.div
               whileHover={{ scale: 1.03 }}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 
-                rounded-full text-[10px] sm:text-xs border shadow-sm
-                ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs border shadow-sm ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
             >
               <StatusIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <span>{statusConfig.label}</span>
@@ -484,25 +394,25 @@ const IssueCard = ({
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={handleMenuToggle}
-                className={`p-1 sm:p-1.5 rounded-full transition-colors ${isDark ? theme.hover : "hover:bg-gray-100"}`}
-                aria-label="More options"
+                className={`p-1 sm:p-1.5 rounded-full transition-colors ${theme.hover}`}
               >
                 <MoreHorizontal size={16} className={`sm:w-5 sm:h-5 ${theme.textMuted}`} />
               </motion.button>
+
               <AnimatePresence>
                 {showMenu && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: -10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                    className={`absolute right-0 mt-1 w-40 sm:w-44 border rounded-xl shadow-2xl py-1 z-50 ${isDark ? theme.cardBg : "bg-white"} ${isDark ? "border-gray-800" : "border-gray-200"}`}
+                    className={`absolute right-0 mt-1 w-40 sm:w-44 border rounded-xl shadow-2xl py-1 z-50 ${theme.cardBg} ${isDark ? "border-zinc-800" : "border-gray-200"}`}
                   >
                     {menuItems.map((item, i) => (
                       <motion.button
                         key={i}
                         whileHover={{ x: 3 }}
                         onClick={item.action}
-                        className={`w-full flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm ${isDark ? "hover:bg-gray-800 text-gray-300" : "hover:bg-gray-50 text-gray-700"}`}
+                        className={`w-full flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm ${isDark ? "hover:bg-zinc-800 text-gray-300" : "hover:bg-gray-50 text-gray-700"}`}
                       >
                         <item.icon className="w-3 h-3 sm:w-4 sm:h-4" />
                         {item.label}
@@ -515,9 +425,9 @@ const IssueCard = ({
           </div>
         </div>
 
-        {/* Image section with fixed height on large screens to prevent layout shift */}
+        {/* Image Section */}
         <div
-          className={`relative select-none ${isDark ? "bg-gray-900" : "bg-gray-100"}`}
+          className={`relative select-none ${isDark ? "bg-zinc-950" : "bg-gray-100"}`}
           style={{ touchAction: "pan-y" }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -534,146 +444,69 @@ const IssueCard = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15, ease: "easeInOut" }}
+                    transition={{ duration: 0.15 }}
                     src={images[currentImageIndex]}
                     alt={`Issue ${currentImageIndex + 1}`}
                     className="w-full h-full object-cover lg:object-contain"
                     draggable={false}
-                    onContextMenu={(e) => e.preventDefault()}
                     loading="lazy"
                   />
                 </AnimatePresence>
               </div>
 
-              <AnimatePresence>
-                {totalImages > 1 && currentImageIndex > 0 && (
-                  <motion.button
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    whileHover={{ scale: 1.1 }}
-                    onClick={prevImage}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-1 sm:p-2 rounded-full backdrop-blur-sm"
-                  >
-                    <ChevronLeft size={18} className="sm:w-5 sm:h-5" />
-                  </motion.button>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence>
-                {totalImages > 1 && currentImageIndex < totalImages - 1 && (
-                  <motion.button
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    whileHover={{ scale: 1.1 }}
-                    onClick={nextImage}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-1 sm:p-2 rounded-full backdrop-blur-sm"
-                  >
-                    <ChevronRight size={18} className="sm:w-5 sm:h-5" />
-                  </motion.button>
-                )}
-              </AnimatePresence>
+              {totalImages > 1 && (
+                <>
+                  {currentImageIndex > 0 && (
+                    <motion.button onClick={prevImage} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full backdrop-blur-sm">
+                      <ChevronLeft size={20} />
+                    </motion.button>
+                  )}
+                  {currentImageIndex < totalImages - 1 && (
+                    <motion.button onClick={nextImage} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full backdrop-blur-sm">
+                      <ChevronRight size={20} />
+                    </motion.button>
+                  )}
+                </>
+              )}
 
               {totalImages > 1 && (
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 sm:gap-1.5">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                   {images.map((_, i) => (
                     <motion.button
                       key={i}
-                      whileHover={{ scale: 1.2 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isTransitioning.current) changeImage(i);
-                      }}
-                      className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all ${
-                        i === currentImageIndex
-                          ? "bg-green-600 w-3 sm:w-3"
-                          : isDark
-                            ? "bg-gray-600 hover:bg-gray-500"
-                            : "bg-gray-400/70 hover:bg-gray-600"
-                      }`}
+                      whileHover={{ scale: 1.3 }}
+                      onClick={(e) => { e.stopPropagation(); if (!isTransitioning.current) changeImage(i); }}
+                      className={`w-2 h-2 rounded-full transition-all ${i === currentImageIndex ? "bg-green-500 scale-125" : isDark ? "bg-zinc-600" : "bg-gray-400"}`}
                     />
                   ))}
                 </div>
               )}
-
-              {totalImages > 1 && (
-                <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full backdrop-blur-sm">
-                  {currentImageIndex + 1}/{totalImages}
-                </div>
-              )}
             </>
           ) : (
-            <div className={`aspect-square flex flex-col items-center justify-center gap-1 sm:gap-2 ${isDark ? "bg-gray-900 text-gray-600" : "bg-gray-50 text-gray-400"}`}>
-              <ImageIcon className={`w-8 h-8 sm:w-12 sm:h-12 ${isDark ? "text-gray-700" : "text-gray-300"}`} />
-              <p className={`text-xs sm:text-sm ${isDark ? "text-gray-500" : "text-gray-500"}`}>No image</p>
+            <div className={`aspect-square flex flex-col items-center justify-center gap-2 ${isDark ? "bg-zinc-950 text-gray-600" : "bg-gray-50 text-gray-400"}`}>
+              <ImageIcon className={`w-12 h-12 ${isDark ? "text-gray-700" : "text-gray-300"}`} />
+              <p className="text-sm">No image</p>
             </div>
           )}
         </div>
 
-        {/* ACTION BAR WITHOUT SHARE COUNT */}
+        {/* Action Bar & Content */}
         <div className="flex justify-between items-center px-3 sm:px-4 py-1.5 sm:py-2 relative">
           <div className="flex gap-4 sm:gap-6">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onLike?.();
-              }}
-              className="group flex items-center gap-1"
-              aria-label={liked ? "Unlike" : "Like"}
-            >
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); onLike?.(); }} className="group flex items-center gap-1">
               <motion.div animate={liked ? { scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.3 }}>
-                <Heart
-                  size={24}
-                  className={`sm:w-7 sm:h-7 transition-all duration-300 ${
-                    liked ? "text-red-500 fill-red-500" : isDark ? "text-gray-300" : theme.textMuted
-                  }`}
-                />
+                <Heart size={24} className={`sm:w-7 sm:h-7 transition-all ${liked ? "text-red-500 fill-red-500" : isDark ? "text-gray-300" : theme.textMuted}`} />
               </motion.div>
-              <span className={`text-xs sm:text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                {likeCount}
-              </span>
+              <span className={`text-xs sm:text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>{likeCount}</span>
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onComment?.();
-              }}
-              className="group flex items-center gap-1"
-              aria-label="Comment"
-            >
-              <MessageCircle
-                size={24}
-                className={`sm:w-7 sm:h-7 transition-colors ${
-                  isDark ? "text-gray-200 group-hover:text-green-400" : "text-gray-600 group-hover:text-green-600"
-                }`}
-              />
-              <span className={`text-xs sm:text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                {commentCount}
-              </span>
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); onComment?.(); }} className="group flex items-center gap-1">
+              <MessageCircle size={24} className={`sm:w-7 sm:h-7 ${isDark ? "text-gray-200 group-hover:text-green-400" : "text-gray-600 group-hover:text-green-600"}`} />
+              <span className={`text-xs sm:text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>{commentCount}</span>
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleShare();
-              }}
-              className="group"
-              aria-label="Share"
-            >
-              <Send
-                size={24}
-                className={`sm:w-7 sm:h-7 transition-colors ${
-                  isDark ? "text-gray-200 group-hover:text-blue-400" : "text-gray-600 group-hover:text-blue-500"
-                }`}
-              />
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); handleShare(); }} className="group">
+              <Send size={24} className={`sm:w-7 sm:h-7 ${isDark ? "text-gray-200 group-hover:text-blue-400" : "text-gray-600 group-hover:text-blue-500"}`} />
             </motion.button>
           </div>
 
@@ -685,12 +518,7 @@ const IssueCard = ({
               disabled={!citizenId || saving}
               className={`focus:outline-none ${!citizenId || saving ? "opacity-50 cursor-not-allowed" : ""}`}
             >
-              <Bookmark
-                size={24}
-                className={`sm:w-7 sm:h-7 transition-all duration-300 ${
-                  isSaved ? "fill-green-500 text-green-500" : isDark ? "text-gray-300" : theme.textMuted
-                }`}
-              />
+              <Bookmark size={24} className={`sm:w-7 sm:h-7 transition-all duration-300 ${isSaved ? "fill-green-500 text-green-500" : isDark ? "text-gray-300" : theme.textMuted}`} />
             </motion.button>
 
             <AnimatePresence>
@@ -699,10 +527,7 @@ const IssueCard = ({
                   initial={{ opacity: 0, y: 10, scale: 0.8 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  className={`absolute -bottom-8 right-0 text-white text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 whitespace-nowrap ${
-                    saveMessage === "Saved" ? "bg-green-500" : saveMessage === "Removed" ? "bg-orange-500" : "bg-red-500"
-                  }`}
+                  className={`absolute -bottom-8 right-0 text-white text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 ${saveMessage === "Saved" ? "bg-green-500" : saveMessage === "Removed" ? "bg-orange-500" : "bg-red-500"}`}
                 >
                   {saveMessage === "Saved" ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
                   <span>{saveMessage}</span>
@@ -712,105 +537,67 @@ const IssueCard = ({
           </div>
         </div>
 
-        <div className="px-3 sm:px-4 pb-3 sm:pb-4">
-          <div className="mt-1 sm:mt-2 space-y-1 sm:space-y-1.5">
+        {/* Description & Footer */}
+        <div className="px-3 sm:px-4 pb-4">
+          <div className="mt-2 space-y-1.5">
             {issue.description_en && (
-              <p className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-800"}`}>
+              <p className={`text-sm ${isDark ? "text-gray-300" : "text-gray-800"}`}>
                 <span className={`font-semibold ${theme.text}`}>{username}</span>{" "}
-                {truncatedText(issue.description_en, false)}
+                {truncatedText(issue.description_en)}
               </p>
             )}
 
             {issue.description_ta && (
-              <div className="mt-1.5 sm:mt-2">
-                <p className={`text-xs sm:text-sm font-tamil leading-relaxed ${isDark ? "text-gray-400" : "text-gray-700"}`}>
-                  <span className="font-semibold text-green-600 dark:text-green-400">தமிழ்:</span>{" "}
+              <div>
+                <p className={`text-sm font-tamil leading-relaxed ${isDark ? "text-gray-400" : "text-gray-700"}`}>
+                  <span className="font-semibold text-green-600">தமிழ்:</span>{" "}
                   {isExpanded ? issue.description_ta : truncatedText(issue.description_ta, true)}
                 </p>
                 {needsTruncation(issue.description_ta, true) && !isExpanded && (
-                  <button
-                    onClick={() => setIsExpanded(true)}
-                    className={`text-[10px] sm:text-xs font-medium hover:underline mt-0.5 flex items-center gap-0.5 ${
-                      isDark ? "text-green-400" : "text-green-600"
-                    }`}
-                  >
-                    <ChevronDown size={12} className="sm:w-4 sm:h-4" />
-                    Read more...
+                  <button onClick={() => setIsExpanded(true)} className={`text-xs text-green-600 dark:text-green-400 flex items-center gap-1 mt-1`}>
+                    <ChevronDown size={14} /> Read more...
                   </button>
                 )}
               </div>
             )}
 
-            {(needsTruncation(issue.description_en) || needsTruncation(issue.description_ta, true)) && isExpanded && (
-              <button
-                onClick={() => setIsExpanded(false)}
-                className={`text-[10px] sm:text-xs font-medium hover:underline mt-1 flex items-center gap-0.5 ${
-                  isDark ? "text-green-400" : "text-green-600"
-                }`}
-              >
-                <ChevronUp size={12} className="sm:w-4 sm:h-4" />
-                show less
+            {isExpanded && (needsTruncation(issue.description_en) || needsTruncation(issue.description_ta, true)) && (
+              <button onClick={() => setIsExpanded(false)} className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <ChevronUp size={14} /> Show less
               </button>
             )}
           </div>
 
-          <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <span
-              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-[10px] sm:text-xs ${
-                isDark ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-700"
-              }`}
-            >
-              <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs ${isDark ? "bg-zinc-800 text-gray-300" : "bg-gray-100 text-gray-700"}`}>
+              <Tag size={14} />
               {issue.department || "Unknown"}
             </span>
           </div>
 
           {issue.hashtags?.length > 0 && (
-            <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-1.5 sm:mt-2">
+            <div className="flex flex-wrap gap-1 mt-2">
               {issue.hashtags.map((tag, i) => (
-                <span
-                  key={i}
-                  className={`text-[10px] sm:text-xs hover:underline cursor-pointer ${
-                    isDark ? "text-blue-400" : "text-blue-600"
-                  }`}
-                >
-                  #{tag}
-                </span>
+                <span key={i} className={`text-xs ${isDark ? "text-blue-400" : "text-blue-600"}`}>#{tag}</span>
               ))}
             </div>
           )}
 
-          <div className={`mt-2 sm:mt-3 pt-2 sm:pt-3 border-t ${isDark ? "border-gray-800" : "border-gray-100"}`}>
-            <div className="flex items-start gap-1.5 sm:gap-2">
-              <Home
-                className={`w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${
-                  isDark ? "text-gray-500" : "text-gray-400"
-                }`}
-              />
-              <p className={`text-[10px] sm:text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                {formatFullAddress()}
-              </p>
+          <div className={`mt-4 pt-3 border-t ${isDark ? "border-zinc-800" : "border-gray-100"}`}>
+            <div className="flex gap-2 text-xs">
+              <Home className={`mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`} size={16} />
+              <p className={isDark ? "text-gray-400" : "text-gray-600"}>{formatFullAddress()}</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-2 sm:mt-3">
+          <div className="flex justify-between items-center mt-3 text-xs">
             {commentCount > 0 && (
-              <motion.button
-                whileHover={{ x: 2 }}
-                onClick={onComment}
-                className={`text-[10px] sm:text-xs transition-colors ${
-                  isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {commentCount} {commentCount === 1 ? "comment" : "comments"} பார்க்க
+              <motion.button onClick={onComment} className={`transition-colors ${isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+                {commentCount} comments பார்க்க
               </motion.button>
             )}
-            <p
-              className={`text-[8px] sm:text-[10px] flex items-center gap-0.5 sm:gap-1 ${
-                isDark ? "text-gray-600" : "text-gray-400"
-              } ${commentCount > 0 ? "" : "ml-auto"}`}
-            >
-              <Clock className="w-2 h-2 sm:w-3 sm:h-3" />
+            <p className={`flex items-center gap-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+              <Clock size={14} />
               {formatDate(issue.createdAt)}
             </p>
           </div>
@@ -818,12 +605,8 @@ const IssueCard = ({
       </motion.article>
 
       <AnimatePresence>
-        {showSavedToast && (
-          <Toast message="Link copied!" type="success" onClose={() => setShowSavedToast(false)} />
-        )}
-        {showErrorToast && (
-          <Toast message={errorMessage} type="error" onClose={() => setShowErrorToast(false)} />
-        )}
+        {showSavedToast && <Toast message="Link copied!" type="success" />}
+        {showErrorToast && <Toast message={errorMessage} type="error" />}
       </AnimatePresence>
 
       <style jsx global>{`
@@ -835,27 +618,13 @@ const IssueCard = ({
           animation: heartPop 1s ease-out forwards;
         }
         @keyframes heartPop {
-          0% {
-            transform: translate(-50%, -50%) scale(0.3);
-            opacity: 0;
-          }
-          20% {
-            transform: translate(-50%, -50%) scale(1.2);
-            opacity: 1;
-          }
-          80% {
-            transform: translate(-50%, -150px) scale(0.8);
-            opacity: 0.5;
-          }
-          100% {
-            transform: translate(-50%, -200px) scale(0.5);
-            opacity: 0;
-          }
+          0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+          20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+          80% { transform: translate(-50%, -150px) scale(0.8); opacity: 0.5; }
+          100% { transform: translate(-50%, -200px) scale(0.5); opacity: 0; }
         }
         .font-tamil {
-          font-family:
-            "Noto Sans Tamil", "Latha", "Tamil MN", "Bamini", "Mukta Malar",
-            sans-serif;
+          font-family: "Noto Sans Tamil", "Latha", "Tamil MN", "Bamini", "Mukta Malar", sans-serif;
           line-height: 1.6;
         }
       `}</style>

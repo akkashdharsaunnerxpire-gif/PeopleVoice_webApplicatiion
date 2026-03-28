@@ -60,7 +60,7 @@ const Profile = () => {
 
   return (
     <div className={`min-h-screen pb-24 pt-6 px-4 transition-colors
-      ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
+      ${isDark ? "bg-black/95" : "bg-gray-50"}`}>
       
       <div className="max-w-2xl mx-auto">
         <div

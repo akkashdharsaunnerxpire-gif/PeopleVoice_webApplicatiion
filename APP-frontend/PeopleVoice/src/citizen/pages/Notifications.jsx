@@ -73,10 +73,10 @@ const Notifications = () => {
     n.issueId?.images_data?.[0] || n.image || "https://via.placeholder.com/150x150";
 
   return (
-    <div className={`min-h-screen pb-20 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
+    <div className={`min-h-screen pb-20 ${isDark ? "bg-black/95" : "bg-gray-50"}`}>
       {/* Header */}
       <div className={`sticky top-0 z-10 backdrop-blur-md border-b px-4 py-3 
-        ${isDark ? "bg-gray-950 border-gray-800" : "bg-white border-gray-200"}`}>
+        ${isDark ? "bg-black/95 border-gray-800" : "bg-white border-gray-200"}`}>
         <div className="flex items-center gap-3 max-w-3xl mx-auto">
           <div className={`p-1.5 rounded-full ${isDark ? "bg-emerald-950" : "bg-emerald-100"}`}>
             <Bell size={18} className="text-emerald-600" />

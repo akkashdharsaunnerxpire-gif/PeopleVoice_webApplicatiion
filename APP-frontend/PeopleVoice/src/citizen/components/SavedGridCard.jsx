@@ -1,6 +1,8 @@
+// src/components/SavedGridCard.jsx
+
 import { Heart, MessageCircle } from "lucide-react";
 
-const SavedGridCard = ({ post, viewMode, onClick, isDark }) => {
+const SavedGridCard = ({ post, onClick, isDark }) => {
   if (!post) return null;
 
   const image = post.images_data?.[0];
@@ -10,32 +12,44 @@ const SavedGridCard = ({ post, viewMode, onClick, isDark }) => {
   return (
     <div
       onClick={onClick}
-      className={`relative aspect-square cursor-pointer group overflow-hidden bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md transition-all duration-300 ${
-        viewMode === "list" ? "rounded-xl" : ""
-      }`}
+      className={`relative aspect-square cursor-pointer group overflow-hidden 
+        bg-gray-100 dark:bg-zinc-800 rounded-2xl shadow-sm 
+        transition-all duration-300 hover:shadow-xl`}
     >
       {image ? (
         <img
           src={image}
-          alt="saved"
+          alt="saved issue"
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
+        <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-gray-400 text-sm">
           No Image
         </div>
       )}
 
-      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-6 text-white transition-opacity duration-200">
-        <div className="flex items-center gap-1 font-semibold text-sm">
-          <Heart className="fill-white" size={16} />
-          {likeCount}
-        </div>
-        <div className="flex items-center gap-1 font-semibold text-sm">
-          <MessageCircle size={16} />
-          {commentCount}
+      {/* Overlay with stats */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent 
+                      opacity-0 group-hover:opacity-100 transition-opacity duration-300 
+                      flex items-end justify-between p-4">
+        <div className="flex items-center gap-5 text-white">
+          <div className="flex items-center gap-1.5">
+            <Heart className="w-4 h-4 fill-white" />
+            <span className="text-sm font-medium">{likeCount}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <MessageCircle className="w-4 h-4" />
+            <span className="text-sm font-medium">{commentCount}</span>
+          </div>
         </div>
       </div>
+
+      {/* Department badge at top */}
+      {post.department && (
+        <div className="absolute top-3 left-3 bg-black/60 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm">
+          {post.department}
+        </div>
+      )}
     </div>
   );
 };
