@@ -3,112 +3,85 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Bell, CheckCircle2, Info, AlertCircle } from "lucide-react";
 import { useTheme } from "../../Context/ThemeContext";
-import { themeColors } from "../components/constants";
 import { motion } from "framer-motion";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 const Notifications = () => {
   const { isDark } = useTheme();
-  const theme = isDark ? themeColors.dark : themeColors.light;
+  const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
- const citizenId = localStorage.getItem("citizenId");
+  const citizenId = localStorage.getItem("citizenId");
 
-useEffect(() => {
-  let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
-  async function load() {
+    const loadNotifications = async () => {
+      if (!citizenId) return;
+
+      try {
+        const res = await axios.get(
+          `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`
+        );
+        if (mounted) {
+          setNotifications(res.data || []);
+        }
+      } catch (err) {
+        console.error("Fetch notifications error:", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    loadNotifications();
+
+    const interval = setInterval(loadNotifications, 15000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [citizenId]);
+
+  const markAsRead = async (id) => {
+    if (!id) return;
     try {
-      const res = await axios.get(
-        `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`
+      await axios.put(`${BACKEND_URL}/api/notifications/read/${id}`);
+      
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, read: true } : n))
       );
 
-     if (mounted) {
-        setNotifications(res.data || []);
-}
+      window.dispatchEvent(new CustomEvent("notification_update"));
     } catch (err) {
-      console.error("Fetch error:", err);
-    } finally {
-      if (mounted) {
-        setLoading(false);
-      }
+      console.error("Mark as read error:", err);
     }
-  }
-
-  if (!citizenId) return;
-
-  load();
-
-  const interval = setInterval(load, 15000);
-
-  return () => {
-    mounted = false;
-    clearInterval(interval);
   };
-}, [citizenId]);
 
-const markAsRead = async (id) => {
-  if (!id) return;
+  const handleNotificationClick = async (id, notification) => {
+    if (!id) return;
+    if (!notification.read) {
+      await markAsRead(id);
+    }
+    navigate("/peopleVoice/my-issues");
+  };
 
-  try {
-    await axios.put(`${BACKEND_URL}/api/notifications/read/${id}`);
-
-   setNotifications((prev) =>
-  prev.map((n) => (n._id === id ? { ...n, read: true } : n))
-);
-
-    window.dispatchEvent(new CustomEvent("notification_update"));
-  } catch (err) {
-    console.error("Mark read error:", err);
-  }
-};
-
-
-
-
-const handleNotificationClick = async (id, notification) => {
-  if (!id) {
-    console.error("Notification ID missing");
-    return;
-  }
-
-  if (!notification.read) {
-    await markAsRead(id);
-  }
-
-  navigate("/peopleVoice/my-issues");
-};
-
-  // Helper: safe image source
   const getImage = (n) =>
-    n.issueId?.images_data?.[0] || n.image || "https://via.placeholder.com/150";
-
-  const getAccent = (type, unread) => {
-    if (!unread) return "text-gray-400";
-    if (type === "success") return "text-green-500";
-    if (type === "info") return "text-blue-500";
-    if (type === "warning") return "text-yellow-500";
-    return "text-gray-500";
-  };
+    n.issueId?.images_data?.[0] || n.image || "https://via.placeholder.com/150x150";
 
   return (
-    <div className={`min-h-screen pb-20 ${theme.bg}`}>
+    <div className={`min-h-screen pb-20 ${isDark ? "bg-gray-950" : "bg-gray-50"}`}>
       {/* Header */}
-      <div
-        className={`sticky top-0 z-10 backdrop-blur-md border-b px-4 py-3 ${theme.bg} ${theme.border}`}
-      >
+      <div className={`sticky top-0 z-10 backdrop-blur-md border-b px-4 py-3 
+        ${isDark ? "bg-gray-950 border-gray-800" : "bg-white border-gray-200"}`}>
         <div className="flex items-center gap-3 max-w-3xl mx-auto">
-          <div className="p-2 bg-emerald-100 dark:bg-emerald-950/60 rounded-full">
-            <Bell
-              size={20}
-              className="text-emerald-600 dark:text-emerald-400"
-            />
+          <div className={`p-1.5 rounded-full ${isDark ? "bg-emerald-950" : "bg-emerald-100"}`}>
+            <Bell size={18} className="text-emerald-600" />
           </div>
-          <h1 className={`text-xl font-semibold ${theme.text}`}>
+          <h1 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
             Notifications
           </h1>
         </div>
@@ -116,115 +89,109 @@ const handleNotificationClick = async (id, notification) => {
 
       <div className="max-w-3xl mx-auto px-3 pt-2">
         {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin h-7 w-7 border-3 border-emerald-500 border-t-transparent rounded-full" />
+          <div className="flex justify-center py-16">
+            <div className="animate-spin h-5 w-5 border-4 border-emerald-500 border-t-transparent rounded-full" />
           </div>
         ) : notifications.length === 0 ? (
-          <div
-            className={`mt-16 text-center ${
-              isDark ? "text-gray-400" : "text-gray-500"
-            }`}
-          >
-            <Bell size={40} className="mx-auto mb-4 opacity-40" />
-            <p className="text-lg font-medium">No notifications yet</p>
+          <div className={`mt-16 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <Bell size={36} className="mx-auto mb-3 opacity-40" />
+            <p className="text-base font-medium">No notifications yet</p>
           </div>
         ) : (
-          <div className="space-y-2.5 mt-2">
+          <div className="space-y-2 mt-1">
             {notifications.map((n) => {
               const unread = !n.read;
-              const accent = getAccent(n.type, unread);
               const image = getImage(n);
 
               return (
                 <motion.div
-                 key={n._id}
-                  whileHover={{ y: -2 }}
+                  key={n._id}
+                  whileTap={{ scale: 0.985 }}
                   onClick={() => handleNotificationClick(n._id, n)}
                   className={`
-                    cursor-pointer flex gap-3 p-3 rounded-xl border
-                    transition-all duration-200 active:scale-[0.98]
-                    ${
-                      unread
-                        ? `${theme.card} border-emerald-400/40 shadow-md`
-                        : `${theme.card} opacity-80`
+                    cursor-pointer flex gap-3 p-3 rounded-xl border transition-all active:scale-[0.97]
+                    ${isDark 
+                      ? "bg-gray-900 border-gray-800 hover:border-emerald-500/30" 
+                      : "bg-white border-gray-200 hover:border-emerald-500/30 shadow-sm"
                     }
-                    ${theme.border}
+                    ${unread ? "ring-1 ring-emerald-500/20" : ""}
                   `}
                 >
-                  {/* Icon */}
+                  {/* Status Icon */}
                   <div className="flex-shrink-0 pt-0.5">
-                    <div
-                      className={`p-2 rounded-full ${
-                        unread
-                          ? "bg-emerald-100 dark:bg-emerald-950/50"
-                          : "bg-gray-100 dark:bg-gray-800/60"
-                      }`}
-                    >
-                      {n.type === "success" ? (
-                        <CheckCircle2 size={18} className={accent} />
-                      ) : n.type === "info" ? (
-                        <Info size={18} className={accent} />
+                    <div className={`p-2 rounded-full ${unread 
+                      ? (isDark ? "bg-emerald-900/70" : "bg-emerald-100") 
+                      : (isDark ? "bg-gray-800" : "bg-gray-100")
+                    }`}>
+                      {n.status?.toLowerCase().includes("solved") || 
+                       n.status?.toLowerCase().includes("resolved") ? (
+                        <CheckCircle2 size={16} className="text-green-500" />
+                      ) : n.status?.toLowerCase().includes("progress") ? (
+                        <Info size={16} className="text-blue-500" />
                       ) : (
-                        <AlertCircle size={18} className={accent} />
+                        <AlertCircle size={16} className="text-amber-500" />
                       )}
                     </div>
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-[15px] font-medium ${
-                        unread ? theme.text : "text-gray-400"
-                      }`}
-                    >
+                  <div className="flex-1 min-w-0 pr-1">
+                    <p className={`text-[14px] leading-tight font-medium 
+                      ${unread 
+                        ? (isDark ? "text-white" : "text-gray-900") 
+                        : (isDark ? "text-gray-400" : "text-gray-600")
+                      }`}>
                       {n.message}
                     </p>
 
-                    {(n.location || n.issueId?.reason) && (
-                      <p
-                        className={`mt-1 text-xs ${
-                          isDark ? "text-gray-400" : "text-gray-500"
-                        } truncate`}
-                      >
-                        {n.location ? `📍 ${n.location}` : n.issueId?.reason}
+                    {n.location && (
+                      <p className={`mt-0.5 text-[12px] ${isDark ? "text-gray-400" : "text-gray-500"} truncate`}>
+                        📍 {n.location}
                       </p>
                     )}
 
-                    {/* Status */}
-                    <div className="mt-2 flex items-center gap-2.5 text-xs">
+                    <div className="mt-2 flex items-center gap-2 text-xs">
                       <span
-                        className={`px-2 py-0.5 rounded-full font-medium ${
-  n.status?.toLowerCase() === "resolved"
-    ? "bg-green-100 text-green-700"
-    : n.status?.toLowerCase() === "in-progress"
-    ? "bg-yellow-100 text-yellow-700"
-    : "bg-gray-200 text-gray-700"
-}`}
+                        className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
+                          n.status?.toLowerCase() === "resolved" || 
+                          n.status?.toLowerCase() === "solved"
+                            ? isDark 
+                              ? "bg-green-900/60 text-green-400" 
+                              : "bg-green-100 text-green-700"
+                            : n.status?.toLowerCase() === "in-progress"
+                            ? isDark 
+                              ? "bg-amber-900/60 text-amber-400" 
+                              : "bg-amber-100 text-amber-700"
+                            : isDark 
+                              ? "bg-gray-800 text-gray-400" 
+                              : "bg-gray-100 text-gray-600"
+                        }`}
                       >
                         {n.status || "Pending"}
                       </span>
 
-                      <time className="text-gray-400">
+                      <span className="text-gray-400 text-[11.5px]">
                         {new Date(n.createdAt).toLocaleDateString("en-IN", {
                           day: "numeric",
                           month: "short",
                         })}
-                      </time>
+                      </span>
                     </div>
                   </div>
 
-                  {/* Right side: image + unread dot */}
-                  <div className="flex flex-col items-end gap-1.5">
+                  {/* Image + Unread Dot */}
+                  <div className="flex flex-col items-end gap-0.5">
                     {image && (
                       <img
                         src={image}
-                        alt=""
-                        className="w-11 h-11 rounded-lg object-cover border border-gray-200 dark:border-gray-800"
+                        alt="Issue"
+                        className={`w-9 h-9 rounded-lg object-cover border 
+                          ${isDark ? "border-gray-700" : "border-gray-200"}`}
                       />
                     )}
 
                     {unread && (
-                      <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                     )}
                   </div>
                 </motion.div>
@@ -234,7 +201,7 @@ const handleNotificationClick = async (id, notification) => {
         )}
       </div>
 
-      <div className="h-16" />
+      <div className="h-14" />
     </div>
   );
 };
