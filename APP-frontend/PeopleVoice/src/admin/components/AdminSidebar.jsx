@@ -5,10 +5,11 @@ import axios from "axios";
 import {
   LayoutDashboard,
   ClipboardList,
-  BarChart3,
-  Users,
   Settings,
   ShieldCheck,
+  LogOut,
+  Users,
+  BarChart3
 } from "lucide-react";
 
 const API_URL = `${import.meta.env.VITE_BACKEND_URL}/api/admin/issues`;
@@ -21,7 +22,7 @@ const links = [
   { name: "Settings", to: "/admin/dashboard/settings", icon: Settings },
 ];
 
-const POLLING_INTERVAL = 30000; // 30 seconds
+const POLLING_INTERVAL = 30000;
 
 const AdminSidebar = () => {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ const AdminSidebar = () => {
 
   const fetchPendingIssuesCount = async () => {
     if (!adminDistrict) return;
+
     try {
       const res = await axios.get(API_URL, {
         headers: {
@@ -38,26 +40,24 @@ const AdminSidebar = () => {
         },
         params: { 
           district: adminDistrict, 
-          limit: 1000 // Get more issues to count properly
+          limit: 1000 
         },
       });
-      
-      // Filter out closed/resolved issues
+
       const allIssues = res.data.issues || [];
       const pendingIssues = allIssues.filter(
-        issue => issue.status !== "solved" && 
-                 issue.status !== "Closed" && 
-                 issue.status !== "Resolved"
+        (issue) =>
+          issue.status !== "solved" &&
+          issue.status !== "Closed" &&
+          issue.status !== "Resolved"
       );
-      
+
       if (isMounted.current) {
         setPendingIssuesCount(pendingIssues.length);
       }
     } catch (err) {
       console.error("Failed to fetch pending issues count", err);
-      if (isMounted.current) {
-        setPendingIssuesCount(0);
-      }
+      if (isMounted.current) setPendingIssuesCount(0);
     }
   };
 
@@ -79,67 +79,69 @@ const AdminSidebar = () => {
   };
 
   return (
-    <aside className="w-64 h-screen bg-slate-50 border-r border-gray-200 flex flex-col font-sans">
+    <div className="h-full flex flex-col bg-white border-r border-gray-200">
       {/* Brand Header */}
-      <div className="h-20 flex items-center px-8 border-b border-gray-200 bg-white">
-        <motion.div
-          initial={{ rotate: -20, scale: 0.8 }}
-          animate={{ rotate: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 200 }}
-        >
-          <ShieldCheck className="text-emerald-600 mr-3" size={28} />
-        </motion.div>
-        <h1 className="font-bold text-gray-800 tracking-tight text-lg">
-          Tamil Nadu GovPanel
-        </h1>
+      <div className="h-20 flex items-center px-6 border-b border-gray-100 bg-white">
+        <div className="flex items-center gap-3">
+          <motion.div
+            initial={{ rotate: -20, scale: 0.8 }}
+            animate={{ rotate: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 200 }}
+          >
+            <ShieldCheck className="text-emerald-600" size={32} />
+          </motion.div>
+          <div>
+            <h1 className="font-bold text-xl text-gray-900 tracking-tight">
+              Tamil Nadu
+            </h1>
+            <p className="text-xs text-gray-500 -mt-1">GovPanel</p>
+          </div>
+        </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 mt-4">
+      <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
         {links.map(({ name, to, icon: Icon }) => (
           <NavLink
             key={name}
             to={to}
             end={to === "/admin/dashboard"}
             className={({ isActive }) =>
-              `relative flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${
+              `group relative flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? "text-emerald-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900 hover:bg-white"
+                  ? "text-emerald-700 bg-emerald-50"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`
             }
           >
             {({ isActive }) => (
               <>
+                {/* Active Background */}
                 {isActive && (
                   <motion.div
                     layoutId="activeTab"
-                    className="absolute inset-0 bg-emerald-100/80 rounded-xl -z-10"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    className="absolute inset-0 bg-emerald-50 rounded-2xl -z-10"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
                   />
                 )}
 
-                {/* Left side: Icon + Name */}
                 <div className="flex items-center gap-3">
                   <Icon
                     size={20}
-                    className={`transition-transform duration-200 group-hover:scale-110 ${
+                    className={`transition-transform group-hover:scale-110 ${
                       isActive ? "text-emerald-600" : "text-slate-400 group-hover:text-emerald-500"
                     }`}
                   />
                   <span className="relative z-10">{name}</span>
                 </div>
 
-                {/* Pending issues count (excluding closed/resolved) */}
+                {/* Notification Badge for All Issues */}
                 {name === "All Issues" && pendingIssuesCount > 0 && (
-                  <motion.span 
+                  <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                    className={`flex h-6 w-auto min-w-[24px] items-center justify-center rounded-full px-2 text-[11px] font-black border border-white shadow-lg ${
-                      isActive 
-                        ? 'bg-red-600 text-white animate-pulse' // Pulsing on active tab
-                        : 'bg-red-500 text-white' // Changed to red even when inactive for better visibility
+                    className={`ml-auto flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold shadow ${
+                      isActive ? "bg-red-600 text-white" : "bg-red-500 text-white"
                     }`}
                   >
                     {pendingIssuesCount > 99 ? "99+" : pendingIssuesCount}
@@ -147,11 +149,7 @@ const AdminSidebar = () => {
                 )}
 
                 {isActive && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -5 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-600"
-                  />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-600" />
                 )}
               </>
             )}
@@ -159,16 +157,17 @@ const AdminSidebar = () => {
         ))}
       </nav>
 
-      {/* Logout Section */}
-      <div className="p-4 border-t bg-white/50">
+      {/* Logout */}
+      <div className="p-4 border-t border-gray-100 mt-auto">
         <button
-          className="flex items-center gap-3 w-full px-4 py-2 text-slate-500 hover:text-red-600 transition-colors text-sm font-medium"
           onClick={handleLogout}
+          className="flex items-center gap-3 w-full px-4 py-3 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all duration-200 text-sm font-medium"
         >
-          Logout
+          <LogOut size={20} />
+          <span>Logout</span>
         </button>
       </div>
-    </aside>
+    </div>
   );
 };
 
