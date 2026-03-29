@@ -69,7 +69,6 @@ const Notifications = () => {
     navigate("/peopleVoice/my-issues");
   };
 
-  // ✅ FIXED: use "images" not "images_data"
   const getImage = (n) =>
     n.issueId?.images?.[0] || n.image || "https://via.placeholder.com/150x150";
 
@@ -120,28 +119,31 @@ const Notifications = () => {
                   whileTap={{ scale: 0.985 }}
                   onClick={() => handleNotificationClick(n._id, n)}
                   className={`
-  cursor-pointer flex gap-3 p-3 rounded-xl border transition-all active:scale-[0.97]
-
-  ${
-    unread
-      ? isDark
-        ? "bg-gray-900 border-emerald-500/40 shadow-md"
-        : "bg-white border-emerald-300 shadow-md"
-      : isDark
-        ? "bg-gray-900/60 border-gray-800 opacity-70"
-        : "bg-gray-100 border-gray-200 opacity-70"
-  }
-
-  hover:scale-[1.01]
-`}
+                    cursor-pointer flex gap-1.5 sm:gap-3 p-1.5 sm:p-3 rounded-xl border transition-all active:scale-[0.97]
+                    ${
+                      unread
+                        ? isDark
+                          ? "bg-gray-900 border-emerald-500/40 shadow-md"
+                          : "bg-white border-emerald-300 shadow-md"
+                        : isDark
+                          ? "bg-gray-900/60 border-gray-800 opacity-70"
+                          : "bg-gray-100 border-gray-200 opacity-70"
+                    }
+                    hover:scale-[1.01]
+                  `}
                 >
                   {/* Status Icon */}
                   <div className="flex-shrink-0 pt-0.5">
                     <div
-                      className={`p-2 rounded-full${unread 
-  ? (isDark ? "text-white" : "text-gray-900") 
-  : (isDark ? "text-gray-500 opacity-80" : "text-gray-400 opacity-80")
-}`}
+                      className={`p-2 rounded-full${
+                        unread
+                          ? isDark
+                            ? "text-white"
+                            : "text-gray-900"
+                          : isDark
+                            ? "text-gray-500 opacity-80"
+                            : "text-gray-400 opacity-80"
+                      }`}
                     >
                       {n.status?.toLowerCase().includes("solved") ||
                       n.status?.toLowerCase().includes("resolved") ? (
@@ -157,12 +159,12 @@ const Notifications = () => {
                   {/* Content */}
                   <div className="flex-1 min-w-0 pr-1">
                     {unread && (
-  <span className="ml-2 text-[10px] px-2 py-0.5 bg-emerald-500 text-white rounded-full">
-    NEW
-  </span>
-)}
+                      <span className="ml-2 text-[10px] px-2 py-0.5 bg-emerald-500 text-white rounded-full">
+                        NEW
+                      </span>
+                    )}
                     <p
-                      className={`text-[14px] leading-tight font-medium 
+                      className={`text-[13px] sm:text-[14px] leading-tight font-medium mt-1
                       ${
                         unread
                           ? isDark
@@ -178,15 +180,15 @@ const Notifications = () => {
 
                     {n.location && (
                       <p
-                        className={`mt-0.5 text-[12px] ${isDark ? "text-gray-400" : "text-gray-500"} truncate`}
+                        className={`mt-0.5 text-[11px] sm:text-[12px] ${isDark ? "text-gray-400" : "text-gray-500"} truncate`}
                       >
                         📍 {n.location}
                       </p>
                     )}
 
-                    <div className="mt-2 flex items-center gap-2 text-xs">
+                    <div className="mt-1.5 sm:mt-2 flex items-center gap-2 text-xs">
                       <span
-                        className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
+                        className={`text-[9px] sm:text-[10px] font-medium px-2 py-0.5 rounded-full ${
                           n.status?.toLowerCase() === "resolved" ||
                           n.status?.toLowerCase() === "solved"
                             ? isDark
@@ -204,7 +206,7 @@ const Notifications = () => {
                         {n.status || "Pending"}
                       </span>
 
-                      <span className="text-gray-400 text-[11.5px]">
+                      <span className="text-gray-400 text-[10px] sm:text-[11.5px]">
                         {new Date(n.createdAt).toLocaleDateString("en-IN", {
                           day: "numeric",
                           month: "short",
@@ -213,19 +215,19 @@ const Notifications = () => {
                     </div>
                   </div>
 
-                  {/* Image + Unread Dot */}
+                  {/* Image + Unread Dot - smaller on mobile, medium on larger */}
                   <div className="flex flex-col items-end gap-0.5">
                     {image && (
                       <img
                         src={image}
                         alt="Issue"
-                        className={`w-9 h-9 rounded-lg object-cover border 
+                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border 
                           ${isDark ? "border-gray-700" : "border-gray-200"}`}
                       />
                     )}
 
                     {unread && (
-                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                      <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                     )}
                   </div>
                 </motion.div>
