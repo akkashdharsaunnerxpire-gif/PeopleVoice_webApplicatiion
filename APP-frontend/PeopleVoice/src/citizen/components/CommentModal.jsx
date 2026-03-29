@@ -46,7 +46,7 @@ const CommentModal = ({
   citizenId,
   postOwnerId,
   district,
-  setDisplayedIssues, // optional – used to update parent feed
+  setDisplayedIssues,
   isDark: propIsDark,
 }) => {
   const { isDark: contextIsDark } = useTheme();
@@ -57,10 +57,14 @@ const CommentModal = ({
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [localComments, setLocalComments] = useState([]);
-  const [likingMap, setLikingMap] = useState({}); // 🔥 track each comment
+  const [pendingLikes, setPendingLikes] = useState(new Map()); // Track pending like requests
   const [replyTo, setReplyTo] = useState(null);
   const [expandedReplies, setExpandedReplies] = useState({});
   const [activeMenuCommentId, setActiveMenuCommentId] = useState(null);
+  
+  // Refs for debouncing
+  const likeDebounceTimer = useRef({});
+  const lastLikeClickTime = useRef({});
 
   // Refs
   const commentsEndRef = useRef(null);
@@ -75,6 +79,7 @@ const CommentModal = ({
       setReplyTo(null);
       setActiveMenuCommentId(null);
       setText("");
+      setPendingLikes(new Map());
     }
   }, [initialComments, open]);
 
@@ -108,7 +113,7 @@ const CommentModal = ({
 
   const allImages = images?.length > 0 ? images : [];
 
-  // ----- Helper: Update parent issue's comments and commentCount -----
+  // Update parent after comment
   const updateParentAfterComment = useCallback(
     (newComment, isDelete = false, deletedCommentId = null) => {
       if (!setDisplayedIssues) return;
@@ -137,14 +142,59 @@ const CommentModal = ({
     [issueId, setDisplayedIssues],
   );
 
-  // Helper: Update likes in parent issue
-  const updateParentCommentLike = useCallback(
-    (commentId, newLikes) => {
-      if (!setDisplayedIssues) return;
+  // Optimized like toggle with debouncing and queue management
+  const toggleLike = useCallback(async (commentId) => {
+    // Prevent rapid successive clicks
+    const now = Date.now();
+    const lastClick = lastLikeClickTime.current[commentId] || 0;
+    if (now - lastClick < 300) {
+      return; // Ignore clicks within 300ms
+    }
+    lastLikeClickTime.current[commentId] = now;
 
+    // Check if this comment already has a pending request
+    if (pendingLikes.has(commentId)) {
+      return;
+    }
+
+    // Clear any existing debounce timer for this comment
+    if (likeDebounceTimer.current[commentId]) {
+      clearTimeout(likeDebounceTimer.current[commentId]);
+    }
+
+    // Store current like state for rollback
+    let previousLikesState;
+    let optimisticNewLikes;
+
+    // Apply optimistic update immediately
+    setLocalComments((prev) => {
+      const updateLike = (comments) =>
+        comments.map((c) => {
+          if (c._id === commentId) {
+            const alreadyLiked = c.likes?.includes(citizenId);
+            optimisticNewLikes = alreadyLiked
+              ? (c.likes || []).filter((id) => id !== citizenId)
+              : [...(c.likes || []), citizenId];
+            
+            previousLikesState = c.likes || [];
+            return { ...c, likes: optimisticNewLikes };
+          }
+          if (c.replies?.length) {
+            return { ...c, replies: updateLike(c.replies) };
+          }
+          return c;
+        });
+      return updateLike(prev);
+    });
+
+    // Mark as pending
+    setPendingLikes((prev) => new Map(prev).set(commentId, true));
+
+    // Update parent feed optimistically
+    if (setDisplayedIssues) {
       const updateRecursive = (comments) =>
         comments.map((c) => {
-          if (c._id === commentId) return { ...c, likes: newLikes };
+          if (c._id === commentId) return { ...c, likes: optimisticNewLikes };
           if (c.replies?.length) {
             return { ...c, replies: updateRecursive(c.replies) };
           }
@@ -158,13 +208,118 @@ const CommentModal = ({
             ...issue,
             comments: updateRecursive(issue.comments),
           };
-        }),
+        })
       );
-    },
-    [issueId, setDisplayedIssues],
-  );
+    }
 
-  // ----- Add comment (root or reply) -----
+    // Debounced API call
+    likeDebounceTimer.current[commentId] = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${APIURL}/issues/${issueId}/comment/${commentId}/like`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ citizenId }),
+          }
+        );
+
+        const data = await res.json();
+        
+        if (!data.success) {
+          throw new Error(data.message || "Like request failed");
+        }
+
+        // Sync with backend's actual state
+        if (data.likes) {
+          setLocalComments((prev) => {
+            const syncLike = (comments) =>
+              comments.map((c) => {
+                if (c._id === commentId) {
+                  return { ...c, likes: data.likes };
+                }
+                if (c.replies?.length) {
+                  return { ...c, replies: syncLike(c.replies) };
+                }
+                return c;
+              });
+            return syncLike(prev);
+          });
+
+          // Update parent with backend state
+          if (setDisplayedIssues) {
+            const updateRecursive = (comments) =>
+              comments.map((c) => {
+                if (c._id === commentId) return { ...c, likes: data.likes };
+                if (c.replies?.length) {
+                  return { ...c, replies: updateRecursive(c.replies) };
+                }
+                return c;
+              });
+
+            setDisplayedIssues((prevIssues) =>
+              prevIssues.map((issue) => {
+                if (issue._id !== issueId) return issue;
+                return {
+                  ...issue,
+                  comments: updateRecursive(issue.comments),
+                };
+              })
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Like error:", err);
+        
+        // Rollback to previous state on error
+        setLocalComments((prev) => {
+          const rollbackLike = (comments) =>
+            comments.map((c) => {
+              if (c._id === commentId) {
+                return { ...c, likes: previousLikesState };
+              }
+              if (c.replies?.length) {
+                return { ...c, replies: rollbackLike(c.replies) };
+              }
+              return c;
+            });
+          return rollbackLike(prev);
+        });
+
+        // Rollback parent feed
+        if (setDisplayedIssues) {
+          const rollbackRecursive = (comments) =>
+            comments.map((c) => {
+              if (c._id === commentId) return { ...c, likes: previousLikesState };
+              if (c.replies?.length) {
+                return { ...c, replies: rollbackRecursive(c.replies) };
+              }
+              return c;
+            });
+
+          setDisplayedIssues((prevIssues) =>
+            prevIssues.map((issue) => {
+              if (issue._id !== issueId) return issue;
+              return {
+                ...issue,
+                comments: rollbackRecursive(issue.comments),
+              };
+            })
+          );
+        }
+      } finally {
+        // Remove pending flag
+        setPendingLikes((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(commentId);
+          return newMap;
+        });
+        delete likeDebounceTimer.current[commentId];
+      }
+    }, 150); // 150ms debounce
+  }, [citizenId, issueId, setDisplayedIssues, pendingLikes]);
+
+  // Add comment (root or reply) - Optimized
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
 
@@ -179,7 +334,7 @@ const CommentModal = ({
       ...(isReply && { parentCommentId: replyTo.commentId }),
     };
 
-    const tempId = `temp-${Date.now()}`;
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
     const optimisticComment = {
       _id: tempId,
       citizenId,
@@ -188,6 +343,7 @@ const CommentModal = ({
       createdAt: new Date().toISOString(),
       parentCommentId: isReply ? replyTo.commentId : null,
       replies: [],
+      isOptimistic: true, // Flag for optimistic comments
     };
 
     // Optimistic UI update
@@ -208,6 +364,11 @@ const CommentModal = ({
       return [...prev, optimisticComment];
     });
 
+    // Auto-scroll to new comment
+    setTimeout(() => {
+      commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+
     try {
       const res = await fetch(`${APIURL}/issues/${issueId}/comment`, {
         method: "POST",
@@ -220,11 +381,13 @@ const CommentModal = ({
 
       const serverComment = data.newComment;
 
-      // Replace temp ID with real ID
+      // Replace optimistic comment with server comment
       setLocalComments((prev) => {
         const replaceIdRecursively = (comments) =>
           comments.map((c) => {
-            if (c._id === tempId) return { ...c, _id: serverComment._id };
+            if (c._id === tempId) {
+              return { ...serverComment, replies: c.replies || [] };
+            }
             if (c.replies?.length) {
               return { ...c, replies: replaceIdRecursively(c.replies) };
             }
@@ -235,110 +398,30 @@ const CommentModal = ({
 
       // Update parent feed
       updateParentAfterComment(serverComment);
-
-      // Clear reply state
       setReplyTo(null);
-      setTimeout(() => {
-        commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
     } catch (err) {
       console.error("Comment post error:", err);
       setText(currentText);
+      
+      // Remove optimistic comment on error
+      setLocalComments((prev) => {
+        const removeOptimistic = (comments) =>
+          comments
+            .filter((c) => c._id !== tempId)
+            .map((c) => ({
+              ...c,
+              replies: c.replies ? removeOptimistic(c.replies) : [],
+            }));
+        return removeOptimistic(prev);
+      });
+      
       alert(err.message || "Failed to post comment. Please try again.");
-      // Revert optimistic update: we could re-fetch, but simplest is to reload comments
-      // Alternatively, we could revert state, but for simplicity we'll refresh from initial
-      setLocalComments(buildCommentTree(initialComments));
     } finally {
       setIsSending(false);
     }
   };
 
-  // ----- Like / Unlike -----
-
-  const toggleLike = async (commentId) => {
-    // 🚫 Prevent multiple clicks on same comment
-    if (likingMap[commentId]) return;
-
-    let previousState;
-
-    // lock this comment
-    setLikingMap((prev) => ({ ...prev, [commentId]: true }));
-
-    // ✅ Optimistic update
-    setLocalComments((prev) => {
-      previousState = structuredClone(prev); // 🔥 better than JSON copy
-
-      const updateLike = (comments) =>
-        comments.map((c) => {
-          if (c._id === commentId) {
-            const alreadyLiked = c.likes?.includes(citizenId);
-            return {
-              ...c,
-              likes: alreadyLiked
-                ? c.likes.filter((id) => id !== citizenId)
-                : [...(c.likes || []), citizenId],
-            };
-          }
-          if (c.replies?.length) {
-            return { ...c, replies: updateLike(c.replies) };
-          }
-          return c;
-        });
-
-      return updateLike(prev);
-    });
-
-    try {
-      const res = await fetch(
-        `${APIURL}/issues/${issueId}/comment/${commentId}/like`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ citizenId }),
-        },
-      );
-
-      const data = await res.json();
-      if (!data.success) throw new Error("Like request failed");
-
-      // ✅ Sync with backend (source of truth)
-      if (data.likes) {
-        setLocalComments((prev) => {
-          const syncLike = (comments) =>
-            comments.map((c) => {
-              if (c._id === commentId) {
-                return { ...c, likes: data.likes };
-              }
-              if (c.replies?.length) {
-                return { ...c, replies: syncLike(c.replies) };
-              }
-              return c;
-            });
-
-          return syncLike(prev);
-        });
-
-        updateParentCommentLike(commentId, data.likes);
-      }
-    } catch (err) {
-      console.error("Like error:", err);
-
-      // 🔥 rollback safely
-      if (previousState) {
-        setLocalComments(previousState);
-      }
-
-      alert("Failed to like comment. Please try again.");
-    } finally {
-      // 🔓 unlock
-      setLikingMap((prev) => {
-        const updated = { ...prev };
-        delete updated[commentId];
-        return updated;
-      });
-    }
-  };
-  // ----- Delete comment -----
+  // Delete comment - Optimized
   const deleteComment = async (commentId) => {
     if (!window.confirm("Delete this comment?")) return;
 
@@ -366,7 +449,7 @@ const CommentModal = ({
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ citizenId }),
-        },
+        }
       );
 
       const data = await res.json();
@@ -375,23 +458,24 @@ const CommentModal = ({
       console.error("Delete error:", err);
       // Rollback
       setLocalComments(previousComments);
-      updateParentAfterComment(null, false); // refresh parent with original comments
+      updateParentAfterComment(null, false);
       alert("Could not delete comment. Try again.");
     }
   };
 
-  // ----- Render a single comment and its replies -----
+  // Render comment with optimized like button
   const renderComment = (comment, level = 0) => {
     const isLiked = comment.likes?.includes(citizenId);
     const isOwnComment = comment.citizenId === citizenId;
     const isPostOwner = citizenId === postOwnerId;
     const canDelete = isOwnComment || isPostOwner;
+    const isPendingLike = pendingLikes.has(comment._id);
+    const isOptimistic = comment.isOptimistic;
 
     const hasReplies = (comment.replies?.length || 0) > 0;
     const isExpanded = expandedReplies[comment._id] ?? false;
     const showMenu = activeMenuCommentId === comment._id;
 
-    // Indentation: each level adds 16px left padding
     const indent = level * 16;
 
     return (
@@ -404,7 +488,7 @@ const CommentModal = ({
         <div
           className={`flex items-start justify-between px-4 py-3 relative ${
             level > 0 ? `${theme.replyBg} ${theme.replyBorder}` : ""
-          }`}
+          } ${isOptimistic ? 'opacity-70' : ''}`}
         >
           <div className="flex gap-3 flex-1">
             <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center text-white text-sm font-bold shrink-0">
@@ -425,39 +509,49 @@ const CommentModal = ({
                 {comment.likes?.length > 0 && (
                   <span>{comment.likes.length} likes</span>
                 )}
-                <button
-                  onClick={() =>
-                    setReplyTo({
-                      commentId: comment._id,
-                      username: comment.citizenId,
-                    })
-                  }
-                  className="hover:text-blue-400 transition-colors flex items-center gap-1"
-                >
-                  <Reply size={14} /> Reply
-                </button>
+                {!isOptimistic && (
+                  <button
+                    onClick={() =>
+                      setReplyTo({
+                        commentId: comment._id,
+                        username: comment.citizenId,
+                      })
+                    }
+                    className="hover:text-blue-400 transition-colors flex items-center gap-1"
+                  >
+                    <Reply size={14} /> Reply
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => toggleLike(comment._id)}
-              disabled={likingMap[comment._id]}
-            >
-              <Heart
-                size={18}
-                className={`transition-all duration-200 ${
-                  likingMap[comment._id]
-                    ? "opacity-50 cursor-not-allowed scale-95"
-                    : isLiked
-                      ? "text-red-500 fill-red-500 scale-110"
-                      : theme.textMuted
-                }`}
-              />
-            </button>
+            {!isOptimistic && (
+              <button
+                onClick={() => toggleLike(comment._id)}
+                disabled={isPendingLike}
+                className="relative"
+              >
+                <Heart
+                  size={18}
+                  className={`transition-all duration-150 ${
+                    isPendingLike
+                      ? "opacity-50 cursor-not-allowed scale-95"
+                      : isLiked
+                        ? "text-red-500 fill-red-500 scale-110"
+                        : theme.textMuted
+                  } ${!isPendingLike && 'hover:scale-110'}`}
+                />
+                {isPendingLike && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </button>
+            )}
 
-            {canDelete && (
+            {canDelete && !isOptimistic && (
               <button
                 onClick={() => setActiveMenuCommentId(comment._id)}
                 className={`${theme.textMuted} hover:${theme.text} p-1 rounded-full`}
@@ -468,7 +562,7 @@ const CommentModal = ({
           </div>
 
           {/* Dropdown menu */}
-          {showMenu && canDelete && (
+          {showMenu && canDelete && !isOptimistic && (
             <div
               ref={menuRef}
               className={`absolute right-2 top-8 ${
@@ -526,7 +620,7 @@ const CommentModal = ({
     );
   };
 
-  // ----- Main render -----
+  // Main render
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 md:p-4">
       <div

@@ -208,66 +208,30 @@ exports.toggleCommentLike = async (req, res) => {
     const { issueId, commentId } = req.params;
     const { citizenId } = req.body;
 
-    const issue = await Complaint.findOneAndUpdate(
-      {
-        _id: issueId,
-        "comments._id": commentId,
-      },
-      [
-        {
-          $set: {
-            comments: {
-              $map: {
-                input: "$comments",
-                as: "c",
-                in: {
-                  $cond: [
-                    { $eq: ["$$c._id", new mongoose.Types.ObjectId(commentId)] },
-                    {
-                      $mergeObjects: [
-                        "$$c",
-                        {
-                          likes: {
-                            $cond: [
-                              { $in: [citizenId, "$$c.likes"] },
-                              {
-                                $filter: {
-                                  input: "$$c.likes",
-                                  as: "l",
-                                  cond: { $ne: ["$$l", citizenId] },
-                                },
-                              },
-                              { $concatArrays: ["$$c.likes", [citizenId]] },
-                            ],
-                          },
-                        },
-                      ],
-                    },
-                    "$$c",
-                  ],
-                },
-              },
-            },
-          },
-        },
-      ],
-      { new: true }
-    );
+    const issue = await Complaint.findById(issueId);
+    if (!issue) return res.status(404).json({ message: "Issue not found" });
 
-    if (!issue) {
-      return res.status(404).json({ success: false, message: "Not found" });
+    const comment = issue.comments.id(commentId);
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+    const likeIndex = comment.likes.indexOf(citizenId);
+    if (likeIndex === -1) {
+      comment.likes.push(citizenId);
+    } else {
+      comment.likes.splice(likeIndex, 1);
     }
 
-    const updatedComment = issue.comments.find(
-      (c) => c._id.toString() === commentId
-    );
+    await issue.save();
 
     res.json({
       success: true,
-      likes: updatedComment.likes,
+      commentId,
+      likes: comment.likes,
+      likeCount: comment.likes.length,
+      likedByUser: comment.likes.includes(citizenId),
     });
   } catch (err) {
-    console.error(err);
+    console.error("toggleCommentLike error:", err);
     res.status(500).json({ message: err.message });
   }
 };
