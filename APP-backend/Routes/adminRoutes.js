@@ -36,7 +36,8 @@ router.post("/issues/:issueId/notify-view", async (req, res) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
-    const customMessage = `Officer has viewed your case: "${issue.reason || "Issue"}"`;
+    // ✅ Always same message → helps duplicate check
+    const customMessage = `Officer has viewed your issue`;
 
     await saveNotification(issue, "Viewed", customMessage);
 

@@ -13,6 +13,17 @@ const saveNotification = async (issue, status, customMessage = null) => {
     const msg =
       customMessage ||
       `Your issue "${issue.reason || "Report"}" is now ${status}`;
+    const exists = await Notification.findOne({
+      citizenId: String(issue.citizenId),
+      issueId: issue._id,
+      message: msg,
+      status: status,
+    });
+
+    if (exists) {
+      console.log("⚠️ Duplicate notification blocked");
+      return;
+    }
 
     await Notification.create({
       citizenId: String(issue.citizenId),
@@ -74,7 +85,7 @@ const markAsRead = async (req, res) => {
     const notification = await Notification.findByIdAndUpdate(
       id,
       { read: true },
-      { new: true }
+      { new: true },
     );
 
     if (!notification) {
