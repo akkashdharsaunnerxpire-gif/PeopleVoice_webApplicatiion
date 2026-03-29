@@ -391,66 +391,65 @@ const Feed = () => {
     setOnlyWithImages(false);
     setOnlyMyIssues(false);
   };
+const handleLike = useCallback(
+  async (issueId) => {
+    if (!citizenId) return;
 
-  const handleLike = useCallback(
-    async (issueId) => {
-      if (!citizenId) return;
+    let previousState;
 
-      const currentIssue = displayedIssues.find(
-        (issue) => issue._id === issueId,
-      );
-      if (!currentIssue) return;
+    // ✅ capture full state safely
+    setDisplayedIssues((prev) => {
+      previousState = prev;
 
-      // Optimistic update
-      setDisplayedIssues((prev) =>
-        prev.map((issue) => {
-          if (issue._id !== issueId) return issue;
-          const wasLiked = issue.likes?.includes(citizenId);
-          const updatedLikes = wasLiked
-            ? (issue.likes || []).filter((id) => id !== citizenId)
-            : [...(issue.likes || []), citizenId];
-          return {
-            ...issue,
-            likes: updatedLikes,
-            likeCount: updatedLikes.length,
-          };
-        }),
-      );
+      return prev.map((issue) => {
+        if (issue._id !== issueId) return issue;
 
-      try {
-        const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ citizenId }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          setDisplayedIssues((prev) =>
-            prev.map((issue) =>
-              issue._id === issueId
-                ? {
-                    ...issue,
-                    likes: data.likes,
-                    likeCount: data.likeCount ?? data.likes.length,
-                  }
-                : issue,
-            ),
-          );
-        } else {
-          // Revert on failure
-          setDisplayedIssues((prev) =>
-            prev.map((issue) => (issue._id === issueId ? currentIssue : issue)),
-          );
-        }
-      } catch (err) {
+        const wasLiked = issue.likes?.includes(citizenId);
+
+        const updatedLikes = wasLiked
+          ? issue.likes.filter((id) => id !== citizenId)
+          : [...(issue.likes || []), citizenId];
+
+        return {
+          ...issue,
+          likes: updatedLikes,
+          likeCount: updatedLikes.length,
+        };
+      });
+    });
+
+    try {
+      const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ citizenId }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
         setDisplayedIssues((prev) =>
-          prev.map((issue) => (issue._id === issueId ? currentIssue : issue)),
+          prev.map((issue) =>
+            issue._id === issueId
+              ? {
+                  ...issue,
+                  likes: data.likes,
+                  likeCount: data.likeCount ?? data.likes.length,
+                }
+              : issue
+          )
         );
+      } else {
+        // 🔥 rollback correct state
+        setDisplayedIssues(previousState);
       }
-    },
-    [citizenId, displayedIssues, setDisplayedIssues],
-  );
-
+    } catch (err) {
+      // 🔥 rollback
+      setDisplayedIssues(previousState);
+    }
+  },
+  [citizenId, setDisplayedIssues]
+);
   // =============================
   // Render
   // =============================
