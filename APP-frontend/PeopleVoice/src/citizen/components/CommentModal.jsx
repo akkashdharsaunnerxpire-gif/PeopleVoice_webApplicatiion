@@ -15,8 +15,16 @@ import { themeColors } from "./constants";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const APIURL = `${BACKEND_URL}/api`;
 
-// Helper: Build nested comment tree from flat array
+// Helper: Build nested comment tree from flat array (if backend returns flat structure)
 const buildCommentTree = (flatComments) => {
+  if (!flatComments || flatComments.length === 0) return [];
+  
+  // If comments already have replies array, return as is
+  if (flatComments.length > 0 && flatComments[0].replies !== undefined) {
+    return flatComments;
+  }
+  
+  // Otherwise build tree from flat structure
   const commentMap = new Map();
   const rootComments = [];
 
@@ -62,9 +70,8 @@ const CommentModal = ({
   const [activeMenuCommentId, setActiveMenuCommentId] = useState(null);
   
   // Refs for debouncing
-  const likeDebounceTimer = useRef({});
   const lastLikeClickTime = useRef({});
-  const isLikeProcessing = useRef(new Map()); // Track processing likes
+  const pendingLikes = useRef(new Map());
 
   // Refs
   const commentsEndRef = useRef(null);
@@ -79,12 +86,23 @@ const CommentModal = ({
       setReplyTo(null);
       setActiveMenuCommentId(null);
       setText("");
+      pendingLikes.current.clear();
+    }
+  }, [initialComments, open]);
+
+  // Refresh comments from parent when they change
+  useEffect(() => {
+    if (open && initialComments) {
+      const tree = buildCommentTree(initialComments);
+      setLocalComments(tree);
     }
   }, [initialComments, open]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
-    if (open) document.body.style.overflow = "hidden";
+    if (open) {
+      document.body.style.overflow = "hidden";
+    }
     return () => {
       document.body.style.overflow = "auto";
     };
@@ -141,71 +159,77 @@ const CommentModal = ({
     [issueId, setDisplayedIssues],
   );
 
-  // Optimized like toggle with proper debouncing and no spinner
+  // Function to update like in nested comments
+  const updateLikeInComments = useCallback((comments, commentId, newLikes) => {
+    return comments.map(comment => {
+      if (comment._id === commentId) {
+        return { ...comment, likes: newLikes };
+      }
+      if (comment.replies && comment.replies.length > 0) {
+        return { ...comment, replies: updateLikeInComments(comment.replies, commentId, newLikes) };
+      }
+      return comment;
+    });
+  }, []);
+
+  // Optimized like toggle with proper sync
   const toggleLike = useCallback(async (commentId) => {
     // Prevent rapid successive clicks
     const now = Date.now();
     const lastClick = lastLikeClickTime.current[commentId] || 0;
     if (now - lastClick < 300) {
-      return; // Ignore clicks within 300ms
+      return;
     }
     lastLikeClickTime.current[commentId] = now;
 
     // Check if already processing this comment
-    if (isLikeProcessing.current.get(commentId)) {
+    if (pendingLikes.current.get(commentId)) {
       return;
     }
 
-    // Clear any existing debounce timer for this comment
-    if (likeDebounceTimer.current[commentId]) {
-      clearTimeout(likeDebounceTimer.current[commentId]);
-    }
-
     // Mark as processing
-    isLikeProcessing.current.set(commentId, true);
+    pendingLikes.current.set(commentId, true);
 
-    // Store current state for rollback
-    let previousLikesState;
-    let optimisticNewLikes;
-
+    // Find current like state
+    let currentLiked = false;
+    let currentLikes = [];
+    
+    const findCurrentState = (comments) => {
+      for (const comment of comments) {
+        if (comment._id === commentId) {
+          currentLikes = comment.likes || [];
+          currentLiked = currentLikes.includes(citizenId);
+          return true;
+        }
+        if (comment.replies && comment.replies.length > 0) {
+          if (findCurrentState(comment.replies)) return true;
+        }
+      }
+      return false;
+    };
+    
+    findCurrentState(localComments);
+    
+    // Calculate new likes
+    const newLikes = currentLiked
+      ? currentLikes.filter(id => id !== citizenId)
+      : [...currentLikes, citizenId];
+    
     // Apply optimistic update immediately
-    setLocalComments((prev) => {
-      const updateLike = (comments) =>
-        comments.map((c) => {
-          if (c._id === commentId) {
-            const alreadyLiked = c.likes?.includes(citizenId);
-            optimisticNewLikes = alreadyLiked
-              ? (c.likes || []).filter((id) => id !== citizenId)
-              : [...(c.likes || []), citizenId];
-            
-            previousLikesState = c.likes || [];
-            return { ...c, likes: optimisticNewLikes };
-          }
-          if (c.replies?.length) {
-            return { ...c, replies: updateLike(c.replies) };
-          }
-          return c;
-        });
-      return updateLike(prev);
-    });
-
+    const updatedComments = updateLikeInComments(localComments, commentId, newLikes);
+    setLocalComments(updatedComments);
+    
     // Update parent feed optimistically
     if (setDisplayedIssues) {
-      const updateRecursive = (comments) =>
-        comments.map((c) => {
-          if (c._id === commentId) return { ...c, likes: optimisticNewLikes };
-          if (c.replies?.length) {
-            return { ...c, replies: updateRecursive(c.replies) };
-          }
-          return c;
-        });
-
       setDisplayedIssues((prevIssues) =>
         prevIssues.map((issue) => {
-          if (issue._id !== issueId) return issue;
+          if (issue._id !== issueId) {
+            return issue;
+          }
+          const updatedIssueComments = updateLikeInComments(issue.comments, commentId, newLikes);
           return {
             ...issue,
-            comments: updateRecursive(issue.comments),
+            comments: updatedIssueComments,
           };
         })
       );
@@ -228,39 +252,23 @@ const CommentModal = ({
         throw new Error(data.message || "Like request failed");
       }
 
-      // Sync with backend's actual state if needed
-      if (data.likes && JSON.stringify(data.likes) !== JSON.stringify(optimisticNewLikes)) {
-        setLocalComments((prev) => {
-          const syncLike = (comments) =>
-            comments.map((c) => {
-              if (c._id === commentId) {
-                return { ...c, likes: data.likes };
-              }
-              if (c.replies?.length) {
-                return { ...c, replies: syncLike(c.replies) };
-              }
-              return c;
-            });
-          return syncLike(prev);
-        });
-
-        // Update parent with backend state
+      // Sync with backend's actual state
+      if (data.likes) {
+        // Update local comments with backend state
+        const syncedComments = updateLikeInComments(localComments, commentId, data.likes);
+        setLocalComments(syncedComments);
+        
+        // Update parent feed with backend state
         if (setDisplayedIssues) {
-          const updateRecursive = (comments) =>
-            comments.map((c) => {
-              if (c._id === commentId) return { ...c, likes: data.likes };
-              if (c.replies?.length) {
-                return { ...c, replies: updateRecursive(c.replies) };
-              }
-              return c;
-            });
-
           setDisplayedIssues((prevIssues) =>
             prevIssues.map((issue) => {
-              if (issue._id !== issueId) return issue;
+              if (issue._id !== issueId) {
+                return issue;
+              }
+              const syncedIssueComments = updateLikeInComments(issue.comments, commentId, data.likes);
               return {
                 ...issue,
-                comments: updateRecursive(issue.comments),
+                comments: syncedIssueComments,
               };
             })
           );
@@ -270,50 +278,33 @@ const CommentModal = ({
       console.error("Like error:", err);
       
       // Rollback to previous state on error
-      setLocalComments((prev) => {
-        const rollbackLike = (comments) =>
-          comments.map((c) => {
-            if (c._id === commentId) {
-              return { ...c, likes: previousLikesState };
-            }
-            if (c.replies?.length) {
-              return { ...c, replies: rollbackLike(c.replies) };
-            }
-            return c;
-          });
-        return rollbackLike(prev);
-      });
-
+      const rollbackComments = updateLikeInComments(localComments, commentId, currentLikes);
+      setLocalComments(rollbackComments);
+      
       // Rollback parent feed
       if (setDisplayedIssues) {
-        const rollbackRecursive = (comments) =>
-          comments.map((c) => {
-            if (c._id === commentId) return { ...c, likes: previousLikesState };
-            if (c.replies?.length) {
-              return { ...c, replies: rollbackRecursive(c.replies) };
-            }
-            return c;
-          });
-
         setDisplayedIssues((prevIssues) =>
           prevIssues.map((issue) => {
-            if (issue._id !== issueId) return issue;
+            if (issue._id !== issueId) {
+              return issue;
+            }
+            const rollbackIssueComments = updateLikeInComments(issue.comments, commentId, currentLikes);
             return {
               ...issue,
-              comments: rollbackRecursive(issue.comments),
+              comments: rollbackIssueComments,
             };
           })
         );
       }
     } finally {
-      // Remove processing flag after a short delay
+      // Remove processing flag
       setTimeout(() => {
-        isLikeProcessing.current.delete(commentId);
+        pendingLikes.current.delete(commentId);
       }, 100);
     }
-  }, [citizenId, issueId, setDisplayedIssues]);
+  }, [citizenId, issueId, setDisplayedIssues, localComments, updateLikeInComments]);
 
-  // Add comment (root or reply) - Optimized
+  // Add comment (root or reply)
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
 
@@ -337,7 +328,7 @@ const CommentModal = ({
       createdAt: new Date().toISOString(),
       parentCommentId: isReply ? replyTo.commentId : null,
       replies: [],
-      isOptimistic: true, // Flag for optimistic comments
+      isOptimistic: true,
     };
 
     // Optimistic UI update
@@ -415,7 +406,7 @@ const CommentModal = ({
     }
   };
 
-  // Delete comment - Optimized
+  // Delete comment
   const deleteComment = async (commentId) => {
     if (!window.confirm("Delete this comment?")) return;
 
@@ -457,13 +448,14 @@ const CommentModal = ({
     }
   };
 
-  // Render comment with optimized like button (no spinner)
+  // Render comment with optimized like button
   const renderComment = (comment, level = 0) => {
     const isLiked = comment.likes?.includes(citizenId);
     const isOwnComment = comment.citizenId === citizenId;
     const isPostOwner = citizenId === postOwnerId;
     const canDelete = isOwnComment || isPostOwner;
     const isOptimistic = comment.isOptimistic;
+    const isPending = pendingLikes.current.get(comment._id);
 
     const hasReplies = (comment.replies?.length || 0) > 0;
     const isExpanded = expandedReplies[comment._id] ?? false;
@@ -499,8 +491,8 @@ const CommentModal = ({
                     minute: "2-digit",
                   })}
                 </span>
-                {comment.likes?.length > 0 && (
-                  <span>{comment.likes.length} likes</span>
+                {(comment.likes?.length || 0) > 0 && (
+                  <span>{comment.likes.length} {comment.likes.length === 1 ? 'like' : 'likes'}</span>
                 )}
                 {!isOptimistic && (
                   <button
@@ -524,6 +516,7 @@ const CommentModal = ({
               <button
                 onClick={() => toggleLike(comment._id)}
                 className="relative transition-transform hover:scale-110 active:scale-95"
+                disabled={isPending}
               >
                 <Heart
                   size={18}
@@ -531,7 +524,7 @@ const CommentModal = ({
                     isLiked
                       ? "text-red-500 fill-red-500"
                       : theme.textMuted
-                  }`}
+                  } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </button>
             )}
