@@ -16,7 +16,7 @@ import {
   Archive,
 } from "lucide-react";
 
-const API_URL = `${import.meta.env.VITE_BACKEND_URL}/api/admin/issues`;
+const API_URL = import.meta.env.VITE_BACKEND_URL;
 
 const Issues = () => {
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ const Issues = () => {
   const fetchIssues = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(API_URL, {
+      const res = await axios.get(`${API_URL}/api/admin/issues`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
         params: { district: adminDistrict, search, page, limit },
       });
@@ -93,7 +93,23 @@ const Issues = () => {
       default: return { text: "Take Action", color: "bg-purple-600 hover:bg-purple-700", icon: <FileText size={16} /> };
     }
   };
+  const handleTakeAction = async (issueId) => {
+  try {
+    await axios.post(
+      `${API_URL}/api/admin/issues/${issueId}/notify-view`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+      }
+    );
+  } catch (err) {
+    console.error("Notification send error:", err);
+  }
 
+  navigate(`/admin/dashboard/issues/${issueId}`);
+};
   return (
     <div className="p-6 md:p-10 max-w-[1600px] mx-auto min-h-screen bg-gray-50">
       {/* HEADER */}
@@ -198,7 +214,7 @@ const Issues = () => {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <button 
-                        onClick={() => navigate(`/admin/dashboard/issues/${issue._id}`)}
+                        onClick={() => handleTakeAction(issue._id)}
                         className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-xs font-bold transition-all ${btn.color}`}
                       >
                         {btn.icon} {btn.text}
