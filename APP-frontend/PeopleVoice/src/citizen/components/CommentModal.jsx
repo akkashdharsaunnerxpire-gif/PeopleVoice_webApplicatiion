@@ -57,6 +57,7 @@ const CommentModal = ({
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [localComments, setLocalComments] = useState([]);
+  const [likingMap, setLikingMap] = useState({}); // 🔥 track each comment
   const [replyTo, setReplyTo] = useState(null);
   const [expandedReplies, setExpandedReplies] = useState({});
   const [activeMenuCommentId, setActiveMenuCommentId] = useState(null);
@@ -121,7 +122,7 @@ const CommentModal = ({
             updatedComments.push(newComment);
           } else if (isDelete && deletedCommentId) {
             updatedComments = updatedComments.filter(
-              (c) => c._id !== deletedCommentId
+              (c) => c._id !== deletedCommentId,
             );
           }
 
@@ -130,10 +131,10 @@ const CommentModal = ({
             comments: updatedComments,
             commentCount: updatedComments.length,
           };
-        })
+        }),
       );
     },
-    [issueId, setDisplayedIssues]
+    [issueId, setDisplayedIssues],
   );
 
   // Helper: Update likes in parent issue
@@ -157,10 +158,10 @@ const CommentModal = ({
             ...issue,
             comments: updateRecursive(issue.comments),
           };
-        })
+        }),
       );
     },
-    [issueId, setDisplayedIssues]
+    [issueId, setDisplayedIssues],
   );
 
   // ----- Add comment (root or reply) -----
@@ -253,12 +254,20 @@ const CommentModal = ({
   };
 
   // ----- Like / Unlike -----
+
   const toggleLike = async (commentId) => {
+    // 🚫 Prevent multiple clicks on same comment
+    if (likingMap[commentId]) return;
+
     let previousState;
 
-    // Optimistic update
+    // lock this comment
+    setLikingMap((prev) => ({ ...prev, [commentId]: true }));
+
+    // ✅ Optimistic update
     setLocalComments((prev) => {
-      previousState = JSON.parse(JSON.stringify(prev)); // deep copy
+      previousState = structuredClone(prev); // 🔥 better than JSON copy
+
       const updateLike = (comments) =>
         comments.map((c) => {
           if (c._id === commentId) {
@@ -275,6 +284,7 @@ const CommentModal = ({
           }
           return c;
         });
+
       return updateLike(prev);
     });
 
@@ -285,35 +295,49 @@ const CommentModal = ({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ citizenId }),
-        }
+        },
       );
 
       const data = await res.json();
       if (!data.success) throw new Error("Like request failed");
 
-      // Sync with server response
+      // ✅ Sync with backend (source of truth)
       if (data.likes) {
         setLocalComments((prev) => {
           const syncLike = (comments) =>
             comments.map((c) => {
-              if (c._id === commentId) return { ...c, likes: data.likes };
+              if (c._id === commentId) {
+                return { ...c, likes: data.likes };
+              }
               if (c.replies?.length) {
                 return { ...c, replies: syncLike(c.replies) };
               }
               return c;
             });
+
           return syncLike(prev);
         });
+
         updateParentCommentLike(commentId, data.likes);
       }
     } catch (err) {
       console.error("Like error:", err);
-      // Rollback
-      setLocalComments(previousState);
+
+      // 🔥 rollback safely
+      if (previousState) {
+        setLocalComments(previousState);
+      }
+
       alert("Failed to like comment. Please try again.");
+    } finally {
+      // 🔓 unlock
+      setLikingMap((prev) => {
+        const updated = { ...prev };
+        delete updated[commentId];
+        return updated;
+      });
     }
   };
-
   // ----- Delete comment -----
   const deleteComment = async (commentId) => {
     if (!window.confirm("Delete this comment?")) return;
@@ -342,7 +366,7 @@ const CommentModal = ({
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ citizenId }),
-        }
+        },
       );
 
       const data = await res.json();
@@ -371,7 +395,11 @@ const CommentModal = ({
     const indent = level * 16;
 
     return (
-      <div key={comment._id} style={{ paddingLeft: `${indent}px` }} className="relative">
+      <div
+        key={comment._id}
+        style={{ paddingLeft: `${indent}px` }}
+        className="relative"
+      >
         {/* Main comment */}
         <div
           className={`flex items-start justify-between px-4 py-3 relative ${
@@ -398,7 +426,12 @@ const CommentModal = ({
                   <span>{comment.likes.length} likes</span>
                 )}
                 <button
-                  onClick={() => setReplyTo({ commentId: comment._id, username: comment.citizenId })}
+                  onClick={() =>
+                    setReplyTo({
+                      commentId: comment._id,
+                      username: comment.citizenId,
+                    })
+                  }
                   className="hover:text-blue-400 transition-colors flex items-center gap-1"
                 >
                   <Reply size={14} /> Reply
@@ -408,13 +441,18 @@ const CommentModal = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={() => toggleLike(comment._id)}>
+            <button
+              onClick={() => toggleLike(comment._id)}
+              disabled={likingMap[comment._id]}
+            >
               <Heart
                 size={18}
                 className={`transition-all duration-200 ${
-                  isLiked
-                    ? "text-red-500 fill-red-500 scale-110"
-                    : theme.textMuted
+                  likingMap[comment._id]
+                    ? "opacity-50 cursor-not-allowed scale-95"
+                    : isLiked
+                      ? "text-red-500 fill-red-500 scale-110"
+                      : theme.textMuted
                 }`}
               />
             </button>
@@ -472,7 +510,10 @@ const CommentModal = ({
               <div className="w-8 h-px bg-gray-600 dark:bg-gray-700"></div>
               <button
                 onClick={() =>
-                  setExpandedReplies((prev) => ({ ...prev, [comment._id]: false }))
+                  setExpandedReplies((prev) => ({
+                    ...prev,
+                    [comment._id]: false,
+                  }))
                 }
                 className="flex items-center gap-1 hover:text-blue-500 transition-colors font-medium"
               >

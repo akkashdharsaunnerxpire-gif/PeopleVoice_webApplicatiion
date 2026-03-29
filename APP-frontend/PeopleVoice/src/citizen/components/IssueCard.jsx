@@ -281,31 +281,36 @@ const IssueCard = ({
   }, []);
 
   const handleTap = useCallback(
-    (e) => {
-      e.preventDefault();
-      const now = Date.now();
-      const timeDiff = now - lastTapTime.current;
+  (e) => {
+    e.preventDefault();
+    const now = Date.now();
+    const timeDiff = now - lastTapTime.current;
 
-      // 🔥 Get the center of the image container
-      const targetElement = e.currentTarget;
-      const rect = targetElement.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
 
-      if (timeDiff < 300 && timeDiff > 0) {
-        isDoubleTap.current = true;
-        showHeartAnimation(centerX, centerY); // 👈 always at center
-        if (!liked) onLike?.();
-        if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
-      } else {
-        doubleTapTimer.current = setTimeout(() => {
-          isDoubleTap.current = false;
-        }, 300);
+    if (timeDiff < 300 && timeDiff > 0) {
+      isDoubleTap.current = true;
+
+      showHeartAnimation(centerX, centerY);
+
+      // ✅ only LIKE (not unlike)
+      if (!liked) {
+        onLike?.();
       }
-      lastTapTime.current = now;
-    },
-    [liked, onLike, showHeartAnimation],
-  );
+
+      if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
+    } else {
+      doubleTapTimer.current = setTimeout(() => {
+        isDoubleTap.current = false;
+      }, 300);
+    }
+
+    lastTapTime.current = now;
+  },
+  [liked, onLike, showHeartAnimation]
+);
 
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX;
@@ -843,37 +848,39 @@ const IssueCard = ({
           z-index: 9999;
           animation: heartPop 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
-     @keyframes heartPop {
-  0% {
-    transform: translate(-50%, -30%) scale(0.3) rotate(0deg);
-    opacity: 0;
-  }
+        @keyframes heartPop {
+          0% {
+            transform: translate(-50%, -30%) scale(0.3) rotate(0deg);
+            opacity: 0;
+          }
 
-  /* 💤 sleep */
-  20% {
-    transform: translate(-50%, -50%) scale(1.3) rotate(calc(var(--tilt) * 0.6));
-    opacity: 1;
-  }
+          /* 💤 sleep */
+          20% {
+            transform: translate(-50%, -50%) scale(1.3)
+              rotate(calc(var(--tilt) * 0.6));
+            opacity: 1;
+          }
 
-  40% {
-    transform: translate(-50%, -70px) scale(1.1) rotate(var(--tilt));
-  }
+          40% {
+            transform: translate(-50%, -70px) scale(1.1) rotate(var(--tilt));
+          }
 
-  /* 🚀 fast upward (but limited height) */
-  55% {
-    transform: translate(-50%, -140px) scale(0.95) rotate(calc(var(--tilt) * 0.3));
-  }
+          /* 🚀 fast upward (but limited height) */
+          55% {
+            transform: translate(-50%, -140px) scale(0.95)
+              rotate(calc(var(--tilt) * 0.3));
+          }
 
-  75% {
-    transform: translate(-50%, -220px) scale(0.75) rotate(0deg);
-    opacity: 0.7;
-  }
+          75% {
+            transform: translate(-50%, -220px) scale(0.75) rotate(0deg);
+            opacity: 0.7;
+          }
 
-  100% {
-    transform: translate(-50%, -300px) scale(0.6) rotate(0deg);
-    opacity: 0;
-  }
-}
+          100% {
+            transform: translate(-50%, -300px) scale(0.6) rotate(0deg);
+            opacity: 0;
+          }
+        }
 
         .font-tamil {
           font-family:

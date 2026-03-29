@@ -397,18 +397,18 @@ const handleLike = useCallback(
 
     let previousState;
 
-    // ✅ capture full state safely
     setDisplayedIssues((prev) => {
       previousState = prev;
 
       return prev.map((issue) => {
         if (issue._id !== issueId) return issue;
 
-        const wasLiked = issue.likes?.includes(citizenId);
+        const alreadyLiked = issue.likes?.includes(citizenId);
 
-        const updatedLikes = wasLiked
-          ? issue.likes.filter((id) => id !== citizenId)
-          : [...(issue.likes || []), citizenId];
+        // ✅ ONLY LIKE (no unlike on double tap)
+        if (alreadyLiked) return issue;
+
+        const updatedLikes = [...(issue.likes || []), citizenId];
 
         return {
           ...issue,
@@ -440,11 +440,9 @@ const handleLike = useCallback(
           )
         );
       } else {
-        // 🔥 rollback correct state
         setDisplayedIssues(previousState);
       }
     } catch (err) {
-      // 🔥 rollback
       setDisplayedIssues(previousState);
     }
   },
