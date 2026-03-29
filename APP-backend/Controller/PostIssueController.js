@@ -209,38 +209,16 @@ exports.toggleCommentLike = async (req, res) => {
     const { citizenId } = req.body;
 
     const issue = await Complaint.findById(issueId);
-    if (!issue) {
-      return res.status(404).json({ message: "Issue not found" });
-    }
+    if (!issue) return res.status(404).json({ message: "Issue not found" });
 
-    // 🔥 Recursive function (MAIN MAGIC)
-    const findAndToggleLike = (comments) => {
-      for (let comment of comments) {
-        if (comment._id.toString() === commentId) {
-          const likeIndex = comment.likes.indexOf(citizenId);
+    const comment = issue.comments.id(commentId);
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
 
-          if (likeIndex === -1) {
-            comment.likes.push(citizenId);
-          } else {
-            comment.likes.splice(likeIndex, 1);
-          }
-
-          return comment; // ✅ found
-        }
-
-        // 🔥 check replies
-        if (comment.replies && comment.replies.length > 0) {
-          const found = findAndToggleLike(comment.replies);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-
-    const updatedComment = findAndToggleLike(issue.comments);
-
-    if (!updatedComment) {
-      return res.status(404).json({ message: "Comment not found" });
+    const likeIndex = comment.likes.indexOf(citizenId);
+    if (likeIndex === -1) {
+      comment.likes.push(citizenId);
+    } else {
+      comment.likes.splice(likeIndex, 1);
     }
 
     await issue.save();
@@ -248,12 +226,12 @@ exports.toggleCommentLike = async (req, res) => {
     res.json({
       success: true,
       commentId,
-      likes: updatedComment.likes,
-      likeCount: updatedComment.likes.length,
-      likedByUser: updatedComment.likes.includes(citizenId),
+      likes: comment.likes,
+      likeCount: comment.likes.length,
+      likedByUser: comment.likes.includes(citizenId),
     });
-
   } catch (err) {
+    console.error("toggleCommentLike error:", err);
     res.status(500).json({ message: err.message });
   }
 };
