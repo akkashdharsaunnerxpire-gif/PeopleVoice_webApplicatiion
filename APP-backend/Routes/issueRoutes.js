@@ -12,7 +12,6 @@ const {
   deleteIssue,
   deleteComment,
   updateComment,
-  getIssueWithFreshComments
 } = require("../Controller/PostIssueController");
 
 // POST ISSUE
@@ -41,9 +40,6 @@ router.delete("/issues/:issueId/comment/:commentId", deleteComment);
 
 // UPDATE COMMENT
 router.put("/issues/:issueId/comment/:commentId", updateComment);
-
-// GET FRESH COMMENTS (for sync)
-router.get("/issues/:id/fresh-comments", getIssueWithFreshComments);
 
 // DELETE ISSUE
 router.delete("/issues/:id", deleteIssue);

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 
+
 const CommentSchema = new mongoose.Schema(
   {
     citizenId: {
@@ -14,7 +15,7 @@ const CommentSchema = new mongoose.Schema(
     },
 
     likes: {
-      type: [String], // store userIds
+      type: [String],
       default: [],
     },
 
@@ -23,15 +24,11 @@ const CommentSchema = new mongoose.Schema(
       default: null,
     },
 
-    replies: {
-      type: [this], // nested replies
-      default: [],
-    },
-
     editedAt: Date,
   },
   { timestamps: true }
 );
+
 
 const PostIssueSchema = new mongoose.Schema(
   {
