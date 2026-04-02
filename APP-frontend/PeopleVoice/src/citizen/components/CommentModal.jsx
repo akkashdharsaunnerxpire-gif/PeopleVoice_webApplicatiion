@@ -642,7 +642,6 @@ const CommentModal = ({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <MoreHorizontal size={22} className={theme.textMuted} />
               <button
                 onClick={onClose}
                 className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition"

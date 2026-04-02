@@ -20,6 +20,7 @@ import {
   Clock,
   Home,
   Bookmark,
+  Type,
 } from "lucide-react";
 import { themeColors } from "./constants";
 import { useTheme } from "../../Context/ThemeContext";
@@ -73,7 +74,7 @@ const IssueCard = ({
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
-
+  const [showAllHashtags, setShowAllHashtags] = useState(false);
   const lastTapTime = useRef(0);
   const doubleTapTimer = useRef(null);
   const heartAnimationRef = useRef(null);
@@ -119,6 +120,8 @@ const IssueCard = ({
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
   }, []);
+
+  // Font size labels for accessibility
 
   const handleMenuToggle = (e) => {
     e.stopPropagation();
@@ -229,7 +232,6 @@ const IssueCard = ({
   ];
 
   const showHeartAnimation = useCallback((x, y) => {
-    // 🚫 prevent multiple triggers
     if (isAnimatingRef.current) return;
 
     isAnimatingRef.current = true;
@@ -274,43 +276,40 @@ const IssueCard = ({
     setTimeout(() => {
       heart.remove();
       heartAnimationRef.current = null;
-
-      // ✅ unlock after animation
       isAnimatingRef.current = false;
-    }, 1600); // same as animation time
+    }, 1600);
   }, []);
 
   const handleTap = useCallback(
-  (e) => {
-    e.preventDefault();
-    const now = Date.now();
-    const timeDiff = now - lastTapTime.current;
+    (e) => {
+      e.preventDefault();
+      const now = Date.now();
+      const timeDiff = now - lastTapTime.current;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
 
-    if (timeDiff < 300 && timeDiff > 0) {
-      isDoubleTap.current = true;
+      if (timeDiff < 300 && timeDiff > 0) {
+        isDoubleTap.current = true;
 
-      showHeartAnimation(centerX, centerY);
+        showHeartAnimation(centerX, centerY);
 
-      // ✅ only LIKE (not unlike)
-      if (!liked) {
-        onLike?.();
+        if (!liked) {
+          onLike?.();
+        }
+
+        if (doubleTapTimer.current) clearTimeout(d0oubleTapTimer.current);
+      } else {
+        doubleTapTimer.current = setTimeout(() => {
+          isDoubleTap.current = false;
+        }, 300);
       }
 
-      if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
-    } else {
-      doubleTapTimer.current = setTimeout(() => {
-        isDoubleTap.current = false;
-      }, 300);
-    }
-
-    lastTapTime.current = now;
-  },
-  [liked, onLike, showHeartAnimation]
-);
+      lastTapTime.current = now;
+    },
+    [liked, onLike, showHeartAnimation],
+  );
 
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX;
@@ -489,17 +488,33 @@ const IssueCard = ({
             </motion.div>
             <div className="min-w-0 flex-1">
               <p
-                className={`font-semibold text-xs sm:text-sm flex items-center gap-1 truncate ${theme.text}`}
+                className={`font-semibold flex items-center gap-1 ${theme.text}`}
+                style={{ fontSize: "15px" }}
               >
-                <span className="truncate">{username}</span>
+                <span
+                  className="min-w-0"
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    maxWidth: "150px",
+                  }}
+                >
+                  {username}
+                </span>
+
                 {issue.official && (
-                  <span className="text-[9px] sm:text-[10px] bg-blue-100 text-blue-600 px-1 py-0.5 rounded-full">
+                  <span
+                    className="bg-blue-100 text-blue-600 px-1 py-0.5 rounded-full"
+                    style={{ fontSize: "0.7em" }}
+                  >
                     Off
                   </span>
                 )}
               </p>
               <p
-                className={`text-[10px] sm:text-xs flex items-center gap-0.5 ${theme.textMuted}`}
+                className={`flex items-center gap-0.5 ${theme.textMuted}`}
+                style={{ fontSize: "0.85em" }}
               >
                 <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" />
                 <span className="truncate">
@@ -512,7 +527,8 @@ const IssueCard = ({
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <motion.div
               whileHover={{ scale: 1.03 }}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs border shadow-sm ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full border shadow-sm ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+              style={{ fontSize: "0.8em" }}
             >
               <StatusIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <span>{statusConfig.label}</span>
@@ -544,7 +560,8 @@ const IssueCard = ({
                         key={i}
                         whileHover={{ x: 3 }}
                         onClick={item.action}
-                        className={`w-full flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm ${isDark ? "hover:bg-zinc-800 text-gray-300" : "hover:bg-gray-50 text-gray-700"}`}
+                        className={`w-full flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 ${isDark ? "hover:bg-zinc-800 text-gray-300" : "hover:bg-gray-50 text-gray-700"}`}
+                        style={{ fontSize: "0.85em" }}
                       >
                         <item.icon className="w-3 h-3 sm:w-4 sm:h-4" />
                         {item.label}
@@ -657,7 +674,8 @@ const IssueCard = ({
                 />
               </motion.div>
               <span
-                className={`text-xs sm:text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                className={`font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                style={{ fontSize: "0.85em" }}
               >
                 {likeCount}
               </span>
@@ -677,7 +695,8 @@ const IssueCard = ({
                 className={`sm:w-7 sm:h-7 ${isDark ? "text-gray-200 group-hover:text-green-400" : "text-gray-600 group-hover:text-green-600"}`}
               />
               <span
-                className={`text-xs sm:text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                className={`font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                style={{ fontSize: "0.85em" }}
               >
                 {commentCount}
               </span>
@@ -719,7 +738,8 @@ const IssueCard = ({
                   initial={{ opacity: 0, y: 10, scale: 0.8 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                  className={`absolute -bottom-8 right-0 text-white text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 ${saveMessage === "Saved" ? "bg-green-500" : saveMessage === "Removed" ? "bg-orange-500" : "bg-red-500"}`}
+                  className={`absolute -bottom-8 right-0 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 ${saveMessage === "Saved" ? "bg-green-500" : saveMessage === "Removed" ? "bg-orange-500" : "bg-red-500"}`}
+                  style={{ fontSize: "0.75rem" }}
                 >
                   {saveMessage === "Saved" ? (
                     <CheckCircle size={14} />
@@ -738,7 +758,8 @@ const IssueCard = ({
           <div className="mt-2 space-y-1.5">
             {issue.description_en && (
               <p
-                className={`text-sm ${isDark ? "text-gray-300" : "text-gray-800"}`}
+                className={isDark ? "text-gray-300" : "text-gray-800"}
+                style={{ fontSize: "1em", lineHeight: "1.5" }}
               >
                 <span className={`font-semibold ${theme.text}`}>
                   {username}
@@ -750,7 +771,8 @@ const IssueCard = ({
             {issue.description_ta && (
               <div>
                 <p
-                  className={`text-sm font-tamil leading-relaxed ${isDark ? "text-gray-400" : "text-gray-700"}`}
+                  className={`font-tamil leading-relaxed ${isDark ? "text-gray-400" : "text-gray-700"}`}
+                  style={{ fontSize: "1em" }}
                 >
                   <span className="font-semibold text-green-600">தமிழ்:</span>{" "}
                   {isExpanded
@@ -760,7 +782,8 @@ const IssueCard = ({
                 {needsTruncation(issue.description_ta, true) && !isExpanded && (
                   <button
                     onClick={() => setIsExpanded(true)}
-                    className={`text-xs text-green-600 dark:text-green-400 flex items-center gap-1 mt-1`}
+                    className={`text-green-600 dark:text-green-400 flex items-center gap-1 mt-1`}
+                    style={{ fontSize: "0.85em" }}
                   >
                     <ChevronDown size={14} /> Read more...
                   </button>
@@ -773,7 +796,8 @@ const IssueCard = ({
                 needsTruncation(issue.description_ta, true)) && (
                 <button
                   onClick={() => setIsExpanded(false)}
-                  className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1"
+                  className="text-green-600 dark:text-green-400 flex items-center gap-1"
+                  style={{ fontSize: "0.85em" }}
                 >
                   <ChevronUp size={14} /> Show less
                 </button>
@@ -782,7 +806,8 @@ const IssueCard = ({
 
           <div className="mt-3 flex flex-wrap gap-2">
             <span
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs ${isDark ? "bg-zinc-800 text-gray-300" : "bg-gray-100 text-gray-700"}`}
+              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full ${isDark ? "bg-zinc-800 text-gray-300" : "bg-gray-100 text-gray-700"}`}
+              style={{ fontSize: "0.85em" }}
             >
               <Tag size={14} />
               {issue.department || "Unknown"}
@@ -790,43 +815,62 @@ const IssueCard = ({
           </div>
 
           {issue.hashtags?.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {issue.hashtags.map((tag, i) => (
+            <div className="flex flex-wrap items-center gap-1 mt-2">
+              {(showAllHashtags
+                ? issue.hashtags
+                : issue.hashtags.slice(0, 3)
+              ).map((tag, i) => (
                 <span
                   key={i}
-                  className={`text-xs ${isDark ? "text-blue-400" : "text-blue-600"}`}
+                  className={isDark ? "text-blue-400" : "text-blue-600"}
+                  style={{ fontSize: "0.85em" }}
                 >
                   #{tag}
                 </span>
               ))}
+              {issue.hashtags.length > 3 && (
+                <button
+                  onClick={() => setShowAllHashtags(!showAllHashtags)}
+                  className="text-xs text-green-600 dark:text-green-400 hover:underline ml-1"
+                >
+                  {showAllHashtags
+                    ? "less"
+                    : `..more`}
+                </button>
+              )}
             </div>
           )}
 
           <div
             className={`mt-4 pt-3 border-t ${isDark ? "border-zinc-800" : "border-gray-100"}`}
           >
-            <div className="flex gap-2 text-xs">
+            <div className="flex gap-2">
               <Home
                 className={`mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}
                 size={16}
               />
-              <p className={isDark ? "text-gray-400" : "text-gray-600"}>
+              <p
+                className={isDark ? "text-gray-400" : "text-gray-600"}
+                style={{ fontSize: "0.85em" }}
+              >
                 {formatFullAddress()}
               </p>
             </div>
           </div>
 
-          <div className="flex justify-between items-center mt-3 text-xs">
+          <div className="flex justify-between items-center mt-3">
             {commentCount > 0 && (
               <motion.button
                 onClick={onComment}
                 className={`transition-colors ${isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+                style={{ fontSize: "0.8em" }}
               >
                 {commentCount} comments பார்க்க
               </motion.button>
             )}
             <p
               className={`flex items-center gap-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+              style={{ fontSize: "0.75em" }}
             >
               <Clock size={14} />
               {formatDate(issue.createdAt)}
@@ -853,29 +897,22 @@ const IssueCard = ({
             transform: translate(-50%, -30%) scale(0.3) rotate(0deg);
             opacity: 0;
           }
-
-          /* 💤 sleep */
           20% {
             transform: translate(-50%, -50%) scale(1.3)
               rotate(calc(var(--tilt) * 0.6));
             opacity: 1;
           }
-
           40% {
             transform: translate(-50%, -70px) scale(1.1) rotate(var(--tilt));
           }
-
-          /* 🚀 fast upward (but limited height) */
           55% {
             transform: translate(-50%, -140px) scale(0.95)
               rotate(calc(var(--tilt) * 0.3));
           }
-
           75% {
             transform: translate(-50%, -220px) scale(0.75) rotate(0deg);
             opacity: 0.7;
           }
-
           100% {
             transform: translate(-50%, -300px) scale(0.6) rotate(0deg);
             opacity: 0;

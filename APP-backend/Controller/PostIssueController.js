@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Complaint = require("../Models/PostIssueModel");
 const SavedIssue = require("../Models/SavedIssue");
+const redisClient = require("../config/redis");
 
 /* ---------------- POST ISSUE ---------------- */
 exports.postIssue = async (req, res) => {
@@ -11,7 +12,11 @@ exports.postIssue = async (req, res) => {
       likeCount: 0,
       comments: [],
     });
+    const keys = await redisClient.keys("issues:*");
 
+    if (keys.length > 0) {
+      await redisClient.del(keys);
+    }
     res.status(201).json({ success: true, issue });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -19,58 +24,54 @@ exports.postIssue = async (req, res) => {
 };
 
 /* ---------------- GET ALL ISSUES (with pagination) ---------------- */
+
 exports.getAllIssues = async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit) || 5, 1);
+
+    // 🔥 UNIQUE CACHE KEY
+    const cacheKey = `issues:${JSON.stringify(req.query)}`;
+
+    // 🥇 CHECK CACHE
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      console.log("⚡ Cache HIT");
+      return res.json(JSON.parse(cachedData));
+    }
+
+    console.log("🐢 Cache MISS → DB");
+
     const skip = (page - 1) * limit;
 
     const filter = {};
     if (req.query.district && req.query.district !== "All")
       filter.district = req.query.district;
-    if (req.query.department && req.query.department !== "All")
-      filter.department = req.query.department;
-    if (req.query.status && req.query.status !== "All")
-      filter.status = req.query.status;
-    if (req.query.citizenId) filter.citizenId = req.query.citizenId;
-    if (req.query.onlyWithImages === "true")
-      filter.images_data = { $exists: true, $ne: [] };
-
-    let sortOption = { createdAt: -1 }; // default newest
-    switch (req.query.sortBy) {
-      case "oldest":
-        sortOption = { createdAt: 1 };
-        break;
-      case "mostLiked":
-        sortOption = { likeCount: -1 };
-        break;
-      case "mostCommented":
-        sortOption = { commentsCount: -1 };
-        break;
-      default:
-        sortOption = { createdAt: -1 };
-    }
 
     const totalCount = await Complaint.countDocuments(filter);
+
     const issues = await Complaint.find(filter)
-      .sort(sortOption)
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    // ❌ REMOVED: issues.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    res.json({
+    const response = {
       success: true,
       page,
       limit,
       total: totalCount,
       hasMore: skip + issues.length < totalCount,
       issues,
-    });
+    };
+
+    // 🥈 STORE IN REDIS (5 mins)
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
+
+    res.json(response);
   } catch (err) {
-    console.error("getAllIssues error:", err);
-    res.status(500).json({ success: false, message: "Failed to fetch issues" });
+    res.status(500).json({ success: false });
   }
 };
 /* ---------------- CHECK FOR NEW POSTS ---------------- */
@@ -281,17 +282,23 @@ exports.deleteComment = async (req, res) => {
     const { citizenId } = req.body;
 
     if (!citizenId) {
-      return res.status(400).json({ success: false, message: "citizenId required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "citizenId required" });
     }
 
     const issue = await Complaint.findById(issueId);
     if (!issue) {
-      return res.status(404).json({ success: false, message: "Issue not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Issue not found" });
     }
 
     const comment = issue.comments.id(commentId);
     if (!comment) {
-      return res.status(404).json({ success: false, message: "Comment not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Comment not found" });
     }
 
     // ✅ Allow deletion if user is comment author OR post owner
@@ -301,7 +308,8 @@ exports.deleteComment = async (req, res) => {
     if (!isCommentAuthor && !isPostOwner) {
       return res.status(403).json({
         success: false,
-        message: "Unauthorized – only the comment author or post owner can delete this comment",
+        message:
+          "Unauthorized – only the comment author or post owner can delete this comment",
       });
     }
 
@@ -320,7 +328,7 @@ exports.deleteComment = async (req, res) => {
     findDescendants(commentId);
 
     issue.comments = issue.comments.filter(
-      (c) => !commentsToDelete.has(c._id.toString())
+      (c) => !commentsToDelete.has(c._id.toString()),
     );
 
     await issue.save();
@@ -333,7 +341,9 @@ exports.deleteComment = async (req, res) => {
     });
   } catch (err) {
     console.error("deleteComment error:", err);
-    res.status(500).json({ success: false, message: "Server error while deleting comment" });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while deleting comment" });
   }
 };
 /* ---------------- UPDATE COMMENT ---------------- */

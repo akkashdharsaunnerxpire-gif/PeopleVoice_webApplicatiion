@@ -44,7 +44,6 @@ const Navigation = () => {
       const res = await axios.get(
         `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`,
       );
-
       const unread = (res.data || []).filter((n) => n.read === false).length;
       setUnreadCount(unread);
     } catch (err) {
@@ -55,22 +54,15 @@ const Navigation = () => {
   // initial + polling
   useEffect(() => {
     fetchUnreadCount();
-
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
   // custom event listener
   useEffect(() => {
-    const handleUpdate = () => {
-        fetchUnreadCount();
-    };
-
+    const handleUpdate = () => fetchUnreadCount();
     window.addEventListener("notification_update", handleUpdate);
-
-    return () => {
-      window.removeEventListener("notification_update", handleUpdate);
-    };
+    return () => window.removeEventListener("notification_update", handleUpdate);
   }, []);
 
   // route change refetch
@@ -78,20 +70,17 @@ const Navigation = () => {
     fetchUnreadCount();
   }, [location.pathname]);
 
-  // scroll hide/show nav
+  // scroll hide/show nav (only for bottom nav)
   useEffect(() => {
     const handleScroll = () => {
       const current = window.scrollY;
-
       if (current > lastScrollY.current && current > 10) {
         setShowBottomNav(false);
       } else {
         setShowBottomNav(true);
       }
-
       lastScrollY.current = current;
     };
-
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -99,14 +88,11 @@ const Navigation = () => {
   // active nav
   useEffect(() => {
     const path = location.pathname;
-
     if (path.startsWith(`${BASE}/feed`)) setActiveNav("home");
     else if (path.startsWith(`${BASE}/my-issues`)) setActiveNav("myissues");
     else if (path.startsWith(`${BASE}/post-issue`)) setActiveNav("post");
-    else if (path.startsWith(`${BASE}/notifications`))
-      setActiveNav("notifications");
+    else if (path.startsWith(`${BASE}/notifications`)) setActiveNav("notifications");
     else if (path.startsWith(`${BASE}/profile`)) setActiveNav("profile");
-
     setShowMoreMenu(false);
   }, [location.pathname]);
 
@@ -142,7 +128,7 @@ const Navigation = () => {
                 : "text-gray-500"
           }`}
         >
-          <FinalIcon className="w-5 h-5" />
+          <FinalIcon className="w-6 h-6 sm:w-7 sm:h-7" />
           {badge > 0 && (
             <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
               {badge > 9 ? "9+" : badge}
@@ -152,7 +138,7 @@ const Navigation = () => {
       );
     }
 
-    // Desktop version (sidebar)
+    // Desktop / Tablet version (sidebar)
     return (
       <motion.button
         whileTap={{ scale: 0.96 }}
@@ -167,7 +153,6 @@ const Navigation = () => {
       >
         <FinalIcon className="w-5 h-5" />
         <span className="text-sm font-medium">{label}</span>
-
         {badge > 0 && (
           <span className="absolute right-4 min-w-[20px] h-[20px] text-[10px] bg-red-500 text-white font-bold rounded-full flex items-center justify-center">
             {badge > 9 ? "9+" : badge}
@@ -179,12 +164,12 @@ const Navigation = () => {
 
   return (
     <>
-      {/* DESKTOP / TABLET SIDEBAR */}
+      {/* DESKTOP / TABLET SIDEBAR – visible from md breakpoint (≥768px) */}
       <motion.aside
         initial={{ x: -300 }}
         animate={{ x: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 180 }}
-        className={`hidden lg:flex fixed top-0 left-0 z-40 h-screen w-72 flex-col border-r shadow-xl
+        className={`hidden md:flex fixed top-0 left-0 z-40 h-screen w-72 flex-col border-r shadow-xl
           ${
             isDark
               ? themeColors.dark.bg + " " + themeColors.dark.border
@@ -315,9 +300,9 @@ const Navigation = () => {
         </div>
       </motion.aside>
 
-      {/* MOBILE BOTTOM NAV - WITH HIDE ON SCROLL & GLASS EFFECT */}
+      {/* BOTTOM NAVIGATION – visible only on mobile (below md: 768px) */}
       <nav
-        className={`fixed bottom-0 left-0 right-0 z-50 lg:hidden
+        className={`fixed bottom-0 left-0 right-0 z-50 md:hidden
           border-t shadow-md backdrop-blur-md transition-transform duration-300
           ${
             isDark
@@ -328,7 +313,7 @@ const Navigation = () => {
           transform: showBottomNav ? "translateY(0)" : "translateY(100%)",
         }}
       >
-        <div className="flex items-end justify-around max-w-md mx-auto px-2 py-1">
+        <div className="flex items-end justify-around px-2 py-1">
           {/* Home */}
           <div className="flex-1 flex flex-col items-center">
             <NavItem icon={LayoutGrid} to="/feed" nav="home" isMobile />
@@ -365,7 +350,7 @@ const Navigation = () => {
             </span>
           </div>
 
-          {/* Post (special raised button) */}
+          {/* Post (raised button) */}
           <div className="flex-1 flex flex-col items-center">
             <motion.button
               whileTap={{ scale: 0.9 }}
@@ -435,6 +420,6 @@ const Navigation = () => {
       </nav>
     </>
   );
-  // your existing JSX same continue...
 };
+
 export default Navigation;

@@ -5,7 +5,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Filter, X, AlertCircle } from "lucide-react";
+import { Filter, X, AlertCircle, Users, Loader2 } from "lucide-react";
 import { useUserValues } from "../../Context/UserValuesContext";
 import IssueCard from "../components/IssueCard";
 import FilterBar from "../components/FilterBar";
@@ -20,6 +20,9 @@ import { useTheme } from "../../Context/ThemeContext";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const APIURL = `${BACKEND_URL}/api`;
+
+// Cache TTL: 5 minutes
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // =============================
 // Helper Components
@@ -80,6 +83,74 @@ const SkeletonIssueCard = ({ isDark }) => {
   );
 };
 
+const AdvancedLoader = ({ isDark }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="flex flex-col items-center justify-center py-20 px-4 text-center"
+    >
+      <div className="relative">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+          className="w-20 h-20 rounded-full border-4 border-t-transparent"
+          style={{
+            borderColor: isDark ? "#a78bfa" : "#10b981",
+            borderTopColor: "transparent",
+          }}
+        />
+        <motion.div
+          animate={{ rotate: -360 }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-2 w-16 h-16 rounded-full border-4 border-b-transparent"
+          style={{
+            borderColor: isDark ? "#c4b5fd" : "#34d399",
+            borderBottomColor: "transparent",
+          }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Users
+            size={28}
+            className={isDark ? "text-violet-300" : "text-green-600"}
+          />
+        </div>
+      </div>
+      <motion.h3
+        initial={{ y: 10, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className={`mt-6 text-xl font-black ${
+          isDark ? "text-white" : "text-gray-800"
+        }`}
+      >
+        Loading Issues
+      </motion.h3>
+      <motion.p
+        initial={{ y: 10, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className={`text-sm mt-2 ${isDark ? "text-violet-300" : "text-gray-500"}`}
+      >
+        Fetching reports based on your filters...
+      </motion.p>
+      <div className="flex gap-1 mt-6">
+        {[...Array(3)].map((_, i) => (
+          <motion.div
+            key={i}
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+            className={`w-2 h-2 rounded-full ${
+              isDark ? "bg-violet-400" : "bg-green-500"
+            }`}
+          />
+        ))}
+      </div>
+    </motion.div>
+  );
+};
+
 // =============================
 // Main Component
 // =============================
@@ -101,6 +172,9 @@ const Feed = () => {
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [error, setError] = useState(null);
 
+  // Advanced loader for ANY filter change
+  const [showAdvancedLoader, setShowAdvancedLoader] = useState(false);
+
   // Pagination and data
   const { displayedIssues, setDisplayedIssues } = useUserValues();
   const [page, setPage] = useState(1);
@@ -114,9 +188,48 @@ const Feed = () => {
   const bottomObserverRef = useRef(null);
   const scrollRestoredRef = useRef(false);
   const initialDataLoaded = useRef(false);
+  const advancedLoaderTimer = useRef(null);
+  const prevFiltersRef = useRef(null); // Track previous filters to detect real changes
 
   const ITEMS_PER_PAGE = 5;
   const citizenId = localStorage.getItem("citizenId") || "CID-XXXX";
+
+  // =============================
+  // Cache Helpers (with TTL)
+  // =============================
+  const saveFeedState = useCallback(
+    (issuesData, pageNum = 1) => {
+      if (!issuesData || issuesData.length === 0) return;
+
+      const stateToSave = {
+        issues: issuesData,
+        page: pageNum,
+        filters: {
+          district,
+          department,
+          status,
+          sortBy,
+          onlyWithImages,
+          onlyMyIssues,
+        },
+        timestamp: Date.now(),
+      };
+
+      sessionStorage.setItem("feedData", JSON.stringify(stateToSave));
+    },
+    [district, department, status, sortBy, onlyWithImages, onlyMyIssues],
+  );
+
+  const clearCache = useCallback(() => {
+    sessionStorage.removeItem("feedData");
+  }, []);
+
+  // Expose clearCache globally for post/update/delete events
+  useEffect(() => {
+    const handleClearCache = () => clearCache();
+    window.addEventListener("clearFeedCache", handleClearCache);
+    return () => window.removeEventListener("clearFeedCache", handleClearCache);
+  }, [clearCache]);
 
   // =============================
   // Scroll Restoration Helpers
@@ -187,7 +300,8 @@ const Feed = () => {
         });
 
         if (district !== DISTRICTS[0]) params.append("district", district);
-        if (department !== DEPARTMENTS[0]) params.append("department", department);
+        if (department !== DEPARTMENTS[0])
+          params.append("department", department);
         if (status !== STATUSES[0]) params.append("status", status);
         if (sortBy !== SORT_OPTIONS[0])
           params.append("sortBy", sortBy.toLowerCase().replace(" ", ""));
@@ -203,14 +317,27 @@ const Feed = () => {
 
         const rawIssues = data.issues || [];
         const newIssues = rawIssues.map(normalizeIssue);
+        
+        if (newIssues.length === 0) {
+          setHasMore(false);
+          return;
+        }
 
         if (append) {
           setDisplayedIssues((prev) => {
             const existingIds = new Set(prev.map((i) => i._id));
             const uniqueNew = newIssues.filter((i) => !existingIds.has(i._id));
-            return [...prev, ...uniqueNew];
+            const updated = [...prev, ...uniqueNew];
+
+            saveFeedState(updated, pageNum);
+
+            return updated;
           });
+
+          // ✅ ADD THIS
           setHasMore(data.hasMore);
+
+          // ✅ ADD THIS
           pageRef.current = pageNum;
           setPage(pageNum);
         } else {
@@ -218,6 +345,8 @@ const Feed = () => {
           setHasMore(data.hasMore);
           pageRef.current = 1;
           setPage(1);
+          // Save fresh data to cache
+          saveFeedState(newIssues, 1);
         }
       } catch (err) {
         if (err.name !== "AbortError") {
@@ -232,38 +361,25 @@ const Feed = () => {
         else setLoadingMore(false);
         isFetchingRef.current = false;
         abortControllerRef.current = null;
+        // Turn off the advanced loader when done
+        setShowAdvancedLoader(false);
       }
     },
-    [district, department, status, sortBy, onlyWithImages, onlyMyIssues, citizenId, setDisplayedIssues],
+    [
+      district,
+      department,
+      status,
+      sortBy,
+      onlyWithImages,
+      onlyMyIssues,
+      citizenId,
+      setDisplayedIssues,
+      saveFeedState,
+    ],
   );
 
   // =============================
-  // Save feed data & filters to sessionStorage
-  // =============================
-  const saveFeedState = useCallback(() => {
-    const stateToSave = {
-      issues: displayedIssues,
-      page: pageRef.current,
-      filters: {
-        district,
-        department,
-        status,
-        sortBy,
-        onlyWithImages,
-        onlyMyIssues,
-      },
-    };
-    sessionStorage.setItem("feedData", JSON.stringify(stateToSave));
-  }, [displayedIssues, district, department, status, sortBy, onlyWithImages, onlyMyIssues]);
-
-  useEffect(() => {
-    if (displayedIssues.length > 0) {
-      saveFeedState();
-    }
-  }, [displayedIssues, saveFeedState]);
-
-  // =============================
-  // Initial load & restoration
+  // Initial load & restoration (with TTL)
   // =============================
   useEffect(() => {
     const savedStateStr = sessionStorage.getItem("feedData");
@@ -279,14 +395,24 @@ const Feed = () => {
           onlyWithImages,
           onlyMyIssues,
         };
-        const filtersMatch = JSON.stringify(savedFilters) === JSON.stringify(currentFilters);
-        if (filtersMatch && savedState.issues?.length) {
+        const filtersMatch =
+          JSON.stringify(savedFilters) === JSON.stringify(currentFilters);
+        const isCacheValid =
+          Date.now() - (savedState.timestamp || 0) < CACHE_TTL_MS;
+
+        if (filtersMatch && isCacheValid && savedState.issues?.length) {
           setDisplayedIssues(savedState.issues);
           setPage(savedState.page);
           pageRef.current = savedState.page;
           setHasMore(true);
           scrollRestoredRef.current = false;
+
           initialDataLoaded.current = true;
+
+          // 🔥 IMPORTANT FIX
+          prevFiltersRef.current = JSON.stringify(savedState.filters);
+
+          console.log("⚡ Loaded from cache (TTL valid)");
           return;
         } else {
           sessionStorage.removeItem("feedData");
@@ -295,7 +421,7 @@ const Feed = () => {
         console.error("Failed to parse saved feed data", e);
       }
     }
-    // No cached data or filters don't match – fetch fresh
+    // No cached data or cache expired / filters mismatch – fetch fresh
     fetchIssues(1, false).then(() => {
       initialDataLoaded.current = true;
     });
@@ -306,6 +432,7 @@ const Feed = () => {
   // =============================
   useEffect(() => {
     const handleNewIssue = (event) => {
+      clearCache(); // Invalidate cache on new issue
       const currentScroll = window.scrollY;
       fetchIssues(1, false).then(() => {
         window.scrollTo(0, currentScroll);
@@ -314,16 +441,51 @@ const Feed = () => {
 
     window.addEventListener("newIssueCreated", handleNewIssue);
     return () => window.removeEventListener("newIssueCreated", handleNewIssue);
-  }, [fetchIssues]);
+  }, [fetchIssues, clearCache]);
 
   // =============================
-  // Filter Changes – fetch fresh data (skip initial mount)
+  // Filter Changes – show Advanced Loader and fetch (only if filters actually changed)
   // =============================
   useEffect(() => {
     if (!initialDataLoaded.current) return;
 
-    if (filterTimeout.current) clearTimeout(filterTimeout.current);
+    // 🔥 NEW FIX (IMPORTANT)
+    if (prevFiltersRef.current === null) {
+      prevFiltersRef.current = JSON.stringify({
+        district,
+        department,
+        status,
+        sortBy,
+        onlyWithImages,
+        onlyMyIssues,
+      });
+      return; // ❌ STOP first execution
+    }
 
+    // Get current filter values as a string for comparison
+    const currentFilters = JSON.stringify({
+      district,
+      department,
+      status,
+      sortBy,
+      onlyWithImages,
+      onlyMyIssues,
+    });
+
+    // Skip if filters haven't changed from previous render
+    if (prevFiltersRef.current === currentFilters) return;
+    prevFiltersRef.current = currentFilters;
+
+    // Clear any pending timer
+    if (filterTimeout.current) clearTimeout(filterTimeout.current);
+    if (advancedLoaderTimer.current) clearTimeout(advancedLoaderTimer.current);
+
+    // Clear existing data and show loader
+    setDisplayedIssues([]);
+    setShowAdvancedLoader(true);
+    setError(null);
+
+    // Debounce filter changes (300ms)
     filterTimeout.current = setTimeout(() => {
       pageRef.current = 1;
       setPage(1);
@@ -343,6 +505,7 @@ const Feed = () => {
     onlyWithImages,
     onlyMyIssues,
     fetchIssues,
+    setDisplayedIssues,
   ]);
 
   // =============================
@@ -357,12 +520,13 @@ const Feed = () => {
     }
   }, [loading, displayedIssues, restoreScrollPosition]);
 
-  // =============================
-  // Infinite Scroll Observer
-  // =============================
   const loadMoreIssues = useCallback(async () => {
     if (isFetchingRef.current || loading || loadingMore || !hasMore) return;
+
     const nextPage = pageRef.current + 1;
+
+    console.log("👉 Fetching page:", nextPage);
+
     await fetchIssues(nextPage, true);
   }, [hasMore, loading, loadingMore, fetchIssues]);
 
@@ -391,63 +555,59 @@ const Feed = () => {
     setOnlyWithImages(false);
     setOnlyMyIssues(false);
   };
-const handleLike = useCallback(
-  async (issueId) => {
-    if (!citizenId) return;
 
-    let previousState;
+  const handleLike = useCallback(
+    async (issueId) => {
+      if (!citizenId) return;
 
-    setDisplayedIssues((prev) => {
-      previousState = prev;
+      let previousState;
 
-      return prev.map((issue) => {
-        if (issue._id !== issueId) return issue;
-
-        const alreadyLiked = issue.likes?.includes(citizenId);
-
-        // ✅ ONLY LIKE (no unlike on double tap)
-        if (alreadyLiked) return issue;
-
-        const updatedLikes = [...(issue.likes || []), citizenId];
-
-        return {
-          ...issue,
-          likes: updatedLikes,
-          likeCount: updatedLikes.length,
-        };
-      });
-    });
-
-    try {
-      const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citizenId }),
+      setDisplayedIssues((prev) => {
+        previousState = prev;
+        return prev.map((issue) => {
+          if (issue._id !== issueId) return issue;
+          const alreadyLiked = issue.likes?.includes(citizenId);
+          if (alreadyLiked) return issue;
+          const updatedLikes = [...(issue.likes || []), citizenId];
+          return {
+            ...issue,
+            likes: updatedLikes,
+            likeCount: updatedLikes.length,
+          };
+        });
       });
 
-      const data = await res.json();
-
-      if (data.success) {
-        setDisplayedIssues((prev) =>
-          prev.map((issue) =>
-            issue._id === issueId
-              ? {
-                  ...issue,
-                  likes: data.likes,
-                  likeCount: data.likeCount ?? data.likes.length,
-                }
-              : issue
-          )
-        );
-      } else {
+      try {
+        const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ citizenId }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setDisplayedIssues((prev) =>
+            prev.map((issue) =>
+              issue._id === issueId
+                ? {
+                    ...issue,
+                    likes: data.likes,
+                    likeCount: data.likeCount ?? data.likes.length,
+                  }
+                : issue,
+            ),
+          );
+          // Update cache after like (optional, but keeps consistency)
+          saveFeedState();
+        } else {
+          setDisplayedIssues(previousState);
+        }
+      } catch (err) {
         setDisplayedIssues(previousState);
       }
-    } catch (err) {
-      setDisplayedIssues(previousState);
-    }
-  },
-  [citizenId, setDisplayedIssues]
-);
+    },
+    [citizenId, setDisplayedIssues, saveFeedState],
+  );
+
   // =============================
   // Render
   // =============================
@@ -467,7 +627,7 @@ const handleLike = useCallback(
           <div className="px-4 py-3 flex items-center justify-between">
             <div>
               <h1 className={`text-lg font-black tracking-tight ${theme.text}`}>
-                Feed
+                PEOPLE VOICE
               </h1>
               <p
                 className={`text-[10px] uppercase tracking-wider ${
@@ -525,8 +685,10 @@ const handleLike = useCallback(
         {/* Main Feed */}
         <main className="flex-1 max-w-2xl w-full relative">
           <div className="space-y-0 md:space-y-6 pb-16">
-            {/* Loading State (first load) */}
-            {loading && displayedIssues.length === 0 ? (
+            {/* Show Advanced Loader for 4 seconds on ANY filter change */}
+            {showAdvancedLoader ? (
+              <AdvancedLoader isDark={isDark} />
+            ) : loading && displayedIssues.length === 0 ? (
               <div className="space-y-6">
                 {Array.from({ length: ITEMS_PER_PAGE }).map((_, idx) => (
                   <SkeletonIssueCard key={idx} isDark={isDark} />
@@ -594,7 +756,7 @@ const handleLike = useCallback(
                       onComment={() =>
                         setCommentModalData({ ...issue, setDisplayedIssues })
                       }
-                      fullWidthMobile={true} // 👈 enable Instagram style on mobile
+                      fullWidthMobile={true}
                     />
                   </motion.div>
                 ))}
