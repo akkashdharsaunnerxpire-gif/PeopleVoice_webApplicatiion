@@ -89,8 +89,9 @@ const IssueCard = ({
   const heartDirectionRef = useRef("left");
   const isAnimatingRef = useRef(false);
   const imageContainerRef = useRef(null);
+  const scrollStartY = useRef(0); // 🔥 NEW: track vertical scroll
 
-  // ========== FUNCTIONS (defined before useEffect) ==========
+  // ========== FUNCTIONS ==========
   const showHeartAnimation = useCallback((x, y) => {
     if (isAnimatingRef.current) return;
 
@@ -149,57 +150,92 @@ const IssueCard = ({
     }, 200);
   }, []);
 
-  const handleTap = useCallback(
+  // 🔥 FIXED: Double tap handler for BOTH desktop and mobile
+  const handleDoubleTap = useCallback(
     (e) => {
       e.preventDefault();
-      const now = Date.now();
-      const timeDiff = now - lastTapTime.current;
-
+      e.stopPropagation();
+      
+      // Get center position for heart animation
       const rect = e.currentTarget.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-
-      if (timeDiff < 300 && timeDiff > 0) {
-        isDoubleTap.current = true;
-        showHeartAnimation(centerX, centerY);
-        if (!liked) onLike?.();
-        if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
+      let centerX, centerY;
+      
+      if (e.clientX) {
+        // Desktop click event
+        centerX = e.clientX;
+        centerY = e.clientY;
+      } else if (e.touches && e.touches[0]) {
+        // Mobile touch event
+        centerX = e.touches[0].clientX;
+        centerY = e.touches[0].clientY;
       } else {
-        doubleTapTimer.current = setTimeout(() => {
-          isDoubleTap.current = false;
-        }, 300);
+        // Fallback to center of element
+        centerX = rect.left + rect.width / 2;
+        centerY = rect.top + rect.height / 2;
       }
-
-      lastTapTime.current = now;
+      
+      showHeartAnimation(centerX, centerY);
+      if (!liked) onLike?.();
     },
     [liked, onLike, showHeartAnimation]
   );
+
+  // 🔥 FIXED: Touch handlers for mobile (allows vertical scroll)
+  const handleTouchStart = useCallback((e) => {
+    touchStartX.current = e.touches[0].clientX;
+    scrollStartY.current = e.touches[0].clientY; // 🔥 Track vertical start
+    isDoubleTap.current = false;
+    
+    // Setup double tap detection
+    const now = Date.now();
+    const timeDiff = now - lastTapTime.current;
+    
+    if (timeDiff < 300 && timeDiff > 0) {
+      isDoubleTap.current = true;
+      handleDoubleTap(e);
+      if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
+    } else {
+      if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
+      doubleTapTimer.current = setTimeout(() => {
+        isDoubleTap.current = false;
+      }, 300);
+    }
+    
+    lastTapTime.current = now;
+  }, [handleDoubleTap]);
 
   const handleTouchMove = useCallback((e) => {
     touchEndX.current = e.touches[0].clientX;
   }, []);
 
   const handleTouchEnd = useCallback(() => {
+    // 🔥 CRITICAL: Don't handle swipe if double tap occurred
     if (isDoubleTap.current) {
       isDoubleTap.current = false;
       touchStartX.current = 0;
       touchEndX.current = 0;
+      scrollStartY.current = 0;
       return;
     }
 
-    const diff = touchStartX.current - touchEndX.current;
-    if (Math.abs(diff) > 60) {
-      if (diff > 0 && currentImageIndex < totalImages - 1)
+    const diffX = touchStartX.current - touchEndX.current;
+    const diffY = Math.abs(scrollStartY.current - (touchEndX.current === touchStartX.current ? scrollStartY.current : touchEndX.current));
+    
+    // 🔥 Only handle horizontal swipe if horizontal movement > vertical movement
+    if (Math.abs(diffX) > 60 && Math.abs(diffX) > diffY) {
+      if (diffX > 0 && currentImageIndex < totalImages - 1) {
         changeImage(currentImageIndex + 1);
-      else if (diff < 0 && currentImageIndex > 0)
+      } else if (diffX < 0 && currentImageIndex > 0) {
         changeImage(currentImageIndex - 1);
+      }
     }
+    
     touchStartX.current = 0;
     touchEndX.current = 0;
+    scrollStartY.current = 0;
   }, [currentImageIndex, totalImages, changeImage]);
 
   // ========== EFFECTS ==========
-  // Preload images
   useEffect(() => {
     images.forEach((url) => {
       const img = new Image();
@@ -207,7 +243,6 @@ const IssueCard = ({
     });
   }, [images]);
 
-  // Fetch saved status
   useEffect(() => {
     if (!citizenId || !issue._id) return;
     const checkSaved = async () => {
@@ -224,7 +259,6 @@ const IssueCard = ({
     checkSaved();
   }, [citizenId, issue._id]);
 
-  // Cleanup timers and animation on unmount
   useEffect(() => {
     return () => {
       if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
@@ -233,29 +267,26 @@ const IssueCard = ({
     };
   }, []);
 
-  // Attach native touch listeners with passive: false
+  // 🔥 FIXED: Attach touch listeners WITHOUT preventDefault (allows scroll)
   useEffect(() => {
     const container = imageContainerRef.current;
     if (!container) return;
 
-    const touchStartHandler = (e) => {
-      e.preventDefault();
-      touchStartX.current = e.touches[0].clientX;
-      handleTap(e);
-    };
-    const touchMoveHandler = (e) => handleTouchMove(e);
-    const touchEndHandler = () => handleTouchEnd();
-
-    container.addEventListener("touchstart", touchStartHandler, { passive: false });
-    container.addEventListener("touchmove", touchMoveHandler);
-    container.addEventListener("touchend", touchEndHandler);
+    // Use passive: true for touchstart to allow scrolling
+    container.addEventListener("touchstart", handleTouchStart, { passive: true });
+    container.addEventListener("touchmove", handleTouchMove, { passive: true });
+    container.addEventListener("touchend", handleTouchEnd);
+    
+    // 🔥 Desktop double click support
+    container.addEventListener("dblclick", handleDoubleTap);
 
     return () => {
-      container.removeEventListener("touchstart", touchStartHandler);
-      container.removeEventListener("touchmove", touchMoveHandler);
-      container.removeEventListener("touchend", touchEndHandler);
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchmove", handleTouchMove);
+      container.removeEventListener("touchend", handleTouchEnd);
+      container.removeEventListener("dblclick", handleDoubleTap);
     };
-  }, [handleTap, handleTouchMove, handleTouchEnd]);
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd, handleDoubleTap]);
 
   // ========== MENU & HELPERS ==========
   const handleMenuToggle = (e) => {
@@ -599,12 +630,11 @@ const IssueCard = ({
           </div>
         </div>
 
-        {/* Image Section */}
+        {/* 🔥 FIXED: Image Section - Now scrollable on mobile, double tap works on desktop */}
         <div
           ref={imageContainerRef}
           className={`relative select-none ${isDark ? "bg-zinc-950" : "bg-gray-100"}`}
-          style={{ touchAction: "pan-y" }}
-          onDoubleClick={handleTap}
+          style={{ touchAction: "pan-y pinch-zoom" }} // 🔥 Allows vertical scroll
         >
           {images.length > 0 ? (
             <>
@@ -618,7 +648,7 @@ const IssueCard = ({
                     transition={{ duration: 0.15 }}
                     src={images[currentImageIndex]}
                     alt={`Issue ${currentImageIndex + 1}`}
-                    className="w-full h-full object-cover lg:object-contain"
+                    className="w-full h-full object-cover lg:object-contain pointer-events-none" // 🔥 pointer-events-none allows scrolling through image
                     draggable={false}
                     loading="lazy"
                   />
@@ -630,7 +660,7 @@ const IssueCard = ({
                   {currentImageIndex > 0 && (
                     <motion.button
                       onClick={prevImage}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full backdrop-blur-sm"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full backdrop-blur-sm z-10"
                     >
                       <ChevronLeft size={20} />
                     </motion.button>
@@ -638,7 +668,7 @@ const IssueCard = ({
                   {currentImageIndex < totalImages - 1 && (
                     <motion.button
                       onClick={nextImage}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full backdrop-blur-sm"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full backdrop-blur-sm z-10"
                     >
                       <ChevronRight size={20} />
                     </motion.button>
@@ -647,7 +677,7 @@ const IssueCard = ({
               )}
 
               {totalImages > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
                   {images.map((_, i) => (
                     <motion.button
                       key={i}
@@ -949,7 +979,7 @@ const IssueCard = ({
         {showErrorToast && <Toast message={errorMessage} type="error" />}
       </AnimatePresence>
 
-      <style jsx global >{`
+      <style jsx global>{`
         .double-tap-heart {
           position: fixed;
           transform: translate(-50%, -50%);
