@@ -174,9 +174,13 @@ exports.getIssueById = async (req, res) => {
 };
 
 /* ================= UPDATE ISSUE STATUS ================= */
+/* ================= UPDATE ISSUE STATUS (FIXED) ================= */
 exports.updateIssueStatus = async (req, res) => {
   try {
     const { status } = req.body;
+    const { id } = req.params;
+
+    console.log("🔄 Updating issue status:", { id, status });
 
     const validStatuses = ["Sent", "In Progress", "Resolved", "Closed", "solved"];
 
@@ -185,9 +189,9 @@ exports.updateIssueStatus = async (req, res) => {
     }
 
     const issue = await Issue.findByIdAndUpdate(
-      req.params.id,
+      id,
       {
-        status,
+        status: status,
         updatedAt: new Date(),
         notificationRead: false,
       },
@@ -198,30 +202,39 @@ exports.updateIssueStatus = async (req, res) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
-    /* ✅ ALWAYS SAVE NOTIFICATION */
+    console.log("✅ Issue updated:", issue._id, "Status:", status);
+    console.log("   Citizen ID:", issue.citizenId);
+
+    /* ✅ SAVE NOTIFICATION for all status changes except "Sent" */
     if (status !== "Sent") {
       let message;
 
       if (status === "solved" || status === "Closed") {
-        message = `Your issue "${issue.reason}" has been closed`;
+        message = `✅ Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" has been closed`;
       } else if (status === "Resolved") {
-        message = `Your issue "${issue.reason}" has been resolved`;
+        message = `✅ Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" has been resolved`;
       } else if (status === "In Progress") {
-        message = `Your issue "${issue.reason}" is now In Progress`;
+        message = `🔄 Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" is now In Progress`;
       } else {
-        message = `Your issue "${issue.reason}" is now ${status}`;
+        message = `📢 Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" is now ${status}`;
       }
 
-      console.log("🔥 Saving notification...");
+      console.log("🔥 Saving notification for citizen:", issue.citizenId);
+      console.log("   Message:", message);
+      
       await saveNotification(issue, status, message);
+      console.log("✅ Notification save completed");
+    } else {
+      console.log("⚠️ Status is 'Sent', skipping notification");
     }
 
     res.json({
+      success: true,
       message: "Issue status updated successfully",
       issue,
     });
   } catch (error) {
-    console.error("Update Status Error:", error);
+    console.error("❌ Update Status Error:", error);
     res.status(500).json({ message: "Status update failed" });
   }
 };
