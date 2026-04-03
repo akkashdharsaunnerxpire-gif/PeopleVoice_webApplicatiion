@@ -11,7 +11,7 @@ import {
   Tag,
   Share2,
   Flag,
-  Link as LinkIcon,
+  LinkIcon,
   Image as ImageIcon,
   CheckCircle,
   ChevronDown,
@@ -20,7 +20,6 @@ import {
   Clock,
   Home,
   Bookmark,
-  Type,
 } from "lucide-react";
 import { themeColors } from "./constants";
 import { useTheme } from "../../Context/ThemeContext";
@@ -60,6 +59,7 @@ const IssueCard = ({
     ? `${issue.district.toLowerCase().trim().replace(/\s+/g, "")}_citizen`
     : "local_citizen";
 
+  // ========== STATE ==========
   const [showMenu, setShowMenu] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const images = issue.images_data || [];
@@ -75,6 +75,8 @@ const IssueCard = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAllHashtags, setShowAllHashtags] = useState(false);
+
+  // ========== REFS ==========
   const lastTapTime = useRef(0);
   const doubleTapTimer = useRef(null);
   const heartAnimationRef = useRef(null);
@@ -86,7 +88,117 @@ const IssueCard = ({
   const isTransitioning = useRef(false);
   const heartDirectionRef = useRef("left");
   const isAnimatingRef = useRef(false);
+  const imageContainerRef = useRef(null);
 
+  // ========== FUNCTIONS (defined before useEffect) ==========
+  const showHeartAnimation = useCallback((x, y) => {
+    if (isAnimatingRef.current) return;
+
+    isAnimatingRef.current = true;
+
+    if (heartAnimationRef.current) heartAnimationRef.current.remove();
+
+    const heart = document.createElement("div");
+    heart.className = "double-tap-heart";
+
+    const tilt = heartDirectionRef.current === "left" ? -25 : 25;
+    heartDirectionRef.current =
+      heartDirectionRef.current === "left" ? "right" : "left";
+
+    heart.style.setProperty("--tilt", `${tilt}deg`);
+
+    heart.style.left = `${x}px`;
+    heart.style.top = `${y}px`;
+
+    heart.innerHTML = `
+      <svg width="110" height="110" viewBox="0 0 24 24">
+        <defs>
+          <linearGradient id="heartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#ff3b5c"/>
+            <stop offset="50%" stop-color="#ff2e88"/>
+            <stop offset="100%" stop-color="#ff2e88"/>
+          </linearGradient>
+        </defs>
+        <path 
+          d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 
+          2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09 
+          C13.09 3.81 14.76 3 16.5 3 
+          19.58 3 22 5.42 22 8.5 
+          c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+          fill="url(#heartGradient)"
+        />
+      </svg>
+    `;
+
+    document.body.appendChild(heart);
+    heartAnimationRef.current = heart;
+
+    setTimeout(() => {
+      heart.remove();
+      heartAnimationRef.current = null;
+      isAnimatingRef.current = false;
+    }, 1600);
+  }, []);
+
+  const changeImage = useCallback((newIndex) => {
+    if (isTransitioning.current) return;
+    isTransitioning.current = true;
+    setCurrentImageIndex(newIndex);
+    setTimeout(() => {
+      isTransitioning.current = false;
+    }, 200);
+  }, []);
+
+  const handleTap = useCallback(
+    (e) => {
+      e.preventDefault();
+      const now = Date.now();
+      const timeDiff = now - lastTapTime.current;
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      if (timeDiff < 300 && timeDiff > 0) {
+        isDoubleTap.current = true;
+        showHeartAnimation(centerX, centerY);
+        if (!liked) onLike?.();
+        if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
+      } else {
+        doubleTapTimer.current = setTimeout(() => {
+          isDoubleTap.current = false;
+        }, 300);
+      }
+
+      lastTapTime.current = now;
+    },
+    [liked, onLike, showHeartAnimation]
+  );
+
+  const handleTouchMove = useCallback((e) => {
+    touchEndX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (isDoubleTap.current) {
+      isDoubleTap.current = false;
+      touchStartX.current = 0;
+      touchEndX.current = 0;
+      return;
+    }
+
+    const diff = touchStartX.current - touchEndX.current;
+    if (Math.abs(diff) > 60) {
+      if (diff > 0 && currentImageIndex < totalImages - 1)
+        changeImage(currentImageIndex + 1);
+      else if (diff < 0 && currentImageIndex > 0)
+        changeImage(currentImageIndex - 1);
+    }
+    touchStartX.current = 0;
+    touchEndX.current = 0;
+  }, [currentImageIndex, totalImages, changeImage]);
+
+  // ========== EFFECTS ==========
   // Preload images
   useEffect(() => {
     images.forEach((url) => {
@@ -101,7 +213,7 @@ const IssueCard = ({
     const checkSaved = async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/api/saved/check?citizenId=${citizenId}&issueId=${issue._id}`,
+          `${API_BASE}/api/saved/check?citizenId=${citizenId}&issueId=${issue._id}`
         );
         const data = await res.json();
         if (data.success) setIsSaved(data.isSaved);
@@ -112,7 +224,7 @@ const IssueCard = ({
     checkSaved();
   }, [citizenId, issue._id]);
 
-  // Cleanup
+  // Cleanup timers and animation on unmount
   useEffect(() => {
     return () => {
       if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
@@ -121,8 +233,31 @@ const IssueCard = ({
     };
   }, []);
 
-  // Font size labels for accessibility
+  // Attach native touch listeners with passive: false
+  useEffect(() => {
+    const container = imageContainerRef.current;
+    if (!container) return;
 
+    const touchStartHandler = (e) => {
+      e.preventDefault();
+      touchStartX.current = e.touches[0].clientX;
+      handleTap(e);
+    };
+    const touchMoveHandler = (e) => handleTouchMove(e);
+    const touchEndHandler = () => handleTouchEnd();
+
+    container.addEventListener("touchstart", touchStartHandler, { passive: false });
+    container.addEventListener("touchmove", touchMoveHandler);
+    container.addEventListener("touchend", touchEndHandler);
+
+    return () => {
+      container.removeEventListener("touchstart", touchStartHandler);
+      container.removeEventListener("touchmove", touchMoveHandler);
+      container.removeEventListener("touchend", touchEndHandler);
+    };
+  }, [handleTap, handleTouchMove, handleTouchEnd]);
+
+  // ========== MENU & HELPERS ==========
   const handleMenuToggle = (e) => {
     e.stopPropagation();
     setShowMenu((prev) => !prev);
@@ -223,130 +358,13 @@ const IssueCard = ({
       action: () => {
         setShowMenu(false);
         navigator.clipboard.writeText(
-          `${window.location.origin}/issue/${issue._id}`,
+          `${window.location.origin}/issue/${issue._id}`
         );
         setShowSavedToast(true);
         setTimeout(() => setShowSavedToast(false), 2000);
       },
     },
   ];
-
-  const showHeartAnimation = useCallback((x, y) => {
-    if (isAnimatingRef.current) return;
-
-    isAnimatingRef.current = true;
-
-    if (heartAnimationRef.current) heartAnimationRef.current.remove();
-
-    const heart = document.createElement("div");
-    heart.className = "double-tap-heart";
-
-    const tilt = heartDirectionRef.current === "left" ? -25 : 25;
-    heartDirectionRef.current =
-      heartDirectionRef.current === "left" ? "right" : "left";
-
-    heart.style.setProperty("--tilt", `${tilt}deg`);
-
-    heart.style.left = `${x}px`;
-    heart.style.top = `${y}px`;
-
-    heart.innerHTML = `
-  <svg width="110" height="110" viewBox="0 0 24 24">
-    <defs>
-      <linearGradient id="heartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#ff3b5c"/>
-        <stop offset="50%" stop-color="#ff2e88"/>
-        <stop offset="100%" stop-color="#ff2e88"/>
-      </linearGradient>
-    </defs>
-    <path 
-      d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 
-      2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09 
-      C13.09 3.81 14.76 3 16.5 3 
-      19.58 3 22 5.42 22 8.5 
-      c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-      fill="url(#heartGradient)"
-    />
-  </svg>
-`;
-
-    document.body.appendChild(heart);
-    heartAnimationRef.current = heart;
-
-    setTimeout(() => {
-      heart.remove();
-      heartAnimationRef.current = null;
-      isAnimatingRef.current = false;
-    }, 1600);
-  }, []);
-
-  const handleTap = useCallback(
-    (e) => {
-      e.preventDefault();
-      const now = Date.now();
-      const timeDiff = now - lastTapTime.current;
-
-      const rect = e.currentTarget.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-
-      if (timeDiff < 300 && timeDiff > 0) {
-        isDoubleTap.current = true;
-
-        showHeartAnimation(centerX, centerY);
-
-        if (!liked) {
-          onLike?.();
-        }
-
-        if (doubleTapTimer.current) clearTimeout(d0oubleTapTimer.current);
-      } else {
-        doubleTapTimer.current = setTimeout(() => {
-          isDoubleTap.current = false;
-        }, 300);
-      }
-
-      lastTapTime.current = now;
-    },
-    [liked, onLike, showHeartAnimation],
-  );
-
-  const handleTouchStart = (e) => {
-    touchStartX.current = e.touches[0].clientX;
-    handleTap(e);
-  };
-
-  const handleTouchMove = (e) => {
-    touchEndX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = () => {
-    if (isDoubleTap.current) {
-      isDoubleTap.current = false;
-      touchStartX.current = 0;
-      touchEndX.current = 0;
-      return;
-    }
-
-    const diff = touchStartX.current - touchEndX.current;
-    if (Math.abs(diff) > 60) {
-      if (diff > 0 && currentImageIndex < totalImages - 1)
-        changeImage(currentImageIndex + 1);
-      else if (diff < 0 && currentImageIndex > 0)
-        changeImage(currentImageIndex - 1);
-    }
-    touchStartX.current = 0;
-    touchEndX.current = 0;
-  };
-
-  const changeImage = (newIndex) => {
-    if (isTransitioning.current) return;
-    isTransitioning.current = true;
-    setCurrentImageIndex(newIndex);
-    setTimeout(() => {
-      isTransitioning.current = false;
-    }, 200);
-  };
 
   const nextImage = (e) => {
     e.stopPropagation();
@@ -363,9 +381,7 @@ const IssueCard = ({
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
-
     const diff = now - date;
-
     const seconds = Math.floor(diff / 1000);
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -378,7 +394,6 @@ const IssueCard = ({
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days}d ago`;
     if (days < 30) return `${Math.floor(days / 7)}w ago`;
-
     return date.toLocaleDateString("en-IN", {
       day: "numeric",
       month: "short",
@@ -477,6 +492,7 @@ const IssueCard = ({
     }
   `;
 
+  // ========== RENDER ==========
   return (
     <>
       <motion.article
@@ -512,7 +528,6 @@ const IssueCard = ({
                 >
                   {username}
                 </span>
-
                 {issue.official && (
                   <span
                     className="bg-blue-100 text-blue-600 px-1 py-0.5 rounded-full"
@@ -586,12 +601,9 @@ const IssueCard = ({
 
         {/* Image Section */}
         <div
+          ref={imageContainerRef}
           className={`relative select-none ${isDark ? "bg-zinc-950" : "bg-gray-100"}`}
           style={{ touchAction: "pan-y" }}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onClick={handleTap}
           onDoubleClick={handleTap}
         >
           {images.length > 0 ? (
@@ -644,7 +656,13 @@ const IssueCard = ({
                         e.stopPropagation();
                         if (!isTransitioning.current) changeImage(i);
                       }}
-                      className={`w-2 h-2 rounded-full transition-all ${i === currentImageIndex ? "bg-green-500 scale-125" : isDark ? "bg-zinc-600" : "bg-gray-400"}`}
+                      className={`w-2 h-2 rounded-full transition-all ${
+                        i === currentImageIndex
+                          ? "bg-green-500 scale-125"
+                          : isDark
+                          ? "bg-zinc-600"
+                          : "bg-gray-400"
+                      }`}
                     />
                   ))}
                 </div>
@@ -652,7 +670,9 @@ const IssueCard = ({
             </>
           ) : (
             <div
-              className={`aspect-square flex flex-col items-center justify-center gap-2 ${isDark ? "bg-zinc-950 text-gray-600" : "bg-gray-50 text-gray-400"}`}
+              className={`aspect-square flex flex-col items-center justify-center gap-2 ${
+                isDark ? "bg-zinc-950 text-gray-600" : "bg-gray-50 text-gray-400"
+              }`}
             >
               <ImageIcon
                 className={`w-12 h-12 ${isDark ? "text-gray-700" : "text-gray-300"}`}
@@ -680,7 +700,13 @@ const IssueCard = ({
               >
                 <Heart
                   size={24}
-                  className={`sm:w-7 sm:h-7 transition-all ${liked ? "text-red-500 fill-red-500" : isDark ? "text-gray-300" : theme.textMuted}`}
+                  className={`sm:w-7 sm:h-7 transition-all ${
+                    liked
+                      ? "text-red-500 fill-red-500"
+                      : isDark
+                      ? "text-gray-300"
+                      : theme.textMuted
+                  }`}
                 />
               </motion.div>
               <span
@@ -702,7 +728,11 @@ const IssueCard = ({
             >
               <MessageCircle
                 size={24}
-                className={`sm:w-7 sm:h-7 ${isDark ? "text-gray-200 group-hover:text-green-400" : "text-gray-600 group-hover:text-green-600"}`}
+                className={`sm:w-7 sm:h-7 ${
+                  isDark
+                    ? "text-gray-200 group-hover:text-green-400"
+                    : "text-gray-600 group-hover:text-green-600"
+                }`}
               />
               <span
                 className={`font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}
@@ -723,7 +753,11 @@ const IssueCard = ({
             >
               <Send
                 size={24}
-                className={`sm:w-7 sm:h-7 ${isDark ? "text-gray-200 group-hover:text-blue-400" : "text-gray-600 group-hover:text-blue-500"}`}
+                className={`sm:w-7 sm:h-7 ${
+                  isDark
+                    ? "text-gray-200 group-hover:text-blue-400"
+                    : "text-gray-600 group-hover:text-blue-500"
+                }`}
               />
             </motion.button>
           </div>
@@ -734,11 +768,19 @@ const IssueCard = ({
               whileTap={{ scale: 0.9 }}
               onClick={handleSaveClick}
               disabled={!citizenId || saving}
-              className={`focus:outline-none ${!citizenId || saving ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`focus:outline-none ${
+                !citizenId || saving ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               <Bookmark
                 size={24}
-                className={`sm:w-7 sm:h-7 transition-all duration-300 ${isSaved ? "fill-green-500 text-green-500" : isDark ? "text-gray-300" : theme.textMuted}`}
+                className={`sm:w-7 sm:h-7 transition-all duration-300 ${
+                  isSaved
+                    ? "fill-green-500 text-green-500"
+                    : isDark
+                    ? "text-gray-300"
+                    : theme.textMuted
+                }`}
               />
             </motion.button>
 
@@ -748,7 +790,13 @@ const IssueCard = ({
                   initial={{ opacity: 0, y: 10, scale: 0.8 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                  className={`absolute -bottom-8 right-0 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 ${saveMessage === "Saved" ? "bg-green-500" : saveMessage === "Removed" ? "bg-orange-500" : "bg-red-500"}`}
+                  className={`absolute -bottom-8 right-0 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 ${
+                    saveMessage === "Saved"
+                      ? "bg-green-500"
+                      : saveMessage === "Removed"
+                      ? "bg-orange-500"
+                      : "bg-red-500"
+                  }`}
                   style={{ fontSize: "0.75rem" }}
                 >
                   {saveMessage === "Saved" ? (
@@ -781,7 +829,9 @@ const IssueCard = ({
             {issue.description_ta && (
               <div>
                 <p
-                  className={`font-tamil leading-relaxed ${isDark ? "text-gray-400" : "text-gray-700"}`}
+                  className={`font-tamil leading-relaxed ${
+                    isDark ? "text-gray-400" : "text-gray-700"
+                  }`}
                   style={{ fontSize: "1em" }}
                 >
                   <span className="font-semibold text-green-600">தமிழ்:</span>{" "}
@@ -792,7 +842,7 @@ const IssueCard = ({
                 {needsTruncation(issue.description_ta, true) && !isExpanded && (
                   <button
                     onClick={() => setIsExpanded(true)}
-                    className={`text-green-600 dark:text-green-400 flex items-center gap-1 mt-1`}
+                    className="text-green-600 dark:text-green-400 flex items-center gap-1 mt-1"
                     style={{ fontSize: "0.85em" }}
                   >
                     <ChevronDown size={14} /> Read more...
@@ -816,7 +866,9 @@ const IssueCard = ({
 
           <div className="mt-3 flex flex-wrap gap-2">
             <span
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full ${isDark ? "bg-zinc-800 text-gray-300" : "bg-gray-100 text-gray-700"}`}
+              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full ${
+                isDark ? "bg-zinc-800 text-gray-300" : "bg-gray-100 text-gray-700"
+              }`}
               style={{ fontSize: "0.85em" }}
             >
               <Tag size={14} />
@@ -826,31 +878,32 @@ const IssueCard = ({
 
           {issue.hashtags?.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 mt-2">
-              {(showAllHashtags
-                ? issue.hashtags
-                : issue.hashtags.slice(0, 3)
-              ).map((tag, i) => (
-                <span
-                  key={i}
-                  className={isDark ? "text-blue-400" : "text-blue-600"}
-                  style={{ fontSize: "0.85em" }}
-                >
-                  #{tag}
-                </span>
-              ))}
+              {(showAllHashtags ? issue.hashtags : issue.hashtags.slice(0, 3)).map(
+                (tag, i) => (
+                  <span
+                    key={i}
+                    className={isDark ? "text-blue-400" : "text-blue-600"}
+                    style={{ fontSize: "0.85em" }}
+                  >
+                    #{tag}
+                  </span>
+                )
+              )}
               {issue.hashtags.length > 3 && (
                 <button
                   onClick={() => setShowAllHashtags(!showAllHashtags)}
                   className="text-xs text-green-600 dark:text-green-400 hover:underline ml-1"
                 >
-                  {showAllHashtags ? "less" : `..more`}
+                  {showAllHashtags ? "less" : "..more"}
                 </button>
               )}
             </div>
           )}
 
           <div
-            className={`mt-4 pt-3 border-t ${isDark ? "border-zinc-800" : "border-gray-100"}`}
+            className={`mt-4 pt-3 border-t ${
+              isDark ? "border-zinc-800" : "border-gray-100"
+            }`}
           >
             <div className="flex gap-2">
               <Home
@@ -870,14 +923,18 @@ const IssueCard = ({
             {commentCount > 0 && (
               <motion.button
                 onClick={onComment}
-                className={`transition-colors ${isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+                className={`transition-colors ${
+                  isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                }`}
                 style={{ fontSize: "0.8em" }}
               >
                 {commentCount} comments பார்க்க
               </motion.button>
             )}
             <p
-              className={`flex items-center gap-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+              className={`flex items-center gap-1 ${
+                isDark ? "text-gray-500" : "text-gray-400"
+              }`}
               style={{ fontSize: "0.75em" }}
             >
               <Clock size={14} />
@@ -892,7 +949,7 @@ const IssueCard = ({
         {showErrorToast && <Toast message={errorMessage} type="error" />}
       </AnimatePresence>
 
-      <style jsx global>{`
+      <style jsx global >{`
         .double-tap-heart {
           position: fixed;
           transform: translate(-50%, -50%);
