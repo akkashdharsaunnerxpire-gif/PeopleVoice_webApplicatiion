@@ -363,12 +363,22 @@ const IssueCard = ({
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays}d ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    const diff = now - date;
+
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (seconds < 10) return "Just now";
+    if (seconds < 60) return `${seconds}s ago`;
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days}d ago`;
+    if (days < 30) return `${Math.floor(days / 7)}w ago`;
+
     return date.toLocaleDateString("en-IN", {
       day: "numeric",
       month: "short",
@@ -833,9 +843,7 @@ const IssueCard = ({
                   onClick={() => setShowAllHashtags(!showAllHashtags)}
                   className="text-xs text-green-600 dark:text-green-400 hover:underline ml-1"
                 >
-                  {showAllHashtags
-                    ? "less"
-                    : `..more`}
+                  {showAllHashtags ? "less" : `..more`}
                 </button>
               )}
             </div>

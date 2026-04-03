@@ -281,7 +281,9 @@ const Feed = () => {
   const fetchIssues = useCallback(
     async (pageNum, append = false) => {
       if (append && isFetchingRef.current) return;
+
       if (abortControllerRef.current) abortControllerRef.current.abort();
+
       const controller = new AbortController();
       abortControllerRef.current = controller;
       isFetchingRef.current = true;
@@ -311,13 +313,14 @@ const Feed = () => {
         const res = await fetch(`${APIURL}/issues?${params.toString()}`, {
           signal: controller.signal,
         });
+
         const data = await res.json();
 
         if (!data.success) throw new Error(data.message);
 
         const rawIssues = data.issues || [];
         const newIssues = rawIssues.map(normalizeIssue);
-        
+
         if (newIssues.length === 0) {
           setHasMore(false);
           return;
@@ -334,10 +337,7 @@ const Feed = () => {
             return updated;
           });
 
-          // ✅ ADD THIS
           setHasMore(data.hasMore);
-
-          // ✅ ADD THIS
           pageRef.current = pageNum;
           setPage(pageNum);
         } else {
@@ -345,12 +345,13 @@ const Feed = () => {
           setHasMore(data.hasMore);
           pageRef.current = 1;
           setPage(1);
-          // Save fresh data to cache
+
           saveFeedState(newIssues, 1);
         }
       } catch (err) {
         if (err.name !== "AbortError") {
           setError(err.message);
+
           if (!append) {
             setDisplayedIssues([]);
             setHasMore(false);
@@ -359,9 +360,9 @@ const Feed = () => {
       } finally {
         if (!append) setLoading(false);
         else setLoadingMore(false);
+
         isFetchingRef.current = false;
         abortControllerRef.current = null;
-        // Turn off the advanced loader when done
         setShowAdvancedLoader(false);
       }
     },
@@ -431,12 +432,13 @@ const Feed = () => {
   // Real-time Updates: New Issue Created
   // =============================
   useEffect(() => {
-    const handleNewIssue = (event) => {
-      clearCache(); // Invalidate cache on new issue
-      const currentScroll = window.scrollY;
-      fetchIssues(1, false).then(() => {
-        window.scrollTo(0, currentScroll);
-      });
+    const handleNewIssue = () => {
+      clearCache();
+
+      fetchIssues(1, false);
+
+      // 🔥 ADD THIS
+      window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
     window.addEventListener("newIssueCreated", handleNewIssue);

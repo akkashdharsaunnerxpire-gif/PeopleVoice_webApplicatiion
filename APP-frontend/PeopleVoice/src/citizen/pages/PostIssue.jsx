@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../Context/ThemeContext";
 import { DISTRICTS } from "../components/constants";
 import { themeColors } from "../components/constants";
+import { useUserValues } from "../../Context/UserValuesContext";
 
 /* ================= CONFIG ================= */
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
@@ -270,6 +271,7 @@ const PostIssue = () => {
   const [cameraAllowed, setCameraAllowed] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
   const [isValidatingImage, setIsValidatingImage] = useState(false);
+  const { addNewIssue } = useUserValues();
 
   // Description view toggle
   const [descView, setDescView] = useState("both");
@@ -457,12 +459,18 @@ const PostIssue = () => {
 
       let friendlyMsg = t("cameraDenied");
 
-      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+      if (
+        err.name === "NotAllowedError" ||
+        err.name === "PermissionDeniedError"
+      ) {
         friendlyMsg =
           language === "en"
             ? "Camera permission denied. Please allow camera access in your browser settings and try again."
             : "கேமரா அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் கேமரா அனுமதியை அனுமதித்து மீண்டும் முயற்சிக்கவும்.";
-      } else if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+      } else if (
+        err.name === "NotFoundError" ||
+        err.name === "OverconstrainedError"
+      ) {
         friendlyMsg =
           language === "en"
             ? "No suitable camera found on this device."
@@ -658,6 +666,7 @@ const PostIssue = () => {
       });
       const result = await res.json();
       if (res.ok && result.success) {
+        addNewIssue(result.issue);
         setDistrict("");
         setArea("");
         setDepartment("");
