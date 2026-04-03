@@ -67,7 +67,7 @@ exports.getAllIssues = async (req, res) => {
     };
 
     // 🥈 STORE IN REDIS (5 mins)
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
+    await redisClient.setEx(cacheKey, 20, JSON.stringify(response)); // ✅ FIX
 
     res.json(response);
   } catch (err) {
@@ -109,6 +109,10 @@ exports.toggleLike = async (req, res) => {
   try {
     const { id } = req.params;
     const { citizenId } = req.body;
+    const keys = await redisClient.keys("issues:*");
+    if (keys.length > 0) {
+      await redisClient.del(keys);
+    }
 
     if (!citizenId)
       return res.status(400).json({ message: "citizenId required" });

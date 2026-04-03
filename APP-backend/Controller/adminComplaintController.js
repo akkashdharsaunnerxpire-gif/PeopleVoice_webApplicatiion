@@ -40,7 +40,7 @@ exports.handleStatusAction = async (req, res) => {
         await DistrictPerformance.findOneAndUpdate(
           { district: issue.district },
           { $inc: { issuesResolved: 1 } },
-          { upsert: true }
+          { upsert: true },
         );
       }
 
@@ -60,7 +60,22 @@ exports.handleStatusAction = async (req, res) => {
     });
 
     /* 🔥 ADD THIS (NOTIFICATION SAVE) */
-    await saveNotification(updatedIssue, updatedIssue.status);
+    // 🔥 CORRECT NOTIFICATION LOGIC
+    if (action === "notify") {
+      await saveNotification(
+        updatedIssue,
+        updatedIssue.status,
+        `Officer has started working on your issue: "${updatedIssue.reason}"`,
+      );
+    }
+
+    if (action === "close") {
+      await saveNotification(
+        updatedIssue,
+        updatedIssue.status,
+        `Your issue "${updatedIssue.reason}" has been closed`,
+      );
+    }
 
     res.json({
       success: true,
@@ -101,7 +116,7 @@ exports.resolveIssue = async (req, res) => {
       await DistrictPerformance.findOneAndUpdate(
         { district: issue.district },
         { $inc: { issuesResolved: 1 } },
-        { upsert: true }
+        { upsert: true },
       );
     }
 
@@ -114,11 +129,15 @@ exports.resolveIssue = async (req, res) => {
         resolved_date: new Date(),
         notificationRead: false,
       },
-      { new: true }
+      { new: true },
     );
 
     /* 🔥 ADD THIS (NOTIFICATION SAVE) */
-    await saveNotification(updatedIssue, updatedIssue.status);
+    await saveNotification(
+      updatedIssue,
+      updatedIssue.status,
+      `Your issue "${updatedIssue.reason}" has been resolved`,
+    );
 
     res.json({
       success: true,

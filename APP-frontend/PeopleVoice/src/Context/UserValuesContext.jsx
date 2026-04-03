@@ -6,48 +6,21 @@ export const UserValuesProvider = ({ children }) => {
   const [displayedIssues, setDisplayedIssues] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ ADD NEW ISSUE (TOP LA INSERT + DUPLICATE AVOID)
   const addNewIssue = useCallback((newIssue) => {
-    setDisplayedIssues((prev) => {
-      const exists = prev.some((issue) => issue._id === newIssue._id);
-      if (exists) return prev;
-
-      return [
-        {
-          ...newIssue,
-          likes: newIssue.likes || [],
-          likeCount:
-            newIssue.likeCount ?? newIssue.likes?.length ?? 0,
-          comments: newIssue.comments || [],
-        },
-        ...prev,
-      ];
-    });
+    setDisplayedIssues((prev) => [newIssue, ...prev]);
   }, []);
 
-  // ✅ UPDATE ISSUE (LIKE + GENERAL UPDATE FIX)
   const updateIssue = useCallback((issueId, updates) => {
     setDisplayedIssues((prev) =>
-      prev.map((issue) => {
-        if (issue._id !== issueId) return issue;
-
-        const updatedLikes = updates.likes ?? issue.likes ?? [];
-
-        return {
-          ...issue,
-          ...updates,
-          likes: updatedLikes,
-          likeCount:
-            updates.likeCount ??
-            updatedLikes.length ??
-            issue.likeCount ??
-            0,
-        };
-      })
+      prev.map((issue) =>
+        issue._id === issueId
+          ? { ...issue, ...updates, likes: updates.likes ?? issue.likes ?? [] }
+          : issue
+      )
     );
   }, []);
 
-  // ✅ COMMENTS UPDATE
+
   const updateComments = useCallback((issueId, newComments) => {
     setDisplayedIssues((prev) =>
       prev.map((issue) =>
@@ -58,7 +31,6 @@ export const UserValuesProvider = ({ children }) => {
     );
   }, []);
 
-  // ✅ SINGLE COMMENT UPDATE
   const updateComment = useCallback((issueId, commentId, updates) => {
     setDisplayedIssues((prev) =>
       prev.map((issue) => {

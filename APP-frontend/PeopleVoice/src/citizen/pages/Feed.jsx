@@ -22,7 +22,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const APIURL = `${BACKEND_URL}/api`;
 
 // Cache TTL: 5 minutes
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 30 * 1000;
 
 // =============================
 // Helper Components
@@ -281,9 +281,7 @@ const Feed = () => {
   const fetchIssues = useCallback(
     async (pageNum, append = false) => {
       if (append && isFetchingRef.current) return;
-
       if (abortControllerRef.current) abortControllerRef.current.abort();
-
       const controller = new AbortController();
       abortControllerRef.current = controller;
       isFetchingRef.current = true;
@@ -313,7 +311,6 @@ const Feed = () => {
         const res = await fetch(`${APIURL}/issues?${params.toString()}`, {
           signal: controller.signal,
         });
-
         const data = await res.json();
 
         if (!data.success) throw new Error(data.message);
@@ -337,7 +334,10 @@ const Feed = () => {
             return updated;
           });
 
+          // ✅ ADD THIS
           setHasMore(data.hasMore);
+
+          // ✅ ADD THIS
           pageRef.current = pageNum;
           setPage(pageNum);
         } else {
@@ -345,13 +345,12 @@ const Feed = () => {
           setHasMore(data.hasMore);
           pageRef.current = 1;
           setPage(1);
-
+          // Save fresh data to cache
           saveFeedState(newIssues, 1);
         }
       } catch (err) {
         if (err.name !== "AbortError") {
           setError(err.message);
-
           if (!append) {
             setDisplayedIssues([]);
             setHasMore(false);
@@ -360,9 +359,9 @@ const Feed = () => {
       } finally {
         if (!append) setLoading(false);
         else setLoadingMore(false);
-
         isFetchingRef.current = false;
         abortControllerRef.current = null;
+        // Turn off the advanced loader when done
         setShowAdvancedLoader(false);
       }
     },
@@ -432,13 +431,12 @@ const Feed = () => {
   // Real-time Updates: New Issue Created
   // =============================
   useEffect(() => {
-    const handleNewIssue = () => {
-      clearCache();
-
-      fetchIssues(1, false);
-
-      // 🔥 ADD THIS
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    const handleNewIssue = (event) => {
+      clearCache(); // Invalidate cache on new issue
+      const currentScroll = window.scrollY;
+      fetchIssues(1, false).then(() => {
+        window.scrollTo(0, currentScroll);
+      });
     };
 
     window.addEventListener("newIssueCreated", handleNewIssue);
@@ -587,8 +585,8 @@ const Feed = () => {
         });
         const data = await res.json();
         if (data.success) {
-          setDisplayedIssues((prev) =>
-            prev.map((issue) =>
+          setDisplayedIssues((prev) => {
+            const updated = prev.map((issue) =>
               issue._id === issueId
                 ? {
                     ...issue,
@@ -596,10 +594,12 @@ const Feed = () => {
                     likeCount: data.likeCount ?? data.likes.length,
                   }
                 : issue,
-            ),
-          );
-          // Update cache after like (optional, but keeps consistency)
-          saveFeedState();
+            );
+
+            saveFeedState(updated, pageRef.current); // ✅ correct
+
+            return updated;
+          });
         } else {
           setDisplayedIssues(previousState);
         }
