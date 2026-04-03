@@ -151,15 +151,16 @@ const IssueCard = ({
   }, []);
 
   // 🔥 FIXED: Double tap handler for BOTH desktop and mobile
+  // 🔥 FIXED: Remove preventDefault to avoid passive event listener warning
   const handleDoubleTap = useCallback(
     (e) => {
-      e.preventDefault();
+      // ✅ REMOVED e.preventDefault() - causes warning
       e.stopPropagation();
-      
+
       // Get center position for heart animation
       const rect = e.currentTarget.getBoundingClientRect();
       let centerX, centerY;
-      
+
       if (e.clientX) {
         // Desktop click event
         centerX = e.clientX;
@@ -173,26 +174,26 @@ const IssueCard = ({
         centerX = rect.left + rect.width / 2;
         centerY = rect.top + rect.height / 2;
       }
-      
+
       showHeartAnimation(centerX, centerY);
       if (!liked) onLike?.();
     },
-    [liked, onLike, showHeartAnimation]
+    [liked, onLike, showHeartAnimation],
   );
 
-  // 🔥 FIXED: Touch handlers for mobile (allows vertical scroll)
+  // 🔥 FIXED: Don't call handleDoubleTap directly in touchstart
   const handleTouchStart = useCallback((e) => {
     touchStartX.current = e.touches[0].clientX;
-    scrollStartY.current = e.touches[0].clientY; // 🔥 Track vertical start
+    scrollStartY.current = e.touches[0].clientY;
     isDoubleTap.current = false;
-    
+
     // Setup double tap detection
     const now = Date.now();
     const timeDiff = now - lastTapTime.current;
-    
+
     if (timeDiff < 300 && timeDiff > 0) {
       isDoubleTap.current = true;
-      handleDoubleTap(e);
+      // ✅ REMOVED: handleDoubleTap(e) - don't call here
       if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
     } else {
       if (doubleTapTimer.current) clearTimeout(doubleTapTimer.current);
@@ -200,18 +201,28 @@ const IssueCard = ({
         isDoubleTap.current = false;
       }, 300);
     }
-    
+
     lastTapTime.current = now;
-  }, [handleDoubleTap]);
+  }, []); // ✅ Removed handleDoubleTap dependency
 
-  const handleTouchMove = useCallback((e) => {
-    touchEndX.current = e.touches[0].clientX;
-  }, []);
-
+  // 🔥 FIXED: Handle double tap in touchend
   const handleTouchEnd = useCallback(() => {
-    // 🔥 CRITICAL: Don't handle swipe if double tap occurred
+    // Handle double tap like
     if (isDoubleTap.current) {
       isDoubleTap.current = false;
+
+      // Trigger like if not already liked
+      if (!liked) onLike?.();
+
+      // Show heart animation at center of image
+      const container = imageContainerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        showHeartAnimation(centerX, centerY);
+      }
+
       touchStartX.current = 0;
       touchEndX.current = 0;
       scrollStartY.current = 0;
@@ -219,9 +230,14 @@ const IssueCard = ({
     }
 
     const diffX = touchStartX.current - touchEndX.current;
-    const diffY = Math.abs(scrollStartY.current - (touchEndX.current === touchStartX.current ? scrollStartY.current : touchEndX.current));
-    
-    // 🔥 Only handle horizontal swipe if horizontal movement > vertical movement
+    const diffY = Math.abs(
+      scrollStartY.current -
+        (touchEndX.current === touchStartX.current
+          ? scrollStartY.current
+          : touchEndX.current),
+    );
+
+    // Only handle horizontal swipe if horizontal movement > vertical movement
     if (Math.abs(diffX) > 60 && Math.abs(diffX) > diffY) {
       if (diffX > 0 && currentImageIndex < totalImages - 1) {
         changeImage(currentImageIndex + 1);
@@ -229,12 +245,21 @@ const IssueCard = ({
         changeImage(currentImageIndex - 1);
       }
     }
-    
+
     touchStartX.current = 0;
     touchEndX.current = 0;
     scrollStartY.current = 0;
-  }, [currentImageIndex, totalImages, changeImage]);
-
+  }, [
+    currentImageIndex,
+    totalImages,
+    changeImage,
+    liked,
+    onLike,
+    showHeartAnimation,
+  ]);
+  const handleTouchMove = useCallback((e) => {
+    touchEndX.current = e.touches[0].clientX;
+  }, []);
   // ========== EFFECTS ==========
   useEffect(() => {
     images.forEach((url) => {
@@ -248,7 +273,7 @@ const IssueCard = ({
     const checkSaved = async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/api/saved/check?citizenId=${citizenId}&issueId=${issue._id}`
+          `${API_BASE}/api/saved/check?citizenId=${citizenId}&issueId=${issue._id}`,
         );
         const data = await res.json();
         if (data.success) setIsSaved(data.isSaved);
@@ -273,10 +298,12 @@ const IssueCard = ({
     if (!container) return;
 
     // Use passive: true for touchstart to allow scrolling
-    container.addEventListener("touchstart", handleTouchStart, { passive: true });
+    container.addEventListener("touchstart", handleTouchStart, {
+      passive: true,
+    });
     container.addEventListener("touchmove", handleTouchMove, { passive: true });
     container.addEventListener("touchend", handleTouchEnd);
-    
+
     // 🔥 Desktop double click support
     container.addEventListener("dblclick", handleDoubleTap);
 
@@ -389,7 +416,7 @@ const IssueCard = ({
       action: () => {
         setShowMenu(false);
         navigator.clipboard.writeText(
-          `${window.location.origin}/issue/${issue._id}`
+          `${window.location.origin}/issue/${issue._id}`,
         );
         setShowSavedToast(true);
         setTimeout(() => setShowSavedToast(false), 2000);
@@ -690,8 +717,8 @@ const IssueCard = ({
                         i === currentImageIndex
                           ? "bg-green-500 scale-125"
                           : isDark
-                          ? "bg-zinc-600"
-                          : "bg-gray-400"
+                            ? "bg-zinc-600"
+                            : "bg-gray-400"
                       }`}
                     />
                   ))}
@@ -701,7 +728,9 @@ const IssueCard = ({
           ) : (
             <div
               className={`aspect-square flex flex-col items-center justify-center gap-2 ${
-                isDark ? "bg-zinc-950 text-gray-600" : "bg-gray-50 text-gray-400"
+                isDark
+                  ? "bg-zinc-950 text-gray-600"
+                  : "bg-gray-50 text-gray-400"
               }`}
             >
               <ImageIcon
@@ -734,8 +763,8 @@ const IssueCard = ({
                     liked
                       ? "text-red-500 fill-red-500"
                       : isDark
-                      ? "text-gray-300"
-                      : theme.textMuted
+                        ? "text-gray-300"
+                        : theme.textMuted
                   }`}
                 />
               </motion.div>
@@ -808,8 +837,8 @@ const IssueCard = ({
                   isSaved
                     ? "fill-green-500 text-green-500"
                     : isDark
-                    ? "text-gray-300"
-                    : theme.textMuted
+                      ? "text-gray-300"
+                      : theme.textMuted
                 }`}
               />
             </motion.button>
@@ -824,8 +853,8 @@ const IssueCard = ({
                     saveMessage === "Saved"
                       ? "bg-green-500"
                       : saveMessage === "Removed"
-                      ? "bg-orange-500"
-                      : "bg-red-500"
+                        ? "bg-orange-500"
+                        : "bg-red-500"
                   }`}
                   style={{ fontSize: "0.75rem" }}
                 >
@@ -897,7 +926,9 @@ const IssueCard = ({
           <div className="mt-3 flex flex-wrap gap-2">
             <span
               className={`inline-flex items-center gap-1 px-3 py-1 rounded-full ${
-                isDark ? "bg-zinc-800 text-gray-300" : "bg-gray-100 text-gray-700"
+                isDark
+                  ? "bg-zinc-800 text-gray-300"
+                  : "bg-gray-100 text-gray-700"
               }`}
               style={{ fontSize: "0.85em" }}
             >
@@ -908,17 +939,18 @@ const IssueCard = ({
 
           {issue.hashtags?.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 mt-2">
-              {(showAllHashtags ? issue.hashtags : issue.hashtags.slice(0, 3)).map(
-                (tag, i) => (
-                  <span
-                    key={i}
-                    className={isDark ? "text-blue-400" : "text-blue-600"}
-                    style={{ fontSize: "0.85em" }}
-                  >
-                    #{tag}
-                  </span>
-                )
-              )}
+              {(showAllHashtags
+                ? issue.hashtags
+                : issue.hashtags.slice(0, 3)
+              ).map((tag, i) => (
+                <span
+                  key={i}
+                  className={isDark ? "text-blue-400" : "text-blue-600"}
+                  style={{ fontSize: "0.85em" }}
+                >
+                  #{tag}
+                </span>
+              ))}
               {issue.hashtags.length > 3 && (
                 <button
                   onClick={() => setShowAllHashtags(!showAllHashtags)}
@@ -954,7 +986,9 @@ const IssueCard = ({
               <motion.button
                 onClick={onComment}
                 className={`transition-colors ${
-                  isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                  isDark
+                    ? "text-gray-400 hover:text-gray-200"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
                 style={{ fontSize: "0.8em" }}
               >
@@ -979,7 +1013,7 @@ const IssueCard = ({
         {showErrorToast && <Toast message={errorMessage} type="error" />}
       </AnimatePresence>
 
-      <style jsx global>{`
+      <style>{`
         .double-tap-heart {
           position: fixed;
           transform: translate(-50%, -50%);
