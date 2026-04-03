@@ -1,10 +1,12 @@
 const Notification = require("../Models/Notification");
-const Issue = require("../Models/PostIssueModel"); // ✅ FORCE LOAD
+const Issue = require("../Models/PostIssueModel");
 
-/* ================= SAVE ================= */
+/* ================= SAVE NOTIFICATION ================= */
 const saveNotification = async (issue, status, customMessage = null) => {
   try {
-    if (!issue || !issue.citizenId) return;
+    if (!issue || !issue.citizenId) {
+      return;
+    }
 
     let type = "info";
     if (["Resolved", "solved", "Closed"].includes(status)) type = "success";
@@ -13,36 +15,26 @@ const saveNotification = async (issue, status, customMessage = null) => {
     const msg =
       customMessage ||
       `Your issue "${issue.reason || "Report"}" is now ${status}`;
-    const exists = await Notification.findOne({
+
+    const notification = await Notification.create({
       citizenId: String(issue.citizenId),
       issueId: issue._id,
       message: msg,
       status: status,
-    });
-
-    if (exists) {
-      console.log("⚠️ Duplicate notification blocked");
-      return;
-    }
-
-    await Notification.create({
-      citizenId: String(issue.citizenId),
-      issueId: issue._id,
-      message: msg,
-      status,
-      type,
-      location: issue.area || "",
+      type: type,
+      location: issue.area || issue.district || "",
       image: issue.images_data?.[0] || null,
       read: false,
+      createdAt: new Date(),
     });
-
-    console.log("✅ Notification saved");
+    
+    return notification;
   } catch (err) {
-    console.error("❌ Save Error:", err);
+    console.error("Save Notification Error:", err);
   }
 };
 
-/* ================= GET ================= */
+/* ================= GET NOTIFICATIONS ================= */
 const getNotifications = async (req, res) => {
   try {
     const { citizenId } = req.query;
@@ -51,29 +43,21 @@ const getNotifications = async (req, res) => {
       return res.status(400).json({ message: "citizenId is required" });
     }
 
-    console.log("Fetching notifications for:", citizenId); // ← important debug
-
     const notifications = await Notification.find({
-      citizenId: String(citizenId), // safe side
+      citizenId: String(citizenId),
     })
       .sort({ createdAt: -1 })
-      .populate({
-        path: "issueId",
-        ref: "PostIssue",
-        select: "reason images_data area department",
-      })
-      .lean(); // ← faster + easier to debug
-
-    console.log(`Found ${notifications.length} notifications`);
+      .limit(50)
+      .lean();
 
     res.json(notifications);
   } catch (error) {
-    console.error("❌ Fetch notifications error:", error);
+    console.error("Fetch notifications error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-/* ================= READ ================= */
+/* ================= MARK AS READ ================= */
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
@@ -85,7 +69,7 @@ const markAsRead = async (req, res) => {
     const notification = await Notification.findByIdAndUpdate(
       id,
       { read: true },
-      { new: true },
+      { new: true }
     );
 
     if (!notification) {
@@ -94,17 +78,18 @@ const markAsRead = async (req, res) => {
 
     res.json({ success: true, notification });
   } catch (error) {
-    console.error("❌ Mark read error:", error);
+    console.error("Mark read error:", error);
     res.status(500).json({ message: "Error updating notification" });
   }
 };
 
-/* ================= DELETE ================= */
+/* ================= DELETE NOTIFICATION ================= */
 const deleteNotification = async (req, res) => {
   try {
     await Notification.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (error) {
+    console.error("Delete failed:", error);
     res.status(500).json({ message: "Delete failed" });
   }
 };
