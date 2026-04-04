@@ -10,6 +10,7 @@ const {
   checkNewPosts,
   getIssue,
   deleteIssue,
+  getMyIssues,
   deleteComment,
   updateComment,
 } = require("../Controller/PostIssueController");
@@ -25,6 +26,8 @@ router.get("/issues/check-new", checkNewPosts);
 
 // GET SINGLE ISSUE
 router.get("/issues/:id", getIssue);
+
+router.get("/my-issues", getMyIssues);
 
 // LIKE/UNLIKE POST
 router.post("/issues/:id/like", toggleLike);

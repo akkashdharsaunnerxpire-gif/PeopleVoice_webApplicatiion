@@ -3,6 +3,25 @@ const Complaint = require("../Models/PostIssueModel");
 const SavedIssue = require("../Models/SavedIssue");
 const redisClient = require("../config/redis");
 
+/* ---------------- HELPER: Get current cache version (or create) ---------------- */
+const getCacheVersion = async () => {
+  let version = await redisClient.get("cache:version:issues");
+  if (!version) {
+    version = "1";
+    await redisClient.set("cache:version:issues", version);
+  }
+  return version;
+};
+
+/* ---------------- HELPER: Increment cache version (invalidates all caches) ---------------- */
+const invalidateAllCaches = async () => {
+  const newVersion = Date.now().toString(); // Use timestamp for unique version
+  await redisClient.set("cache:version:issues", newVersion);
+  console.log(
+    `🔄 Cache version updated to ${newVersion} – all caches invalidated`,
+  );
+};
+
 /* ---------------- POST ISSUE ---------------- */
 exports.postIssue = async (req, res) => {
   try {
@@ -12,11 +31,7 @@ exports.postIssue = async (req, res) => {
       likeCount: 0,
       comments: [],
     });
-    const keys = await redisClient.keys("issues:*");
-
-    if (keys.length > 0) {
-      await redisClient.del(keys);
-    }
+    await invalidateAllCaches();
     res.status(201).json({ success: true, issue });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -24,25 +39,20 @@ exports.postIssue = async (req, res) => {
 };
 
 /* ---------------- GET ALL ISSUES (with pagination) ---------------- */
-
 exports.getAllIssues = async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit) || 5, 1);
+    const version = await getCacheVersion();
+    const cacheKey = `issues:v${version}:${JSON.stringify(req.query)}`;
 
-    // 🔥 UNIQUE CACHE KEY
-    const cacheKey = `issues:${JSON.stringify(req.query)}`;
-
-    // 🥇 CHECK CACHE
     const cachedData = await redisClient.get(cacheKey);
-
     if (cachedData) {
-      console.log("⚡ Cache HIT");
+      console.log("⚡ Cache HIT", cacheKey);
       return res.json(JSON.parse(cachedData));
     }
 
-    console.log("🐢 Cache MISS → DB");
-
+    console.log("🐢 Cache MISS → DB", cacheKey);
     const skip = (page - 1) * limit;
 
     const filter = {};
@@ -50,9 +60,8 @@ exports.getAllIssues = async (req, res) => {
       filter.district = req.query.district;
 
     const totalCount = await Complaint.countDocuments(filter);
-
     const issues = await Complaint.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
@@ -66,14 +75,14 @@ exports.getAllIssues = async (req, res) => {
       issues,
     };
 
-    // 🥈 STORE IN REDIS (5 mins)
-    await redisClient.setEx(cacheKey, 20, JSON.stringify(response)); // ✅ FIX
-
+    await redisClient.setEx(cacheKey, 20, JSON.stringify(response));
     res.json(response);
   } catch (err) {
-    res.status(500).json({ success: false });
+    console.error("getAllIssues error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
+
 /* ---------------- CHECK FOR NEW POSTS ---------------- */
 exports.checkNewPosts = async (req, res) => {
   try {
@@ -109,10 +118,6 @@ exports.toggleLike = async (req, res) => {
   try {
     const { id } = req.params;
     const { citizenId } = req.body;
-    const keys = await redisClient.keys("issues:*");
-    if (keys.length > 0) {
-      await redisClient.del(keys);
-    }
 
     if (!citizenId)
       return res.status(400).json({ message: "citizenId required" });
@@ -121,7 +126,6 @@ exports.toggleLike = async (req, res) => {
     if (!issue) return res.status(404).json({ message: "Issue not found" });
 
     const liked = issue.likes.includes(citizenId);
-
     let updateOperation;
     if (liked) {
       updateOperation = {
@@ -139,6 +143,8 @@ exports.toggleLike = async (req, res) => {
       new: true,
     });
 
+    await invalidateAllCaches();
+
     res.json({
       success: true,
       likes: updated.likes,
@@ -146,13 +152,12 @@ exports.toggleLike = async (req, res) => {
       liked: !liked,
     });
   } catch (err) {
+    console.error("toggleLike error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
 /* ---------------- ADD COMMENT (WITH FULL NESTED REPLY SUPPORT) ---------------- */
-// controllers/PostIssueController.js
-
 exports.addComment = async (req, res) => {
   try {
     const { id: issueId } = req.params;
@@ -172,7 +177,6 @@ exports.addComment = async (req, res) => {
         .json({ success: false, message: "Issue not found" });
     }
 
-    // Optional: validate parent exists if provided
     if (parentCommentId) {
       const parentExists = issue.comments.some(
         (c) => c._id.toString() === parentCommentId,
@@ -194,19 +198,23 @@ exports.addComment = async (req, res) => {
     };
 
     issue.comments.push(newComment);
+    issue.updatedAt = new Date();
     await issue.save();
+
+    await invalidateAllCaches();
 
     res.status(201).json({
       success: true,
       message: "Comment added",
       newComment,
-      comments: issue.comments, // optional - can be removed if frontend manages it
+      comments: issue.comments,
     });
   } catch (err) {
     console.error("addComment error:", err);
     res.status(500).json({ success: false, message: "Failed to add comment" });
   }
 };
+
 /* ---------------- LIKE / UNLIKE COMMENT (WITH NESTED SUPPORT) ---------------- */
 exports.toggleCommentLike = async (req, res) => {
   try {
@@ -214,40 +222,35 @@ exports.toggleCommentLike = async (req, res) => {
     const { citizenId } = req.body;
 
     if (!citizenId) {
-      return res.status(400).json({
-        success: false,
-        message: "citizenId required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "citizenId required" });
     }
 
     const issue = await Complaint.findById(issueId);
-
     if (!issue) {
-      return res.status(404).json({
-        success: false,
-        message: "Issue not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Issue not found" });
     }
 
-    // ✅ Find comment directly from flat array
     const comment = issue.comments.id(commentId);
-
     if (!comment) {
-      return res.status(404).json({
-        success: false,
-        message: "Comment not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Comment not found" });
     }
 
     const alreadyLiked = comment.likes.includes(citizenId);
-
     if (alreadyLiked) {
       comment.likes.pull(citizenId);
     } else {
       comment.likes.addToSet(citizenId);
     }
-
+    issue.updatedAt = new Date();
     await issue.save();
+
+    await invalidateAllCaches();
 
     res.json({
       success: true,
@@ -258,24 +261,70 @@ exports.toggleCommentLike = async (req, res) => {
     });
   } catch (err) {
     console.error("toggleCommentLike error:", err);
-
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
+
 /* ---------------- GET SINGLE ISSUE ---------------- */
 exports.getIssue = async (req, res) => {
   try {
     const { id } = req.params;
     const issue = await Complaint.findById(id);
-
     if (!issue) return res.status(404).json({ message: "Issue not found" });
-
     res.json({ success: true, issue });
   } catch (err) {
+    console.error("getIssue error:", err);
     res.status(500).json({ message: err.message });
+  }
+};
+
+/* ---------------- GET MY ISSUES (only logged-in citizen's posts) ---------------- */
+exports.getMyIssues = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.max(parseInt(req.query.limit) || 10, 1);
+    const { citizenId } = req.query;
+
+    if (!citizenId) {
+      return res.status(400).json({
+        success: false,
+        message: "citizenId is required",
+      });
+    }
+
+    const version = await getCacheVersion();
+    const cacheKey = `my-issues:v${version}:${citizenId}:${page}:${limit}`;
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      console.log("⚡ My Issues Cache HIT", cacheKey);
+      return res.json(JSON.parse(cachedData));
+    }
+
+    console.log("🐢 My Issues Cache MISS → DB", cacheKey);
+    const skip = (page - 1) * limit;
+    const filter = { citizenId };
+
+    const totalCount = await Complaint.countDocuments(filter);
+    const issues = await Complaint.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const response = {
+      success: true,
+      page,
+      limit,
+      total: totalCount,
+      hasMore: skip + issues.length < totalCount,
+      issues,
+    };
+
+    await redisClient.setEx(cacheKey, 20, JSON.stringify(response));
+    res.json(response);
+  } catch (err) {
+    console.error("getMyIssues error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -305,7 +354,6 @@ exports.deleteComment = async (req, res) => {
         .json({ success: false, message: "Comment not found" });
     }
 
-    // ✅ Allow deletion if user is comment author OR post owner
     const isCommentAuthor = comment.citizenId === citizenId;
     const isPostOwner = issue.citizenId === citizenId;
 
@@ -317,9 +365,7 @@ exports.deleteComment = async (req, res) => {
       });
     }
 
-    // --- Recursive deletion of all replies ---
     const commentsToDelete = new Set([commentId]);
-
     const findDescendants = (parentId) => {
       issue.comments.forEach((c) => {
         if (c.parentCommentId?.toString() === parentId.toString()) {
@@ -328,14 +374,15 @@ exports.deleteComment = async (req, res) => {
         }
       });
     };
-
     findDescendants(commentId);
 
     issue.comments = issue.comments.filter(
       (c) => !commentsToDelete.has(c._id.toString()),
     );
-
+    issue.updatedAt = new Date();
     await issue.save();
+
+    await invalidateAllCaches();
 
     res.json({
       success: true,
@@ -350,6 +397,7 @@ exports.deleteComment = async (req, res) => {
       .json({ success: false, message: "Server error while deleting comment" });
   }
 };
+
 /* ---------------- UPDATE COMMENT ---------------- */
 exports.updateComment = async (req, res) => {
   try {
@@ -367,8 +415,10 @@ exports.updateComment = async (req, res) => {
 
     comment.text = text;
     comment.editedAt = new Date();
-
+    issue.updatedAt = new Date();
     await issue.save();
+
+    await invalidateAllCaches();
 
     res.json({
       success: true,
@@ -376,20 +426,17 @@ exports.updateComment = async (req, res) => {
       message: "Comment updated successfully",
     });
   } catch (err) {
+    console.error("updateComment error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
 /* ---------------- DELETE ISSUE ---------------- */
-/* ---------------- DELETE ISSUE ---------------- */
 exports.deleteIssue = async (req, res) => {
   try {
     const { id } = req.params;
 
-    /* FIND ISSUE */
-
     const issue = await Complaint.findById(id);
-
     if (!issue) {
       return res.status(404).json({
         success: false,
@@ -397,26 +444,19 @@ exports.deleteIssue = async (req, res) => {
       });
     }
 
-    /* DELETE ISSUE */
-
     await Complaint.findByIdAndDelete(id);
-
-    /* DELETE SAVED REFERENCES */
-
-    const result = await SavedIssue.deleteMany({
+    await SavedIssue.deleteMany({
       issueId: new mongoose.Types.ObjectId(id),
     });
 
-    console.log("Deleted saved count:", result.deletedCount);
+    await invalidateAllCaches();
 
     res.json({
       success: true,
       message: "Issue deleted and saved posts removed",
-      deletedSaved: result.deletedCount,
     });
   } catch (err) {
     console.error("DELETE ISSUE ERROR:", err);
-
     res.status(500).json({
       success: false,
       message: err.message,
