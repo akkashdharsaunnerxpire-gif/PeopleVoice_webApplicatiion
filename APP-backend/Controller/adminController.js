@@ -173,29 +173,49 @@ exports.getIssueById = async (req, res) => {
   }
 };
 
-/* ================= UPDATE ISSUE STATUS ================= */
-/* ================= UPDATE ISSUE STATUS (FIXED) ================= */
 exports.updateIssueStatus = async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, afterImages, resolutionDetails } = req.body;
     const { id } = req.params;
 
-    console.log("🔄 Updating issue status:", { id, status });
+    console.log("🔄 Updating issue status:", { id, status, hasAfterImages: !!afterImages?.length, resolutionDetails });
 
     const validStatuses = ["Sent", "In Progress", "Resolved", "Closed", "solved"];
-
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status value" });
     }
 
+    // Build update object
+    const updateFields = {
+      status: status,
+      updatedAt: new Date(),
+      notificationRead: false,
+    };
+
+    // Handle after-images (expecting array of base64 strings or URLs)
+    if (afterImages && Array.isArray(afterImages) && afterImages.length > 0) {
+      updateFields.after_images = afterImages;
+    }
+
+    // Handle resolution details
+    if (resolutionDetails && resolutionDetails.trim()) {
+      updateFields.resolution_details = resolutionDetails.trim();
+    }
+
+    // Set resolved date when status becomes Resolved
+    if (status === "Resolved" && !updateFields.resolved_date) {
+      updateFields.resolved_date = new Date();
+    }
+
+    // Set closed date when status becomes Closed or solved
+    if (status === "Closed" || status === "solved") {
+      updateFields.closedDate = new Date();
+    }
+
     const issue = await Issue.findByIdAndUpdate(
       id,
-      {
-        status: status,
-        updatedAt: new Date(),
-        notificationRead: false,
-      },
-      { new: true }
+      updateFields,
+      { new: true, runValidators: true }
     );
 
     if (!issue) {
@@ -203,12 +223,10 @@ exports.updateIssueStatus = async (req, res) => {
     }
 
     console.log("✅ Issue updated:", issue._id, "Status:", status);
-    console.log("   Citizen ID:", issue.citizenId);
 
-    /* ✅ SAVE NOTIFICATION for all status changes except "Sent" */
+    // Save notification for status changes (except "Sent")
     if (status !== "Sent") {
       let message;
-
       if (status === "solved" || status === "Closed") {
         message = `✅ Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" has been closed`;
       } else if (status === "Resolved") {
@@ -219,13 +237,7 @@ exports.updateIssueStatus = async (req, res) => {
         message = `📢 Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" is now ${status}`;
       }
 
-      console.log("🔥 Saving notification for citizen:", issue.citizenId);
-      console.log("   Message:", message);
-      
       await saveNotification(issue, status, message);
-      console.log("✅ Notification save completed");
-    } else {
-      console.log("⚠️ Status is 'Sent', skipping notification");
     }
 
     res.json({
@@ -235,7 +247,7 @@ exports.updateIssueStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Update Status Error:", error);
-    res.status(500).json({ message: "Status update failed" });
+    res.status(500).json({ message: "Status update failed: " + error.message });
   }
 };
 

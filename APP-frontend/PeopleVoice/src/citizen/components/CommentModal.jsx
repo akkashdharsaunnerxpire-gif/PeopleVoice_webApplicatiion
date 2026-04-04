@@ -43,6 +43,56 @@ const buildCommentTree = (flatComments) => {
   return rootComments;
 };
 
+// Helper: Add a reply to a specific parent in the comment tree
+const addReplyToTree = (comments, parentId, newReply) => {
+  return comments.map((comment) => {
+    if (comment._id === parentId) {
+      return {
+        ...comment,
+        replies: [...(comment.replies || []), newReply],
+      };
+    }
+    if (comment.replies && comment.replies.length > 0) {
+      return {
+        ...comment,
+        replies: addReplyToTree(comment.replies, parentId, newReply),
+      };
+    }
+    return comment;
+  });
+};
+
+// Helper: Replace an optimistic comment (by tempId) in the tree
+const replaceCommentInTree = (comments, tempId, serverComment) => {
+  return comments.map((comment) => {
+    if (comment._id === tempId) {
+      return serverComment;
+    }
+    if (comment.replies && comment.replies.length > 0) {
+      return {
+        ...comment,
+        replies: replaceCommentInTree(comment.replies, tempId, serverComment),
+      };
+    }
+    return comment;
+  });
+};
+
+// Helper: Delete a comment from tree (any depth)
+const deleteCommentFromTree = (comments, commentId) => {
+  return comments
+    .filter((comment) => comment._id !== commentId)
+    .map((comment) => {
+      if (comment.replies && comment.replies.length > 0) {
+        return {
+          ...comment,
+          replies: deleteCommentFromTree(comment.replies, commentId),
+        };
+      }
+      return comment;
+    });
+};
+
 const CommentModal = ({
   open,
   onClose,
@@ -57,7 +107,11 @@ const CommentModal = ({
 }) => {
   const { isDark: contextIsDark } = useTheme();
   const isDark = propIsDark !== undefined ? propIsDark : contextIsDark;
-  const theme = isDark ? themeColors.dark : themeColors.light;
+  // Instagram uses light background for comments, but we respect theme
+  const bgColor = isDark ? "bg-black" : "bg-white";
+  const textColor = isDark ? "text-white" : "text-gray-900";
+  const textMuted = isDark ? "text-gray-400" : "text-gray-500";
+  const borderColor = isDark ? "border-gray-800" : "border-gray-200";
 
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -79,13 +133,6 @@ const CommentModal = ({
       setReplyTo(null);
       setActiveMenuCommentId(null);
       setText("");
-    }
-  }, [initialComments, open]);
-
-  useEffect(() => {
-    if (open && initialComments) {
-      const tree = buildCommentTree(initialComments);
-      setLocalComments(tree);
     }
   }, [initialComments, open]);
 
@@ -131,7 +178,7 @@ const CommentModal = ({
             updatedComments.push(newComment);
           } else if (isDelete && deletedCommentId) {
             updatedComments = updatedComments.filter(
-              (c) => c._id !== deletedCommentId
+              (c) => c._id !== deletedCommentId,
             );
           }
 
@@ -140,13 +187,12 @@ const CommentModal = ({
             comments: updatedComments,
             commentCount: updatedComments.length,
           };
-        })
+        }),
       );
     },
-    [issueId, setDisplayedIssues]
+    [issueId, setDisplayedIssues],
   );
 
-  // 🔥 FIXED: Function to update like in nested comments
   const updateLikeInComments = useCallback((comments, commentId, newLikes) => {
     return comments.map((comment) => {
       if (comment._id === commentId) {
@@ -162,16 +208,13 @@ const CommentModal = ({
     });
   }, []);
 
-  // 🔥 FIXED: toggleLike with proper backend sync
   const toggleLike = useCallback(
     async (commentId) => {
-      // Prevent rapid clicks
       const now = Date.now();
       const lastClick = lastLikeClickTime.current[commentId] || 0;
       if (now - lastClick < 300) return;
       lastLikeClickTime.current[commentId] = now;
 
-      // Find current like state
       let currentLiked = false;
       let currentLikes = [];
 
@@ -191,30 +234,31 @@ const CommentModal = ({
 
       findCurrentState(localComments);
 
-      // Calculate new likes for optimistic update
       const newLikes = currentLiked
         ? currentLikes.filter((id) => id !== citizenId)
         : [...currentLikes, citizenId];
 
-      // 🔥 Optimistic update (local)
       setLocalComments((prev) =>
-        updateLikeInComments(prev, commentId, newLikes)
+        updateLikeInComments(prev, commentId, newLikes),
       );
 
-      // 🔥 Update parent feed
       if (setDisplayedIssues) {
         setDisplayedIssues((prevIssues) =>
-          prevIssues.map((issue) => {
-            if (issue._id !== issueId) return issue;
-            return {
-              ...issue,
-              comments: updateLikeInComments(issue.comments, commentId, newLikes),
-            };
-          })
+          prevIssues.map((issue) =>
+            issue._id === issueId
+              ? {
+                  ...issue,
+                  comments: updateLikeInComments(
+                    issue.comments,
+                    commentId,
+                    newLikes,
+                  ),
+                }
+              : issue,
+          ),
         );
       }
 
-      // 🔥 API call
       try {
         const res = await fetch(
           `${APIURL}/issues/${issueId}/comment/${commentId}/like`,
@@ -222,63 +266,47 @@ const CommentModal = ({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ citizenId }),
-          }
+          },
         );
 
         const data = await res.json();
+        if (!data.success) throw new Error();
 
-        if (!data.success) {
-          throw new Error(data.message || "Like request failed");
-        }
-
-        // 🔥 Sync with backend response (using data.likes)
         if (data.likes !== undefined) {
-          setLocalComments((prev) =>
-            updateLikeInComments(prev, commentId, data.likes)
-          );
-
-          if (setDisplayedIssues) {
-            setDisplayedIssues((prevIssues) =>
-              prevIssues.map((issue) => {
-                if (issue._id !== issueId) return issue;
-                return {
-                  ...issue,
-                  comments: updateLikeInComments(
-                    issue.comments,
-                    commentId,
-                    data.likes
-                  ),
-                };
-              })
+          const saved = JSON.parse(sessionStorage.getItem("feedData"));
+          if (saved) {
+            const updatedIssues = saved.issues.map((issue) =>
+              issue._id === issueId
+                ? {
+                    ...issue,
+                    comments: updateLikeInComments(
+                      issue.comments,
+                      commentId,
+                      data.likes,
+                    ),
+                  }
+                : issue,
+            );
+            sessionStorage.setItem(
+              "feedData",
+              JSON.stringify({
+                ...saved,
+                issues: updatedIssues,
+                timestamp: Date.now(),
+              }),
             );
           }
-        }
-      } catch (err) {
-        console.error("Like error:", err);
-
-        // 🔥 Rollback on error
-        setLocalComments((prev) =>
-          updateLikeInComments(prev, commentId, currentLikes)
-        );
-
-        if (setDisplayedIssues) {
-          setDisplayedIssues((prevIssues) =>
-            prevIssues.map((issue) => {
-              if (issue._id !== issueId) return issue;
-              return {
-                ...issue,
-                comments: updateLikeInComments(
-                  issue.comments,
-                  commentId,
-                  currentLikes
-                ),
-              };
-            })
+          setLocalComments((prev) =>
+            updateLikeInComments(prev, commentId, data.likes),
           );
         }
+      } catch (err) {
+        setLocalComments((prev) =>
+          updateLikeInComments(prev, commentId, currentLikes),
+        );
       }
     },
-    [citizenId, issueId, setDisplayedIssues, updateLikeInComments, localComments]
+    [citizenId, issueId, setDisplayedIssues, updateLikeInComments, localComments],
   );
 
   const handleSend = async () => {
@@ -295,7 +323,8 @@ const CommentModal = ({
       ...(isReply && { parentCommentId: replyTo.commentId }),
     };
 
-    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    const tempId = `temp-${Date.now()}`;
+
     const optimisticComment = {
       _id: tempId,
       citizenId,
@@ -307,27 +336,13 @@ const CommentModal = ({
       isOptimistic: true,
     };
 
-    // Optimistic UI update
-    setLocalComments((prev) => {
-      if (isReply) {
-        const addReplyRecursively = (comments) =>
-          comments.map((c) => {
-            if (c._id === replyTo.commentId) {
-              return { ...c, replies: [...c.replies, optimisticComment] };
-            }
-            if (c.replies?.length) {
-              return { ...c, replies: addReplyRecursively(c.replies) };
-            }
-            return c;
-          });
-        return addReplyRecursively(prev);
-      }
-      return [...prev, optimisticComment];
-    });
-
-    setTimeout(() => {
-      commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 50);
+    if (isReply) {
+      setLocalComments((prev) =>
+        addReplyToTree(prev, replyTo.commentId, optimisticComment)
+      );
+    } else {
+      setLocalComments((prev) => [...prev, optimisticComment]);
+    }
 
     try {
       const res = await fetch(`${APIURL}/issues/${issueId}/comment`, {
@@ -337,42 +352,44 @@ const CommentModal = ({
       });
 
       const data = await res.json();
-      if (!data.success) throw new Error(data.message || "Failed to post");
+      if (!data.success) throw new Error();
 
       const serverComment = data.newComment;
 
-      setLocalComments((prev) => {
-        const replaceIdRecursively = (comments) =>
-          comments.map((c) => {
-            if (c._id === tempId) {
-              return { ...serverComment, replies: c.replies || [] };
-            }
-            if (c.replies?.length) {
-              return { ...c, replies: replaceIdRecursively(c.replies) };
-            }
-            return c;
-          });
-        return replaceIdRecursively(prev);
-      });
+      setLocalComments((prev) =>
+        replaceCommentInTree(prev, tempId, serverComment)
+      );
 
       updateParentAfterComment(serverComment);
+
+      const saved = JSON.parse(sessionStorage.getItem("feedData"));
+      if (saved) {
+        const updatedIssues = saved.issues.map((issue) =>
+          issue._id === issueId
+            ? {
+                ...issue,
+                comments: [...issue.comments, serverComment],
+              }
+            : issue,
+        );
+        sessionStorage.setItem(
+          "feedData",
+          JSON.stringify({
+            ...saved,
+            issues: updatedIssues,
+            timestamp: Date.now(),
+          }),
+        );
+      }
+
       setReplyTo(null);
     } catch (err) {
-      console.error("Comment post error:", err);
+      if (isReply) {
+        setLocalComments((prev) => deleteCommentFromTree(prev, tempId));
+      } else {
+        setLocalComments((prev) => prev.filter((c) => c._id !== tempId));
+      }
       setText(currentText);
-
-      setLocalComments((prev) => {
-        const removeOptimistic = (comments) =>
-          comments
-            .filter((c) => c._id !== tempId)
-            .map((c) => ({
-              ...c,
-              replies: c.replies ? removeOptimistic(c.replies) : [],
-            }));
-        return removeOptimistic(prev);
-      });
-
-      alert(err.message || "Failed to post comment. Please try again.");
     } finally {
       setIsSending(false);
     }
@@ -381,18 +398,9 @@ const CommentModal = ({
   const deleteComment = async (commentId) => {
     if (!window.confirm("Delete this comment?")) return;
 
-    const previousComments = JSON.parse(JSON.stringify(localComments));
+    const previousComments = [...localComments];
 
-    const removeCommentRecursively = (comments) =>
-      comments
-        .filter((c) => c._id !== commentId)
-        .map((c) => ({
-          ...c,
-          replies: c.replies ? removeCommentRecursively(c.replies) : [],
-        }));
-
-    setLocalComments(removeCommentRecursively(localComments));
-    setActiveMenuCommentId(null);
+    setLocalComments((prev) => deleteCommentFromTree(prev, commentId));
 
     updateParentAfterComment(null, true, commentId);
 
@@ -403,16 +411,33 @@ const CommentModal = ({
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ citizenId }),
-        }
+        },
       );
 
       const data = await res.json();
-      if (!data.success) throw new Error(data.message || "Delete failed");
+      if (!data.success) throw new Error();
+
+      const saved = JSON.parse(sessionStorage.getItem("feedData"));
+      if (saved) {
+        const updatedIssues = saved.issues.map((issue) =>
+          issue._id === issueId
+            ? {
+                ...issue,
+                comments: issue.comments.filter((c) => c._id !== commentId),
+              }
+            : issue,
+        );
+        sessionStorage.setItem(
+          "feedData",
+          JSON.stringify({
+            ...saved,
+            issues: updatedIssues,
+            timestamp: Date.now(),
+          }),
+        );
+      }
     } catch (err) {
-      console.error("Delete error:", err);
       setLocalComments(previousComments);
-      updateParentAfterComment(null, false);
-      alert("Could not delete comment. Try again.");
     }
   };
 
@@ -427,217 +452,203 @@ const CommentModal = ({
     const isExpanded = expandedReplies[comment._id] ?? false;
     const showMenu = activeMenuCommentId === comment._id;
 
-    const indent = level * 16;
+    // Instagram indentation: 48px per level
+    const indent = Math.min(level * 48, 96);
 
     return (
       <div
         key={comment._id}
-        style={{ paddingLeft: `${indent}px` }}
         className="relative"
       >
-        <div
-          className={`flex items-start justify-between px-4 py-3 relative ${
-            level > 0 ? `${theme.replyBg} ${theme.replyBorder}` : ""
-          } ${isOptimistic ? "opacity-70" : ""}`}
-        >
-          <div className="flex gap-3 flex-1">
-            <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center text-white text-sm font-bold shrink-0">
+        <div className={`flex items-start space-x-3 py-2 ${isOptimistic ? "opacity-60" : ""}`}>
+          {/* Avatar */}
+          <div className="shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
               {comment.citizenId?.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <p className={theme.text}>
-                <span className="font-semibold">{comment.citizenId}</span>{" "}
-                {comment.text}
-              </p>
-              <div className={`flex gap-4 mt-1 text-xs ${theme.textMuted}`}>
-                <span>
-                  {new Date(comment.createdAt).toLocaleString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-                {(comment.likes?.length || 0) > 0 && (
-                  <span>
-                    {comment.likes.length}{" "}
-                    {comment.likes.length === 1 ? "like" : "likes"}
-                  </span>
-                )}
-                {!isOptimistic && (
-                  <button
-                    onClick={() =>
-                      setReplyTo({
-                        commentId: comment._id,
-                        username: comment.citizenId,
-                      })
-                    }
-                    className="hover:text-blue-400 transition-colors flex items-center gap-1"
-                  >
-                    <Reply size={14} /> Reply
-                  </button>
-                )}
-              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Comment content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-baseline gap-1">
+              <span className={`font-semibold text-sm ${textColor}`}>
+                {comment.citizenId}
+              </span>
+              <span className={`text-sm ${textColor} break-words`}>
+                {comment.text}
+              </span>
+            </div>
+            <div className={`flex items-center gap-3 mt-1 text-xs ${textMuted}`}>
+              <span>
+                {new Date(comment.createdAt).toLocaleString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              {(comment.likes?.length || 0) > 0 && (
+                <span>{comment.likes.length} likes</span>
+              )}
+              {!isOptimistic && (
+                <button
+                  onClick={() =>
+                    setReplyTo({
+                      commentId: comment._id,
+                      username: comment.citizenId,
+                    })
+                  }
+                  className="font-semibold hover:text-gray-500 transition"
+                >
+                  Reply
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Like button + menu */}
+          <div className="shrink-0 flex items-center gap-1">
             {!isOptimistic && (
               <button
                 onClick={() => toggleLike(comment._id)}
-                className="relative transition-transform hover:scale-110 active:scale-95"
+                className="p-1 transition-transform active:scale-90"
               >
                 <Heart
                   size={18}
-                  className={`transition-all duration-150 ${
-                    isLiked ? "text-red-500 fill-red-500" : theme.textMuted
+                  className={`transition-all ${
+                    isLiked ? "text-red-500 fill-red-500" : textMuted
                   }`}
                 />
               </button>
             )}
-
             {canDelete && !isOptimistic && (
-              <button
-                onClick={() => setActiveMenuCommentId(comment._id)}
-                className={`${theme.textMuted} hover:${theme.text} p-1 rounded-full`}
-              >
-                <MoreHorizontal size={20} />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setActiveMenuCommentId(comment._id)}
+                  className={`p-1 ${textMuted}`}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+                {showMenu && (
+                  <div
+                    ref={menuRef}
+                    className={`absolute right-0 top-6 z-20 min-w-[100px] rounded-md shadow-lg py-1 ${
+                      isDark ? "bg-gray-800" : "bg-white"
+                    } border ${borderColor}`}
+                  >
+                    <button
+                      onClick={() => deleteComment(comment._id)}
+                      className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
-
-          {showMenu && canDelete && !isOptimistic && (
-            <div
-              ref={menuRef}
-              className={`absolute right-2 top-8 ${
-                isDark ? "bg-gray-800" : "bg-white"
-              } text-sm rounded-lg shadow-xl z-20 min-w-[100px] overflow-hidden border ${theme.border}`}
-            >
-              <button
-                onClick={() => deleteComment(comment._id)}
-                className="w-full text-left px-4 py-2.5 hover:bg-red-600/30 transition-colors flex items-center gap-2"
-              >
-                Delete
-              </button>
-            </div>
-          )}
         </div>
 
-        {hasReplies && !isExpanded && (
-          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1 ml-12">
-            <div className="w-8 h-px bg-gray-600 dark:bg-gray-700"></div>
-            <button
-              onClick={() =>
-                setExpandedReplies((prev) => ({ ...prev, [comment._id]: true }))
-              }
-              className="flex items-center gap-1 hover:text-blue-500 transition-colors font-medium"
-            >
-              <ChevronDown size={14} /> View replies ({comment.replies.length})
-            </button>
-          </div>
-        )}
-
-        {hasReplies && isExpanded && (
-          <>
-            <div className="mt-2">
-              {comment.replies.map((reply) => renderComment(reply, level + 1))}
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1 ml-12">
-              <div className="w-8 h-px bg-gray-600 dark:bg-gray-700"></div>
+        {/* Replies section */}
+        {hasReplies && (
+          <div className="ml-8 mt-1">
+            {!isExpanded ? (
               <button
                 onClick={() =>
-                  setExpandedReplies((prev) => ({
-                    ...prev,
-                    [comment._id]: false,
-                  }))
+                  setExpandedReplies((prev) => ({ ...prev, [comment._id]: true }))
                 }
-                className="flex items-center gap-1 hover:text-blue-500 transition-colors font-medium"
+                className={`text-xs font-semibold ${textMuted} hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1`}
               >
-                <ChevronUp size={14} /> Hide replies
+                <ChevronDown size={14} /> View replies ({comment.replies.length})
               </button>
-            </div>
-          </>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  {comment.replies.map((reply) => renderComment(reply, level + 1))}
+                </div>
+                <button
+                  onClick={() =>
+                    setExpandedReplies((prev) => ({
+                      ...prev,
+                      [comment._id]: false,
+                    }))
+                  }
+                  className={`text-xs font-semibold ${textMuted} hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1 mt-1`}
+                >
+                  <ChevronUp size={14} /> Hide replies
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
     );
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 md:p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 md:p-4">
       <div
-        className={`w-full h-full md:max-w-6xl md:h-[90vh] md:rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl ${theme.card}`}
+        className={`w-full h-full md:max-w-5xl md:h-[90vh] md:rounded-2xl overflow-hidden flex flex-col md:flex-row ${bgColor}`}
       >
-        <div className="hidden md:flex md:w-3/5 bg-black items-center justify-center border-r border-gray-800">
+        {/* Left side: Image (Instagram style) */}
+        <div className="hidden md:flex md:w-3/5 bg-black items-center justify-center">
           {allImages.length > 0 ? (
             <img
               src={allImages[0]}
-              className="max-h-full object-contain"
+              className="max-h-full max-w-full object-contain"
               alt="post"
             />
           ) : (
-            <div className={theme.textMuted}>No media available</div>
+            <div className={textMuted}>No media</div>
           )}
         </div>
 
+        {/* Right side: Comments */}
         <div className="w-full md:w-2/5 flex flex-col h-full">
-          <div
-            className={`flex items-center justify-between px-4 py-3 border-b sticky top-0 z-20 ${theme.card} ${theme.border}`}
-          >
+          {/* Header */}
+          <div className={`flex items-center justify-between px-4 py-3 border-b ${borderColor}`}>
             <div className="flex items-center gap-3">
-              <button onClick={onClose} className="mr-4 md:hidden">
-                <ArrowLeft size={28} className={theme.text} />
+              <button onClick={onClose} className="md:hidden">
+                <ArrowLeft size={24} className={textColor} />
               </button>
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
                   {postOwnerId?.slice(0, 2).toUpperCase() || "OP"}
                 </div>
                 <div>
-                  <p className={`font-semibold ${theme.text}`}>
+                  <p className={`font-semibold text-sm ${textColor}`}>
                     {postOwnerId || "User"}
                   </p>
-                  <p className={`text-xs ${theme.textMuted}`}>
-                    {district || "—"}
-                  </p>
+                  <p className={`text-xs ${textMuted}`}>{district || "—"}</p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onClose}
-                className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition"
-              >
-                <X size={22} className={theme.text} />
-              </button>
-            </div>
+            <button onClick={onClose} className="p-1">
+              <X size={20} className={textColor} />
+            </button>
           </div>
 
-          <div className={`flex-1 overflow-y-auto p-2 ${theme.bg}`}>
+          {/* Comments list */}
+          <div className={`flex-1 overflow-y-auto px-4 py-2 space-y-3 ${bgColor}`}>
             {localComments.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center px-6">
-                <p className={`text-lg font-medium ${theme.text}`}>
-                  No comments yet
-                </p>
-                <p className={`text-sm mt-2 ${theme.textMuted}`}>
-                  Be the first to comment!
-                </p>
+              <div className="h-full flex flex-col items-center justify-center text-center">
+                <p className={`text-sm ${textMuted}`}>No comments yet.</p>
+                <p className={`text-xs ${textMuted} mt-1`}>Be the first to comment.</p>
               </div>
             ) : (
               localComments.map((c) => renderComment(c))
             )}
-            <div ref={commentsEndRef} className="h-8" />
+            <div ref={commentsEndRef} className="h-4" />
           </div>
 
-          <div
-            className={`border-t p-4 ${theme.border} sticky bottom-0 ${theme.card}`}
-          >
+          {/* Reply indicator & Input bar */}
+          <div className={`border-t ${borderColor} p-4`}>
             {replyTo && (
-              <div
-                className={`flex items-center justify-between text-sm mb-3 px-3 py-1.5 rounded-lg ${theme.replyBg}`}
-              >
-                <span className={theme.textMuted}>
-                  Replying to @{replyTo.username}
+              <div className={`flex items-center justify-between text-xs mb-3 px-2 py-1 rounded-md ${isDark ? "bg-gray-900" : "bg-gray-100"}`}>
+                <span className={textMuted}>
+                  Replying to <span className="font-semibold">@{replyTo.username}</span>
                 </span>
                 <button
                   onClick={() => setReplyTo(null)}
-                  className="text-red-400 hover:text-red-300 font-medium"
+                  className="text-red-500 text-xs font-semibold"
                 >
                   Cancel
                 </button>
@@ -645,22 +656,17 @@ const CommentModal = ({
             )}
 
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                {citizenId?.slice(0, 2).toUpperCase() || "?"}
+              <div className="shrink-0">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
+                  {citizenId?.slice(0, 2).toUpperCase() || "?"}
+                </div>
               </div>
-
-              <div
-                className={`flex-1 flex items-center rounded-full px-4 py-2 border ${theme.inputBg}`}
-              >
+              <div className="flex-1 flex items-center bg-transparent border-0">
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder={
-                    replyTo
-                      ? `Reply to @${replyTo.username}...`
-                      : "Add a comment..."
-                  }
-                  className={`flex-1 bg-transparent focus:outline-none text-base ${theme.text}`}
+                  placeholder={replyTo ? "Write a reply..." : "Add a comment..."}
+                  className={`flex-1 bg-transparent focus:outline-none text-sm ${textColor} placeholder:${textMuted}`}
                   value={text}
                   disabled={isSending}
                   onChange={(e) => setText(e.target.value)}
@@ -671,20 +677,17 @@ const CommentModal = ({
                     }
                   }}
                 />
-                <div className="flex items-center gap-3">
-                  <Smile size={24} className={theme.textMuted} />
-                  <button
-                    onClick={handleSend}
-                    disabled={!text.trim() || isSending}
-                    className={`font-semibold transition-colors ${
-                      text.trim() && !isSending
-                        ? "text-blue-500 hover:text-blue-400"
-                        : "text-blue-600/40 cursor-not-allowed"
-                    }`}
-                  >
-                    {isSending ? "..." : "Post"}
-                  </button>
-                </div>
+                <button
+                  onClick={handleSend}
+                  disabled={!text.trim() || isSending}
+                  className={`text-sm font-semibold ml-2 ${
+                    text.trim() && !isSending
+                      ? "text-blue-500"
+                      : "text-blue-500/40 cursor-not-allowed"
+                  }`}
+                >
+                  {isSending ? "..." : "Post"}
+                </button>
               </div>
             </div>
           </div>

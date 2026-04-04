@@ -23,7 +23,6 @@ app.use("/api", require("./Routes/issueRoutes"));
 app.use("/api/auth", require("./Routes/authRoutes"));
 app.use("/api/admin", require("./Routes/adminRoutes"));
 app.use("/api/saved", require("./Routes/savedRoutes"));
-app.use("/api/complaint", require("./Routes/adminComplaintRoutes"));
 app.use("/api/notifications", require("./Routes/notificationRoutes"));
 
 // Catch-all for debugging

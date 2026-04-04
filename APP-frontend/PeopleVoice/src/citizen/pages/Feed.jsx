@@ -557,58 +557,94 @@ const Feed = () => {
   };
 
   const handleLike = useCallback(
-    async (issueId) => {
-      if (!citizenId) return;
+  async (issueId) => {
+    if (!citizenId) return;
 
-      let previousState;
+    let previousState;
 
-      setDisplayedIssues((prev) => {
-        previousState = prev;
-        return prev.map((issue) => {
-          if (issue._id !== issueId) return issue;
-          const alreadyLiked = issue.likes?.includes(citizenId);
-          if (alreadyLiked) return issue;
-          const updatedLikes = [...(issue.likes || []), citizenId];
-          return {
-            ...issue,
-            likes: updatedLikes,
-            likeCount: updatedLikes.length,
-          };
-        });
+    // 🔥 OPTIMISTIC UPDATE
+    setDisplayedIssues((prev) => {
+      previousState = prev;
+
+      return prev.map((issue) => {
+        if (issue._id !== issueId) return issue;
+
+        const alreadyLiked = issue.likes?.includes(citizenId);
+
+        let updatedLikes;
+
+        if (alreadyLiked) {
+          updatedLikes = issue.likes.filter((id) => id !== citizenId);
+        } else {
+          updatedLikes = [...(issue.likes || []), citizenId];
+        }
+
+        return {
+          ...issue,
+          likes: updatedLikes,
+          likeCount: updatedLikes.length,
+        };
+      });
+    });
+
+    try {
+      const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ citizenId }),
       });
 
-      try {
-        const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ citizenId }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          setDisplayedIssues((prev) => {
-            const updated = prev.map((issue) =>
+      const data = await res.json();
+
+      if (data.success) {
+        setDisplayedIssues((prev) => {
+          const updated = prev.map((issue) =>
+            issue._id === issueId
+              ? {
+                  ...issue,
+                  likes: data.likes,
+                  likeCount: data.likeCount ?? data.likes.length,
+                }
+              : issue
+          );
+
+          // 🔥🔥 IMPORTANT: UPDATE CACHE (NOT DELETE)
+          const saved = JSON.parse(sessionStorage.getItem("feedData"));
+
+          if (saved) {
+            const updatedCacheIssues = saved.issues.map((issue) =>
               issue._id === issueId
                 ? {
                     ...issue,
                     likes: data.likes,
                     likeCount: data.likeCount ?? data.likes.length,
                   }
-                : issue,
+                : issue
             );
 
-            saveFeedState(updated, pageRef.current); // ✅ correct
+            sessionStorage.setItem(
+              "feedData",
+              JSON.stringify({
+                ...saved,
+                issues: updatedCacheIssues,
+                timestamp: Date.now(),
+              })
+            );
+          }
 
-            return updated;
-          });
-        } else {
-          setDisplayedIssues(previousState);
-        }
-      } catch (err) {
+          return updated;
+        });
+      } else {
+        // 🔁 rollback
         setDisplayedIssues(previousState);
       }
-    },
-    [citizenId, setDisplayedIssues, saveFeedState],
-  );
+    } catch (err) {
+      // 🔁 rollback
+      setDisplayedIssues(previousState);
+    }
+  },
+  [citizenId, setDisplayedIssues]
+);
 
   // =============================
   // Render

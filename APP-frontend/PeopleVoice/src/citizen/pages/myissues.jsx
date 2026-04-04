@@ -45,7 +45,7 @@ const MyIssues = () => {
         setLoading(true);
 
         const { data } = await axios.get(
-          `${API_BASE}/api/issues?citizenId=${citizenId}&limit=100`
+          `${API_BASE}/api/my-issues?citizenId=${citizenId}&limit=100`,
         );
 
         setMyIssues(data.issues || []);
@@ -70,10 +70,13 @@ const MyIssues = () => {
 
     const status = issue.status;
 
-    if (statusFilter === "Pending") return status === "send" || status === "Sent";
+    if (statusFilter === "Pending")
+      return status === "send" || status === "Sent";
     if (statusFilter === "In Progress") return status === "In Progress";
-    if (statusFilter === "Resolved") return status === "resolved" || status === "Resolved";
-    if (statusFilter === "Solved") return status === "solved" || status === "Solved";
+    if (statusFilter === "Resolved")
+      return status === "resolved" || status === "Resolved";
+    if (statusFilter === "Solved")
+      return status === "solved" || status === "Solved";
 
     return status === statusFilter;
   });
@@ -156,8 +159,8 @@ const MyIssues = () => {
                   statusFilter === s.value
                     ? "bg-violet-600 text-white shadow-md"
                     : isDark
-                    ? "bg-white/5 text-gray-400"
-                    : "bg-gray-200 text-gray-600"
+                      ? "bg-white/5 text-gray-400"
+                      : "bg-gray-200 text-gray-600"
                 }`}
               >
                 {s.label}
@@ -168,8 +171,8 @@ const MyIssues = () => {
                       statusFilter === s.value
                         ? "bg-white/20 text-white"
                         : isDark
-                        ? "bg-gray-600 text-gray-300"
-                        : "bg-gray-300 text-gray-700"
+                          ? "bg-gray-600 text-gray-300"
+                          : "bg-gray-300 text-gray-700"
                     }`}
                   >
                     {count}
