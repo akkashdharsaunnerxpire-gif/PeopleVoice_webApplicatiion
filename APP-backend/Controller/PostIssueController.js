@@ -433,33 +433,73 @@ exports.updateComment = async (req, res) => {
 
 /* ---------------- DELETE ISSUE ---------------- */
 exports.deleteIssue = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
     const { id } = req.params;
+    const { citizenId } = req.body;
 
-    const issue = await Complaint.findById(id);
+    // ✅ Validate ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid issue ID",
+      });
+    }
+
+    // ✅ Start transaction
+    session.startTransaction();
+
+    // ✅ Find issue
+    const issue = await Complaint.findById(id).session(session);
+
     if (!issue) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: "Issue not found",
       });
     }
 
-    await Complaint.findByIdAndDelete(id);
-    await SavedIssue.deleteMany({
-      issueId: new mongoose.Types.ObjectId(id),
-    });
+    // ✅ Authorization (IMPORTANT 🔥)
+    if (issue.citizenId !== citizenId) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to delete this issue",
+      });
+    }
 
+    // ✅ Delete issue
+    await Complaint.deleteOne({ _id: id }).session(session);
+
+    // ✅ Remove from saved posts
+    await SavedIssue.deleteMany(
+      { issueId: new mongoose.Types.ObjectId(id) },
+      { session }
+    );
+
+    // ✅ Commit DB changes
+    await session.commitTransaction();
+    session.endSession();
+
+    // ✅ 🔥 Invalidate cache AFTER commit
     await invalidateAllCaches();
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Issue deleted and saved posts removed",
+      message: "Issue deleted successfully",
+      deletedId: id,
     });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+
     console.error("DELETE ISSUE ERROR:", err);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
-      message: err.message,
+      message: "Server error while deleting issue",
     });
   }
 };

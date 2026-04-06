@@ -81,34 +81,80 @@ const MyIssues = () => {
     return status === statusFilter;
   });
 
-  const handleDelete = async (issueId, e) => {
-    e.stopPropagation();
+const handleDelete = async (issueId, e) => {
+  e.stopPropagation();
 
-    if (!window.confirm("Are you sure you want to delete this report?")) return;
+  if (!window.confirm("Are you sure you want to delete this report?")) return;
+  if (!citizenId) return;
 
-    setDeletingId(issueId);
+  setDeletingId(issueId);
 
-    try {
-      await axios.delete(`${API_BASE}/api/issues/${issueId}`, {
-        data: { citizenId },
-      });
+  let previousIssues;
 
-      setMyIssues((prev) => prev.filter((issue) => issue._id !== issueId));
+  // ✅ OPTIMISTIC UPDATE
+  setMyIssues((prevIssues) => {
+    previousIssues = prevIssues;
 
-      if (
-        selectedIssueIndex !== null &&
-        myIssues[selectedIssueIndex]?._id === issueId
-      ) {
-        setSelectedIssueIndex(null);
-      }
-    } catch (err) {
-      console.error("Delete failed:", err);
-      alert("Failed to delete report. Please try again.");
-    } finally {
-      setDeletingId(null);
-      setOpenMenuId(null);
+    const updated = prevIssues.filter(
+      (issue) => issue._id !== issueId
+    );
+
+    // ✅ FIX selected index (NO BUG)
+    if (
+      selectedIssueIndex !== null &&
+      prevIssues[selectedIssueIndex]?._id === issueId
+    ) {
+      setSelectedIssueIndex(null);
     }
-  };
+
+    return updated;
+  });
+
+  try {
+    const { data } = await axios.delete(
+      `${API_BASE}/api/issues/${issueId}`,
+      {
+        data: { citizenId },
+      }
+    );
+
+    if (!data.success) {
+      throw new Error("Delete failed");
+    }
+
+    // ✅ CACHE UPDATE (ONLY REMOVE DELETED ITEM)
+    const saved = JSON.parse(sessionStorage.getItem("feedData"));
+
+    if (saved) {
+      const updatedCache = saved.issues.filter(
+        (issue) => issue._id !== issueId
+      );
+
+      sessionStorage.setItem(
+        "feedData",
+        JSON.stringify({
+          ...saved,
+          issues: updatedCache,
+          timestamp: Date.now(),
+        })
+      );
+    }
+
+    // ✅ GLOBAL SYNC
+    window.dispatchEvent(new Event("clearFeedCache"));
+
+  } catch (err) {
+    console.error("Delete failed:", err);
+
+    // 🔁 ROLLBACK
+    setMyIssues(previousIssues);
+
+    alert("Failed to delete report. Please try again.");
+  } finally {
+    setDeletingId(null);
+    setOpenMenuId(null);
+  }
+};
 
   return (
     <div

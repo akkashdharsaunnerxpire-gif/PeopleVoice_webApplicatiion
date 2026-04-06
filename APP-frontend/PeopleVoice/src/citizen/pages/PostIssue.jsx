@@ -82,17 +82,59 @@ const REASONS = [
   "Other",
 ];
 
+// Comprehensive hashtags collection
 const ALL_TAGS = [
   "#RoadIssue",
+  "#RoadDamage",
+  "#Pothole",
+  "#RoadSafety",
+  "#RoadAccident",
   "#Garbage",
+  "#WasteManagement",
+  "#GarbageDumping",
+  "#CleanCity",
+  "#SwachhBharat",
   "#WaterProblem",
-  "#Electricity",
+  "#WaterLeakage",
+  "#PipelineIssue",
   "#Drainage",
+  "#SewageOverflow",
+  "#Electricity",
+  "#PowerCut",
+  "#TransformerIssue",
+  "#WireSnapping",
+  "#PoleDamage",
+  "#DrainageBlockage",
+  "#SewageProblem",
+  "#Flooding",
+  "#StagnantWater",
   "#PublicIssue",
   "#PeopleVoice",
+  "#CitizenReport",
+  "#CivicIssue",
   "#Urgent",
+  "#Emergency",
+  "#HighPriority",
+  "#Dangerous",
+  "#SafetyHazard",
   "#Chennai",
   "#Nagercoil",
+  "#Coimbatore",
+  "#Madurai",
+  "#Tirunelveli",
+  "#Salem",
+  "#HealthHazard",
+  "#EnvironmentalIssue",
+  "#TrafficIssue",
+  "#PublicSafety",
+  "#IllegalDumping",
+  "#NoisePollution",
+  "#AirPollution",
+  "#StreetLightOutage",
+  "#FootpathIssue",
+  "#PedestrianSafety",
+  "#WaterLogging",
+  "#MosquitoBreeding",
 ];
 
 /* ================= TRANSLATION HELPER ================= */
@@ -138,7 +180,7 @@ const TEXTS = {
     falseComplaints: "False complaints are punishable offences",
     importantLegalNotice: "Important Legal Notice",
     legalText:
-      "Submitting false, misleading or irrelevant information / photographs constitutes a serious offence. Government authorities may initiate legal action under Section 177 IPC and other applicable laws. Misuse of this platform may result in permanent account suspension.",
+      "Submitting false, misleading or irrelevant information / photographs is a serious offence. Government authorities may impose fines and take legal action under Section 177 IPC and other applicable laws.",
     complaintSummary: "Complaint Summary",
     departmentLabel: "Department",
     locationLabel: "Location",
@@ -151,7 +193,7 @@ const TEXTS = {
     confirmLocationDesc: "Issue location:",
     acceptTerms: "THIS COMPLAINT IS TRUE AND GENUINE",
     acceptTermsDesc:
-      "I understand that providing false information may result in legal action and account suspension.",
+"I understand that providing false information may result in government fines and legal action.",
     goBackEdit: "Go Back & Edit",
     iConfirmSubmit: "I Confirm → Submit Complaint",
     submitting: "Submitting...",
@@ -160,7 +202,7 @@ const TEXTS = {
     duplicatePhoto: "Duplicate photo detected",
     fillAllFields: "Please fill all required fields",
     minPhotosRequired: "Minimum {minImages} photo(s) required for {department}",
-    confirmAllPoints: "Please confirm all points",
+    confirmAllPoints: "Please confirm all required points",
     complaintRegistered:
       "Complaint registered successfully! Authorities will review it soon.",
     networkError: "Network error. Please try again.",
@@ -174,6 +216,7 @@ const TEXTS = {
     readyToCapture: "✓ Ready to capture {department} issues",
     enterValidLocation: "Please enter valid location",
     pleaseLogin: "Please login first",
+    searchHashtags: "Search hashtags...",
   },
   ta: {
     title: "பொது புகார் பதிவு",
@@ -200,8 +243,7 @@ const TEXTS = {
     falseComplaints: "பொய் புகார்கள் தண்டனைக்குரிய குற்றங்கள்",
     importantLegalNotice: "முக்கிய சட்ட அறிவிப்பு",
     legalText:
-      "பொய், தவறான அல்லது தொடர்பில்லாத தகவல்/புகைப்படங்களை சமர்ப்பிப்பது கடுமையான குற்றமாகும். அரசாங்க அதிகாரிகள் பிரிவு 177 IPC மற்றும் பிற பொருந்தக்கூடிய சட்டங்களின் கீழ் சட்ட நடவடிக்கை தொடுக்கலாம். இந்த மேடையின் தவறான பயன்பாடு நிரந்தர கணக்கு நிறுத்தத்திற்கு வழிவகுக்கும்.",
-    complaintSummary: "புகார் சுருக்கம்",
+"பொய், தவறான அல்லது தொடர்பில்லாத தகவல்/புகைப்படங்களை சமர்ப்பிப்பது கடுமையான குற்றமாகும். அரசு அதிகாரிகள் பிரிவு 177 IPC மற்றும் பிற சட்டங்களின் கீழ் அபராதம் விதிக்கலாம் மற்றும் சட்ட நடவடிக்கை எடுக்கலாம்.",
     departmentLabel: "துறை",
     locationLabel: "இடம்",
     photosLabel: "புகைப்படங்கள்",
@@ -215,7 +257,7 @@ const TEXTS = {
     confirmLocationDesc: "பிரச்சினை இடம்:",
     acceptTerms: "இந்த புகார் உண்மை மற்றும் உண்மையானது",
     acceptTermsDesc:
-      "பொய்த் தகவலை வழங்குவது சட்ட நடவடிக்கை மற்றும் கணக்கு நிறுத்தத்திற்கு வழிவகுக்கும் என்பதை நான் புரிந்துகொள்கிறேன்.",
+"பொய்த் தகவலை வழங்குவது அரசு அபராதம் மற்றும் சட்ட நடவடிக்கைக்கு வழிவகுக்கும் என்பதை நான் புரிந்துகொள்கிறேன்.",
     goBackEdit: "திரும்பிச் சென்று திருத்தவும்",
     iConfirmSubmit: "நான் உறுதிப்படுத்துகிறேன் → புகாரைச் சமர்ப்பிக்கவும்",
     submitting: "சமர்ப்பிக்கிறது...",
@@ -224,8 +266,8 @@ const TEXTS = {
     duplicatePhoto: "நகல் புகைப்படம் கண்டறியப்பட்டது",
     fillAllFields: "தேவையான அனைத்து புலங்களையும் பூர்த்தி செய்யவும்",
     minPhotosRequired:
-      "{department} க்கு குறைந்தபடி {minImages} புகைப்பட(ங்கள்) தேவை",
-    confirmAllPoints: "அனைத்து புள்ளிகளையும் உறுதிப்படுத்தவும்",
+      "{department} க்கு குறைந்தபட்ச {minImages} புகைப்பட(ங்கள்) தேவை",
+    confirmAllPoints: "அனைத்து தேவையான புள்ளிகளையும் உறுதிப்படுத்தவும்",
     complaintRegistered:
       "புகார் வெற்றிகரமாக பதிவு செய்யப்பட்டது! அதிகாரிகள் விரைவில் மதிப்பாய்வு செய்வார்கள்.",
     networkError: "பிணையப் பிழை. மீண்டும் முயற்சிக்கவும்.",
@@ -239,6 +281,7 @@ const TEXTS = {
     readyToCapture: "✓ {department} பிரச்சினைகளைப் பிடிக்கத் தயார்",
     enterValidLocation: "சரியான இடத்தை உள்ளிடவும்",
     pleaseLogin: "முதலில் உள்நுழையவும்",
+    searchHashtags: "ஹேஷ்டேக்களைத் தேடுங்கள்...",
   },
 };
 
@@ -429,13 +472,12 @@ const PostIssue = () => {
     }
 
     setIsCameraOpen(true);
-    setError(""); // Clear previous error messages
+    setError("");
 
     try {
-      // More compatible constraints for mobile browsers
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: "environment" }, // prefer rear camera, but not strict
+          facingMode: { ideal: "environment" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -444,7 +486,6 @@ const PostIssue = () => {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Debug: log camera info
         const track = stream.getVideoTracks()[0];
         if (track) {
           console.log("Camera started successfully:", {
@@ -572,26 +613,45 @@ const PostIssue = () => {
     );
   };
 
+  // Enhanced hashtag search - searches through all tags and shows suggestions as you type
   const handleHashtagChange = (e) => {
     const value = e.target.value;
     setHashtags(value);
-    const last = value.split(/\s+/).pop();
-    if (last?.startsWith("#") && last.length > 2) {
-      setSuggestions(
-        ALL_TAGS.filter(
-          (t) =>
-            t.toLowerCase().includes(last.toLowerCase()) && !value.includes(t),
-        ),
-      );
+
+    // Get the last word (potential hashtag being typed)
+    const words = value.split(/\s+/);
+    const lastWord = words[words.length - 1];
+
+    // Show suggestions if last word starts with # and has more than 1 character
+    if (lastWord?.startsWith("#") && lastWord.length > 1) {
+      const searchTerm = lastWord.toLowerCase();
+      const filtered = ALL_TAGS.filter(
+        (tag) => tag.toLowerCase().includes(searchTerm) && !value.includes(tag),
+      ).slice(0, 10); // Limit to 10 suggestions
+      setSuggestions(filtered);
     } else {
-      setSuggestions([]);
+      // If just typed space or no #, show popular tags as suggestions
+      if (!lastWord?.startsWith("#") && words.length > 0) {
+        // Show some popular tags that aren't already used
+        const usedTags = words.filter((w) => w.startsWith("#"));
+        const popularTags = ALL_TAGS.filter(
+          (tag) => !usedTags.includes(tag),
+        ).slice(0, 8);
+        setSuggestions(popularTags);
+      } else {
+        setSuggestions([]);
+      }
     }
   };
 
   const applySuggestion = (tag) => {
     const words = hashtags.split(/\s+/).filter(Boolean);
-    if (words.length > 0 && words.at(-1).startsWith("#")) words.pop();
-    setHashtags([...words, tag, ""].join(" "));
+    // Remove the last word if it's an incomplete hashtag
+    if (words.length > 0 && words[words.length - 1].startsWith("#")) {
+      words.pop();
+    }
+    const newHashtags = [...words, tag].join(" ") + " ";
+    setHashtags(newHashtags);
     setSuggestions([]);
   };
 
@@ -630,6 +690,7 @@ const PostIssue = () => {
   };
 
   const handleVerificationSubmit = async () => {
+    // Only require these three essential checks
     const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
     const allRequiredChecked = requiredChecks.every(
       (check) => verificationChecks[check],
@@ -666,6 +727,7 @@ const PostIssue = () => {
       });
       const result = await res.json();
       if (res.ok && result.success) {
+        localStorage.setItem("lastCheck", Date.now());
         addNewIssue(result.issue);
         setDistrict("");
         setArea("");
@@ -715,7 +777,7 @@ const PostIssue = () => {
           : `${themeColors.light.card} ${themeColors.light.border}`
       }`}
     >
-      <div className="w-full max-w-[700px] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-24 sm:pb-32">
+      <div className="max-w-[700px] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-24 sm:pb-32">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
           <h1
             className={`text-xl sm:text-2xl md:text-3xl font-bold text-center sm:text-left ${
@@ -761,7 +823,7 @@ const PostIssue = () => {
           <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
             <div
               ref={modalRef}
-              className={`rounded-xl sm:rounded-2xl w-full max-w-[95%] sm:max-w-lg md:max-w-xl my-4 sm:my-8 mx-auto shadow-2xl border ${
+              className={`rounded-xl sm:rounded-2xl w-full max-w-[95%] sm:max-w-lg md:max-w-xl mx-auto shadow-2xl border max-h-[90vh] overflow-y-auto ${
                 isDark
                   ? "bg-gray-800 border-gray-700"
                   : "bg-white border-gray-200"
@@ -883,6 +945,7 @@ const PostIssue = () => {
                   >
                     {t("iHerebyDeclare")}
                   </h3>
+
                   <label className="flex items-start gap-2 sm:gap-3 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1496,7 +1559,7 @@ const PostIssue = () => {
             />
             {suggestions.length > 0 && (
               <div
-                className={`absolute z-10 w-full border rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex flex-wrap gap-1 sm:gap-2 mt-1 ${
+                className={`absolute z-10 w-full border rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex flex-wrap gap-1 sm:gap-2 mt-1 max-h-40 overflow-y-auto ${
                   isDark
                     ? "bg-gray-800 border-gray-700"
                     : "bg-white border-gray-200"
@@ -1507,10 +1570,10 @@ const PostIssue = () => {
                     key={tag}
                     type="button"
                     onClick={() => applySuggestion(tag)}
-                    className={`px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-sm hover:bg-green-100 dark:hover:bg-green-900 ${
+                    className={`px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-sm hover:bg-green-100 dark:hover:bg-green-900 transition ${
                       isDark
-                        ? "bg-green-900/50 text-green-300"
-                        : "bg-green-50 text-green-700"
+                        ? "bg-green-900/50 text-green-300 hover:bg-green-800/70"
+                        : "bg-green-50 text-green-700 hover:bg-green-100"
                     }`}
                   >
                     {tag}

@@ -377,10 +377,49 @@ const Feed = () => {
       saveFeedState,
     ],
   );
+  useEffect(() => {
+    let startY = 0;
 
-  // =============================
-  // Initial load & restoration (with TTL)
-  // =============================
+    const handleTouchStart = (e) => {
+      startY = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = async (e) => {
+      const endY = e.changedTouches[0].clientY;
+
+      if (endY - startY > 100 && window.scrollY === 0 && !refreshing) {
+        console.log("🔄 Pull to refresh");
+
+        await refreshFeed();
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [fetchIssues, refreshing]);
+  const refreshFeed = async () => {
+    if (refreshing) return;
+
+    setRefreshing(true);
+    sessionStorage.removeItem("feedData");
+    await fetchIssues(1, false);
+    setRefreshing(false);
+  };
+  useEffect(() => {
+  const handleFocus = async () => {
+    await refreshFeed();
+  };
+
+  window.addEventListener("focus", handleFocus);
+
+  return () => window.removeEventListener("focus", handleFocus);
+}, [refreshFeed]);
+
   useEffect(() => {
     const savedStateStr = sessionStorage.getItem("feedData");
     if (savedStateStr) {
@@ -557,94 +596,94 @@ const Feed = () => {
   };
 
   const handleLike = useCallback(
-  async (issueId) => {
-    if (!citizenId) return;
+    async (issueId) => {
+      if (!citizenId) return;
 
-    let previousState;
+      let previousState;
 
-    // 🔥 OPTIMISTIC UPDATE
-    setDisplayedIssues((prev) => {
-      previousState = prev;
+      // 🔥 OPTIMISTIC UPDATE
+      setDisplayedIssues((prev) => {
+        previousState = prev;
 
-      return prev.map((issue) => {
-        if (issue._id !== issueId) return issue;
+        return prev.map((issue) => {
+          if (issue._id !== issueId) return issue;
 
-        const alreadyLiked = issue.likes?.includes(citizenId);
+          const alreadyLiked = issue.likes?.includes(citizenId);
 
-        let updatedLikes;
+          let updatedLikes;
 
-        if (alreadyLiked) {
-          updatedLikes = issue.likes.filter((id) => id !== citizenId);
-        } else {
-          updatedLikes = [...(issue.likes || []), citizenId];
-        }
+          if (alreadyLiked) {
+            updatedLikes = issue.likes.filter((id) => id !== citizenId);
+          } else {
+            updatedLikes = [...(issue.likes || []), citizenId];
+          }
 
-        return {
-          ...issue,
-          likes: updatedLikes,
-          likeCount: updatedLikes.length,
-        };
-      });
-    });
-
-    try {
-      const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citizenId }),
+          return {
+            ...issue,
+            likes: updatedLikes,
+            likeCount: updatedLikes.length,
+          };
+        });
       });
 
-      const data = await res.json();
+      try {
+        const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ citizenId }),
+        });
 
-      if (data.success) {
-        setDisplayedIssues((prev) => {
-          const updated = prev.map((issue) =>
-            issue._id === issueId
-              ? {
-                  ...issue,
-                  likes: data.likes,
-                  likeCount: data.likeCount ?? data.likes.length,
-                }
-              : issue
-          );
+        const data = await res.json();
 
-          // 🔥🔥 IMPORTANT: UPDATE CACHE (NOT DELETE)
-          const saved = JSON.parse(sessionStorage.getItem("feedData"));
-
-          if (saved) {
-            const updatedCacheIssues = saved.issues.map((issue) =>
+        if (data.success) {
+          setDisplayedIssues((prev) => {
+            const updated = prev.map((issue) =>
               issue._id === issueId
                 ? {
                     ...issue,
                     likes: data.likes,
                     likeCount: data.likeCount ?? data.likes.length,
                   }
-                : issue
+                : issue,
             );
 
-            sessionStorage.setItem(
-              "feedData",
-              JSON.stringify({
-                ...saved,
-                issues: updatedCacheIssues,
-                timestamp: Date.now(),
-              })
-            );
-          }
+            // 🔥🔥 IMPORTANT: UPDATE CACHE (NOT DELETE)
+            const saved = JSON.parse(sessionStorage.getItem("feedData"));
 
-          return updated;
-        });
-      } else {
+            if (saved) {
+              const updatedCacheIssues = saved.issues.map((issue) =>
+                issue._id === issueId
+                  ? {
+                      ...issue,
+                      likes: data.likes,
+                      likeCount: data.likeCount ?? data.likes.length,
+                    }
+                  : issue,
+              );
+
+              sessionStorage.setItem(
+                "feedData",
+                JSON.stringify({
+                  ...saved,
+                  issues: updatedCacheIssues,
+                  timestamp: Date.now(),
+                }),
+              );
+            }
+
+            return updated;
+          });
+        } else {
+          // 🔁 rollback
+          setDisplayedIssues(previousState);
+        }
+      } catch (err) {
         // 🔁 rollback
         setDisplayedIssues(previousState);
       }
-    } catch (err) {
-      // 🔁 rollback
-      setDisplayedIssues(previousState);
-    }
-  },
-  [citizenId, setDisplayedIssues]
-);
+    },
+    [citizenId, setDisplayedIssues],
+  );
 
   // =============================
   // Render
