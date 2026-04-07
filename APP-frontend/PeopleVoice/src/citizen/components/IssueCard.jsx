@@ -484,58 +484,63 @@ const IssueCard = ({
     return text.length > max ? text.substring(0, max) + "..." : text;
   };
 
-  const getStatusConfig = (status) => {
-    const normalized = (status || "").toLowerCase();
-    if (isDark) {
-      if (normalized === "resolved" || normalized === "solved")
-        return {
-          bg: "bg-green-900/40",
-          text: "text-green-300",
-          border: "border-green-800",
-          icon: CheckCircle,
-          label: "Solved",
-        };
-      if (normalized === "in progress")
-        return {
-          bg: "bg-yellow-900/40",
-          text: "text-yellow-300",
-          border: "border-yellow-800",
-          icon: Clock,
-          label: "In Progress",
-        };
+const getStatusConfig = (status) => {
+  const normalized = (status || "").toLowerCase();
+
+  if (isDark) {
+    if (normalized === "resolved" || normalized === "closed")
       return {
-        bg: "bg-red-900/40",
-        text: "text-red-300",
-        border: "border-red-800",
-        icon: AlertCircle,
-        label: "Pending",
+        bg: "bg-green-900/40",
+        text: "text-green-300",
+        border: "border-green-800",
+        icon: CheckCircle,
+        label: normalized === "closed" ? "Closed" : "Solved",
       };
-    } else {
-      if (normalized === "resolved" || normalized === "solved")
-        return {
-          bg: "bg-green-100",
-          text: "text-green-700",
-          border: "border-green-300",
-          icon: CheckCircle,
-          label: "Solved",
-        };
-      if (normalized === "in progress")
-        return {
-          bg: "bg-yellow-100",
-          text: "text-yellow-700",
-          border: "border-yellow-300",
-          icon: Clock,
-          label: "In Progress",
-        };
+
+    if (normalized === "in progress")
       return {
-        bg: "bg-red-100",
-        text: "text-red-700",
-        border: "border-red-300",
-        icon: AlertCircle,
-        label: "Pending",
+        bg: "bg-yellow-900/40",
+        text: "text-yellow-300",
+        border: "border-yellow-800",
+        icon: Clock,
+        label: "In Progress",
       };
-    }
-  };
+
+    return {
+      bg: "bg-red-900/40",
+      text: "text-red-300",
+      border: "border-red-800",
+      icon: AlertCircle,
+      label: "Pending",
+    };
+  } else {
+    if (normalized === "resolved" || normalized === "closed")
+      return {
+        bg: "bg-green-100",
+        text: "text-green-700",
+        border: "border-green-300",
+        icon: CheckCircle,
+        label: normalized === "closed" ? "Closed" : "Solved",
+      };
+
+    if (normalized === "in progress")
+      return {
+        bg: "bg-yellow-100",
+        text: "text-yellow-700",
+        border: "border-yellow-300",
+        icon: Clock,
+        label: "In Progress",
+      };
+
+    return {
+      bg: "bg-red-100",
+      text: "text-red-700",
+      border: "border-red-300",
+      icon: AlertCircle,
+      label: "Pending",
+    };
+  }
+};
 
   const statusConfig = getStatusConfig(issue.status);
   const StatusIcon = statusConfig.icon;

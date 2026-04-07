@@ -5,12 +5,9 @@ import {
   MapPin,
   Plus,
   Search,
-  CheckCircle2,
   Clock,
-  AlertCircle,
   MoreVertical,
   Trash2,
-  Archive,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,6 +30,16 @@ const MyIssues = () => {
   const navigate = useNavigate();
   const citizenId = localStorage.getItem("citizenId");
   const { isDark } = useTheme();
+
+  // FIXED: Normalize status function to handle all statuses correctly
+  const normalizeStatus = (status) => {
+    const s = (status || "").toLowerCase().trim();
+    if (s === "closed") return "closed";
+    if (s === "resolved") return "resolved";
+    if (s === "in progress") return "in progress";
+    if (s === "send" || s === "sent") return "send";
+    return s;
+  };
 
   useEffect(() => {
     if (!citizenId) {
@@ -68,45 +75,66 @@ const MyIssues = () => {
   const filteredIssues = myIssues.filter((issue) => {
     if (statusFilter === "All") return true;
 
-    const status = issue.status;
+    const status = normalizeStatus(issue.status);
 
-    if (statusFilter === "Pending")
-      return status === "send" || status === "Sent";
-    if (statusFilter === "In Progress") return status === "In Progress";
-    if (statusFilter === "Resolved")
-      return status === "resolved" || status === "Resolved";
-    if (statusFilter === "Solved")
-      return status === "solved" || status === "Solved";
+    if (statusFilter === "Pending") return status === "send";
 
-    return status === statusFilter;
+    if (statusFilter === "In Progress") return status === "in progress";
+
+    if (statusFilter === "Resolved") return status === "resolved";
+
+    if (statusFilter === "closed") return status === "closed";
+
+    return status === normalizeStatus(statusFilter);
   });
 
-  const handleDelete = async (issueId, e) => {
-    e.stopPropagation();
 
-    if (!window.confirm("Are you sure you want to delete this report?")) return;
+  // FIXED: Get status display text
+  const getStatusDisplay = (status) => {
+    const statusLower = normalizeStatus(status);
+    switch (statusLower) {
+      case "send":
+        return "SENT";
+      case "in progress":
+        return "IN PROGRESS";
+      case "resolved":
+        return "RESOLVED";
+      case "closed":
+        return "CLOSED";
+      default:
+        return status?.toUpperCase() || "SENT";
+    }
+  };
 
-    setDeletingId(issueId);
-
-    try {
-      await axios.delete(`${API_BASE}/api/issues/${issueId}`, {
-        data: { citizenId },
-      });
-
-      setMyIssues((prev) => prev.filter((issue) => issue._id !== issueId));
-
-      if (
-        selectedIssueIndex !== null &&
-        myIssues[selectedIssueIndex]?._id === issueId
-      ) {
-        setSelectedIssueIndex(null);
+  // FIXED: Get status color for card
+  const getStatusColor = (status) => {
+    const statusLower = normalizeStatus(status);
+    if (isDark) {
+      switch (statusLower) {
+        case "send":
+          return "bg-rose-900/40 text-rose-300";
+        case "in progress":
+          return "bg-amber-900/40 text-amber-300";
+        case "resolved":
+          return "bg-emerald-900/40 text-emerald-300";
+        case "closed":
+          return "bg-purple-900/40 text-purple-300";
+        default:
+          return "bg-gray-800 text-gray-400";
       }
-    } catch (err) {
-      console.error("Delete failed:", err);
-      alert("Failed to delete report. Please try again.");
-    } finally {
-      setDeletingId(null);
-      setOpenMenuId(null);
+    } else {
+      switch (statusLower) {
+        case "send":
+          return "bg-rose-100 text-rose-700";
+        case "in progress":
+          return "bg-amber-100 text-amber-700";
+        case "resolved":
+          return "bg-emerald-100 text-emerald-700";
+        case "closed":
+          return "bg-purple-100 text-purple-700";
+        default:
+          return "bg-gray-100 text-gray-700";
+      }
     }
   };
 
@@ -137,50 +165,69 @@ const MyIssues = () => {
           </button>
         </div>
 
-        {/* FILTER TABS - now wrapped, no horizontal scroll */}
-        <div className="flex flex-wrap gap-2 px-4 pb-4 max-w-4xl mx-auto">
-          {[
-            { label: "All", value: "All" },
-            { label: "Pending", value: "Pending" },
-            { label: "In Progress", value: "In Progress" },
-            { label: "Resolved", value: "Resolved" },
-            { label: "Closed", value: "Solved" },
-          ].map((s) => {
-            const count =
-              s.value === "All"
-                ? myIssues.length
-                : filteredIssues.filter((i) => i.status === s.value).length;
-
-            return (
-              <button
-                key={s.value}
-                onClick={() => setStatusFilter(s.value)}
-                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 whitespace-nowrap ${
-                  statusFilter === s.value
-                    ? "bg-violet-600 text-white shadow-md"
-                    : isDark
-                      ? "bg-white/5 text-gray-400"
-                      : "bg-gray-200 text-gray-600"
-                }`}
-              >
-                {s.label}
-
-                {count > 0 && (
-                  <span
-                    className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] ${
-                      statusFilter === s.value
-                        ? "bg-white/20 text-white"
-                        : isDark
-                          ? "bg-gray-600 text-gray-300"
-                          : "bg-gray-300 text-gray-700"
+        {/* FILTER TABS */}
+        <div className="max-w-4xl mx-auto px-4 pb-4">
+          <div className="flex flex-col gap-2">
+            {/* MOBILE ONLY (2 ROW) */}
+            <div className="flex flex-col gap-2 md:hidden">
+              {/* TOP 3 */}
+              <div className="flex gap-2 justify-center">
+                {["All", "Pending", "In Progress"].map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => setStatusFilter(label)}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                      statusFilter === label
+                        ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                        : "bg-gray-100 text-gray-600"
                     }`}
                   >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* BOTTOM 2 */}
+              <div className="flex gap-2 justify-center">
+                {["Resolved", "closed"].map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => setStatusFilter(label)}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                      statusFilter === label
+                        ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* DESKTOP ONLY (1 ROW CENTERED) */}
+            <div className="hidden md:flex justify-center gap-3 flex-wrap">
+              {[
+                { label: "All", value: "All" },
+                { label: "Pending", value: "Pending" },
+                { label: "In Progress", value: "In Progress" },
+                { label: "Resolved", value: "Resolved" },
+                { label: "Closed", value: "closed" },
+              ].map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setStatusFilter(s.value)}
+                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                    statusFilter === s.value
+                      ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -229,61 +276,17 @@ const MyIssues = () => {
                       alt=""
                     />
 
-                    {/* MENU BUTTON */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(isMenuOpen ? null : issue._id);
-                      }}
-                      className={`absolute top-2 right-2 p-1.5 rounded-full z-20 ${
-                        isDark
-                          ? "bg-black/70 text-white"
-                          : "bg-white/90 text-gray-800"
-                      }`}
+                    {/* Status Badge */}
+                    <div
+                      className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold z-10 ${getStatusColor(
+                        issue.status,
+                      )}`}
                     >
-                      <MoreVertical size={16} />
-                    </button>
-
-                    <AnimatePresence>
-                      {isMenuOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          onClick={(e) => e.stopPropagation()}
-                          className={`absolute top-10 right-2 w-36 rounded-xl shadow-xl border ${
-                            isDark
-                              ? "bg-gray-900 border-white/10"
-                              : "bg-white border-gray-200"
-                          }`}
-                        >
-                          <button
-                            onClick={(e) => handleDelete(issue._id, e)}
-                            disabled={isDeleting}
-                            className={`w-full flex items-center gap-2 px-3 py-2 text-xs ${
-                              isDark
-                                ? "hover:bg-white/10 text-red-400"
-                                : "hover:bg-gray-100 text-red-600"
-                            }`}
-                          >
-                            {isDeleting ? (
-                              <>
-                                <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                                Deleting...
-                              </>
-                            ) : (
-                              <>
-                                <Trash2 size={14} />
-                                Delete
-                              </>
-                            )}
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                      {getStatusDisplay(issue.status)}
+                    </div>
                   </div>
 
-                  {/* CARD INFO - more compact */}
+                  {/* CARD INFO */}
                   <div className="p-2">
                     <div className="flex items-center gap-1 text-gray-500 mb-0.5">
                       <MapPin size={10} />
@@ -296,7 +299,7 @@ const MyIssues = () => {
                       {issue.description_en}
                     </p>
 
-                    <div className="flex items-center gap-1 text-[10px] font-bold opacity-70">
+                    <div className="flex items-center gap-2 text-[10px] font-bold opacity-70">
                       <span className="flex items-center gap-0.5">
                         <Heart size={10} /> {issue.likes?.length || 0}
                       </span>
@@ -304,6 +307,11 @@ const MyIssues = () => {
                       <span className="flex items-center gap-0.5">
                         <MessageCircle size={10} />{" "}
                         {issue.comments?.length || 0}
+                      </span>
+
+                      <span className="flex items-center gap-0.5">
+                        <Clock size={10} />{" "}
+                        {new Date(issue.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                   </div>

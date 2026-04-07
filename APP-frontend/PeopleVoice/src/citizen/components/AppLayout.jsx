@@ -8,23 +8,31 @@ const AppLayout = () => {
   const location = useLocation();
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
-  const [isDark, setIsDark] = useState(localStorage.getItem("theme") === "dark");
+  const [isDark, setIsDark] = useState(
+    localStorage.getItem("theme") === "dark",
+  );
 
   // Disable zooming by setting viewport meta tag
   useEffect(() => {
     let metaViewport = document.querySelector('meta[name="viewport"]');
     if (!metaViewport) {
-      metaViewport = document.createElement('meta');
-      metaViewport.name = 'viewport';
+      metaViewport = document.createElement("meta");
+      metaViewport.name = "viewport";
       document.head.appendChild(metaViewport);
     }
-    metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
-    
+    metaViewport.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
+    );
+
     // Cleanup on unmount (optional: restore original content if needed)
     return () => {
       // Restore default zoom behavior when component unmounts
       if (metaViewport) {
-        metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
+        metaViewport.setAttribute(
+          "content",
+          "width=device-width, initial-scale=1.0",
+        );
       }
     };
   }, []);
@@ -73,11 +81,15 @@ const AppLayout = () => {
         <AnimatePresence>
           {commentModalData && (
             <CommentModal
-              open={true} 
+              open={true}
               onClose={() => setCommentModalData(null)}
               issueId={commentModalData._id}
               comments={commentModalData.comments}
-              images={commentModalData.images_data}
+              images={
+                commentModalData.hideImage
+                  ? [] // ❌ MyIssues → no image
+                  : commentModalData.images_data // ✅ Feed → normal
+              }
               citizenId={localStorage.getItem("citizenId")}
               postOwnerId={commentModalData.citizenId}
               district={commentModalData.district}

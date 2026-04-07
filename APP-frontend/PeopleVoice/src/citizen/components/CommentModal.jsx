@@ -104,7 +104,7 @@ const CommentModal = ({
 }) => {
   const { isDark } = useTheme();
   const [isMobile, setIsMobile] = useState(false);
-  
+
   // Use themeColors for consistent theming
   const colors = isDark ? themeColors.dark : themeColors.light;
   const bgColor = colors.bg;
@@ -357,24 +357,24 @@ const CommentModal = ({
   );
 
   // Handle long press for mobile delete
-// Handle long press for mobile delete
-const handleLongPressStart = (commentId, e) => {
-  if (!isMobile) return;
-  const timer = setTimeout(() => {
-    const commentElement = commentRefs.current[commentId];
-    if (commentElement) {
-      const rect = commentElement.getBoundingClientRect();
-      // Position menu directly below the comment
-      setMobileMenuPosition({
-        x: rect.left + rect.width / 2, // Center horizontally
-        y: rect.bottom + 8, // Position right below the comment (adjusted offset)
-      });
-    }
-    setSelectedCommentId(commentId);
-    setShowMobileDeleteDialog(true);
-  }, 500);
-  setLongPressTimer(timer);
-};
+  // Handle long press for mobile delete
+  const handleLongPressStart = (commentId, e) => {
+    if (!isMobile) return;
+    const timer = setTimeout(() => {
+      const commentElement = commentRefs.current[commentId];
+      if (commentElement) {
+        const rect = commentElement.getBoundingClientRect();
+        // Position menu directly below the comment
+        setMobileMenuPosition({
+          x: rect.left + rect.width / 2, // Center horizontally
+          y: rect.bottom + 8, // Position right below the comment (adjusted offset)
+        });
+      }
+      setSelectedCommentId(commentId);
+      setShowMobileDeleteDialog(true);
+    }, 500);
+    setLongPressTimer(timer);
+  };
 
   const handleLongPressEnd = () => {
     if (longPressTimer) {
@@ -522,208 +522,215 @@ const handleLongPressStart = (commentId, e) => {
     }
   };
 
- const renderComment = (comment, level = 0) => {
-  const isLiked = comment.likes?.includes(citizenId);
-  const isOwnComment = comment.citizenId === citizenId;
-  const isPostOwner = citizenId === postOwnerId;
-  const canDelete = isOwnComment || isPostOwner;
-  const isOptimistic = comment.isOptimistic;
+  const renderComment = (comment, level = 0) => {
+    const isLiked = comment.likes?.includes(citizenId);
+    const isOwnComment = comment.citizenId === citizenId;
+    const isPostOwner = citizenId === postOwnerId;
+    const canDelete = isOwnComment || isPostOwner;
+    const isOptimistic = comment.isOptimistic;
 
-  const hasReplies = (comment.replies?.length || 0) > 0;
-  const isExpanded = expandedReplies[comment._id] ?? false;
-  const showMenu = activeMenuCommentId === comment._id;
+    const hasReplies = (comment.replies?.length || 0) > 0;
+    const isExpanded = expandedReplies[comment._id] ?? false;
+    const showMenu = activeMenuCommentId === comment._id;
 
-  return (
-    <div
-      key={comment._id}
-      ref={(el) => {
-        if (el) commentRefs.current[comment._id] = el;
-      }}
-      className="relative"
-      onTouchStart={(e) => canDelete && handleLongPressStart(comment._id, e)}
-      onTouchEnd={handleLongPressEnd}
-      onTouchCancel={handleLongPressEnd}
-    >
+    return (
       <div
-        className={`flex items-start space-x-3 py-2 group ${isOptimistic ? "opacity-60" : ""}`}
+        key={comment._id}
+        ref={(el) => {
+          if (el) commentRefs.current[comment._id] = el;
+        }}
+        className="relative"
+        onTouchStart={(e) => canDelete && handleLongPressStart(comment._id, e)}
+        onTouchEnd={handleLongPressEnd}
+        onTouchCancel={handleLongPressEnd}
       >
-        {/* Avatar */}
-        <div className="shrink-0">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
-            {comment.citizenId?.slice(0, 2).toUpperCase()}
+        <div
+          className={`flex items-start space-x-3 py-2 group ${isOptimistic ? "opacity-60" : ""}`}
+        >
+          {/* Avatar */}
+          <div className="shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
+              {comment.citizenId?.slice(0, 2).toUpperCase()}
+            </div>
           </div>
-        </div>
 
-        {/* Comment content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-baseline gap-1">
-            <span className={`font-semibold text-sm ${textColor}`}>
-              {comment.citizenId}
-            </span>
-            <span className={`text-sm ${textColor} break-words`}>
-              {comment.text}
-            </span>
-          </div>
-          <div className={`flex items-center gap-3 mt-1 text-xs ${textMuted}`}>
-            <span>
-              {new Date(comment.createdAt).toLocaleString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-            {!isMobile && (comment.likes?.length || 0) > 0 && (
-              <span>{comment.likes.length} likes</span>
-            )}
-            {!isOptimistic && (
-              <button
-                onClick={() =>
-                  setReplyTo({
-                    commentId: comment._id,
-                    username: comment.citizenId,
-                  })
-                }
-                className={`font-semibold ${textMuted} hover:${colors.accent || "text-gray-600 dark:text-gray-300"} transition`}
-              >
-                Reply
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Right side actions */}
-        <div className="shrink-0 flex flex-col items-center justify-start">
-          {!isOptimistic && (
-            <button
-              onClick={() => toggleLike(comment._id)}
-              className="p-1 transition-transform active:scale-90"
+          {/* Comment content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-baseline gap-1">
+              <span className={`font-semibold text-sm ${textColor}`}>
+                {comment.citizenId}
+              </span>
+              <span className={`text-sm ${textColor} break-words`}>
+                {comment.text}
+              </span>
+            </div>
+            <div
+              className={`flex items-center gap-3 mt-1 text-xs ${textMuted}`}
             >
-              <Heart
-                size={18}
-                className={`transition-all ${
-                  isLiked ? "text-red-500 fill-red-500" : textMuted
-                }`}
-              />
-            </button>
-          )}
-
-          {isMobile && (comment.likes?.length || 0) > 0 && (
-            <span className={`text-[10px] leading-none mt-0.5 ${textMuted}`}>
-              {comment.likes.length}
-            </span>
-          )}
-
-          {/* Desktop menu button */}
-          {canDelete && !isOptimistic && !isMobile && (
-            <div className="relative mt-1">
-              <button
-                onClick={() => setActiveMenuCommentId(comment._id)}
-                className={`p-1 opacity-0 group-hover:opacity-100 transition duration-200 ease-in-out ${textMuted}`}
-              >
-                <MoreHorizontal size={16} />
-              </button>
-              {showMenu && (
-                <div
-                  ref={menuRef}
-                  className={`absolute right-0 top-6 z-20 min-w-[120px] rounded-lg shadow-lg py-1 ${cardBg} border ${borderColor}`}
+              <span>
+                {new Date(comment.createdAt).toLocaleString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              {!isMobile && (comment.likes?.length || 0) > 0 && (
+                <span>{comment.likes.length} likes</span>
+              )}
+              {!isOptimistic && (
+                <button
+                  onClick={() =>
+                    setReplyTo({
+                      commentId: comment._id,
+                      username: comment.citizenId,
+                    })
+                  }
+                  className={`font-semibold ${textMuted} hover:${colors.accent || "text-gray-600 dark:text-gray-300"} transition`}
                 >
-                  <button
-                    onClick={() => deleteComment(comment._id)}
-                    className="w-full px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
-                  >
-                    Delete
-                  </button>
-                </div>
+                  Reply
+                </button>
               )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Mobile Delete Menu - Positioned directly below the comment */}
-      {isMobile && showMobileDeleteDialog && selectedCommentId === comment._id && (
-        <div
-          id={`mobile-menu-${comment._id}`}
-          className="fixed z-50 min-w-[140px] rounded-lg shadow-lg py-1 border animate-pop"
-          style={{
-            left: `${mobileMenuPosition.x}px`,
-            top: `${mobileMenuPosition.y}px`,
-            transform: "translateX(-50%)",
-            backgroundColor: isDark ? "#1f2937" : "#ffffff",
-            borderColor: isDark ? "#374151" : "#e5e7eb",
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={handleMobileDeleteConfirm}
-            className="w-full px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
-          >
-            Delete
-          </button>
-        </div>
-      )}
+          {/* Right side actions */}
+          <div className="shrink-0 flex flex-col items-center justify-start">
+            {!isOptimistic && (
+              <button
+                onClick={() => toggleLike(comment._id)}
+                className="p-1 transition-transform active:scale-90"
+              >
+                <Heart
+                  size={18}
+                  className={`transition-all ${
+                    isLiked ? "text-red-500 fill-red-500" : textMuted
+                  }`}
+                />
+              </button>
+            )}
 
-      {/* Replies section */}
-      {hasReplies && (
-        <div className="ml-8 mt-1">
-          {!isExpanded ? (
-            <button
-              onClick={() =>
-                setExpandedReplies((prev) => ({
-                  ...prev,
-                  [comment._id]: true,
-                }))
-              }
-              className={`text-xs font-semibold ${textMuted} ${hoverBg} transition flex items-center gap-1`}
-            >
-              <ChevronDown size={14} /> View replies ({comment.replies.length})
-            </button>
-          ) : (
-            <>
-              <div className="space-y-1">
-                {comment.replies.map((reply) =>
-                  renderComment(reply, level + 1),
+            {isMobile && (comment.likes?.length || 0) > 0 && (
+              <span className={`text-[10px] leading-none mt-0.5 ${textMuted}`}>
+                {comment.likes.length}
+              </span>
+            )}
+
+            {/* Desktop menu button */}
+            {canDelete && !isOptimistic && !isMobile && (
+              <div className="relative mt-1">
+                <button
+                  onClick={() => setActiveMenuCommentId(comment._id)}
+                  className={`p-1 opacity-0 group-hover:opacity-100 transition duration-200 ease-in-out ${textMuted}`}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+                {showMenu && (
+                  <div
+                    ref={menuRef}
+                    className={`absolute right-0 top-6 z-20 min-w-[120px] rounded-lg shadow-lg py-1 ${cardBg} border ${borderColor}`}
+                  >
+                    <button
+                      onClick={() => deleteComment(comment._id)}
+                      className="w-full px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 )}
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Delete Menu - Positioned directly below the comment */}
+        {isMobile &&
+          showMobileDeleteDialog &&
+          selectedCommentId === comment._id && (
+            <div
+              id={`mobile-menu-${comment._id}`}
+              className="fixed z-50 min-w-[140px] rounded-lg shadow-lg py-1 border animate-pop"
+              style={{
+                left: `${mobileMenuPosition.x}px`,
+                top: `${mobileMenuPosition.y}px`,
+                transform: "translateX(-50%)",
+                backgroundColor: isDark ? "#1f2937" : "#ffffff",
+                borderColor: isDark ? "#374151" : "#e5e7eb",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={handleMobileDeleteConfirm}
+                className="w-full px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+
+        {/* Replies section */}
+        {hasReplies && (
+          <div className="ml-8 mt-1">
+            {!isExpanded ? (
               <button
                 onClick={() =>
                   setExpandedReplies((prev) => ({
                     ...prev,
-                    [comment._id]: false,
+                    [comment._id]: true,
                   }))
                 }
-                className={`text-xs font-semibold ${textMuted} ${hoverBg} transition flex items-center gap-1 mt-1`}
+                className={`text-xs font-semibold ${textMuted} ${hoverBg} transition flex items-center gap-1`}
               >
-                <ChevronUp size={14} /> Hide replies
+                <ChevronDown size={14} /> View replies ({comment.replies.length}
+                )
               </button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+            ) : (
+              <>
+                <div className="space-y-1">
+                  {comment.replies.map((reply) =>
+                    renderComment(reply, level + 1),
+                  )}
+                </div>
+                <button
+                  onClick={() =>
+                    setExpandedReplies((prev) => ({
+                      ...prev,
+                      [comment._id]: false,
+                    }))
+                  }
+                  className={`text-xs font-semibold ${textMuted} ${hoverBg} transition flex items-center gap-1 mt-1`}
+                >
+                  <ChevronUp size={14} /> Hide replies
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 md:p-4">
         <div
-          className={`w-full h-full md:max-w-5xl md:h-[90vh] md:rounded-2xl overflow-hidden flex flex-col md:flex-row ${bgColor}`}
+          className={`w-full h-full 
+  ${allImages.length > 0 ? "md:max-w-5xl md:flex-row" : "md:max-w-md"} 
+  md:h-[90vh] md:rounded-2xl overflow-hidden flex flex-col ${bgColor}`}
         >
           {/* Left side: Image (Instagram style) */}
-          <div className="hidden md:flex md:w-3/5 bg-black items-center justify-center">
-            {allImages.length > 0 ? (
+          {allImages.length > 0 && (
+            <div className="hidden md:flex md:w-3/5 bg-black items-center justify-center">
               <img
                 src={allImages[0]}
                 className="max-h-full max-w-full object-contain"
                 alt="post"
               />
-            ) : (
-              <div className={textMuted}>No media</div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Right side: Comments */}
-          <div className="w-full md:w-2/5 flex flex-col h-full">
+          <div
+            className={`${allImages.length > 0 ? "md:w-2/5" : "w-full"} flex flex-col h-full`}
+          >
             {/* Header */}
             <div
               className={`flex items-center justify-between px-4 py-3 border-b ${borderColor}`}
@@ -750,7 +757,9 @@ const handleLongPressStart = (commentId, e) => {
             </div>
 
             {/* Comments list */}
-            <div className={`flex-1 overflow-y-auto px-4 py-2 space-y-3 ${cardBg}`}>
+            <div
+              className={`flex-1 overflow-y-auto px-4 py-2 space-y-3 ${cardBg}`}
+            >
               {localComments.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center">
                   <p className={`text-sm ${textMuted}`}>No comments yet.</p>
@@ -772,7 +781,9 @@ const handleLongPressStart = (commentId, e) => {
                 >
                   <span className={textMuted}>
                     Replying to{" "}
-                    <span className={`font-semibold ${textColor}`}>@{replyTo.username}</span>
+                    <span className={`font-semibold ${textColor}`}>
+                      @{replyTo.username}
+                    </span>
                   </span>
                   <button
                     onClick={() => setReplyTo(null)}
@@ -793,7 +804,9 @@ const handleLongPressStart = (commentId, e) => {
                   <input
                     ref={inputRef}
                     type="text"
-                    placeholder={replyTo ? "Write a reply..." : "Add a comment..."}
+                    placeholder={
+                      replyTo ? "Write a reply..." : "Add a comment..."
+                    }
                     className={`flex-1 bg-transparent focus:outline-none text-sm ${textColor} placeholder:${textMuted}`}
                     value={text}
                     disabled={isSending}

@@ -8,7 +8,6 @@ import {
   Circle,
   AlertCircle,
   Globe,
-  Shield,
   AlertTriangle,
   Crosshair,
   Navigation2,
@@ -25,7 +24,6 @@ import { useUserValues } from "../../Context/UserValuesContext";
 /* ================= CONFIG ================= */
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const APIURL = `${BACKEND_URL}/api`;
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 /* ================= CONSTANTS ================= */
 const DEPARTMENTS = [
@@ -82,36 +80,22 @@ const REASONS = [
   "Other",
 ];
 
+// Comprehensive hashtags collection
 const ALL_TAGS = [
-  "#RoadIssue",
-  "#Garbage",
-  "#WaterProblem",
-  "#Electricity",
-  "#Drainage",
-  "#PublicIssue",
-  "#PeopleVoice",
-  "#Urgent",
-  "#Chennai",
-  "#Nagercoil",
+  "#RoadIssue", "#RoadDamage", "#Pothole", "#RoadSafety", "#RoadAccident",
+  "#Garbage", "#WasteManagement", "#GarbageDumping", "#CleanCity", "#SwachhBharat",
+  "#WaterProblem", "#WaterLeakage", "#PipelineIssue", "#Drainage", "#SewageOverflow",
+  "#Electricity", "#PowerCut", "#TransformerIssue", "#WireSnapping", "#PoleDamage",
+  "#DrainageBlockage", "#SewageProblem", "#Flooding", "#StagnantWater",
+  "#PublicIssue", "#PeopleVoice", "#CitizenReport", "#CivicIssue",
+  "#Urgent", "#Emergency", "#HighPriority", "#Dangerous", "#SafetyHazard",
+  "#Chennai", "#Nagercoil", "#Coimbatore", "#Madurai", "#Tirunelveli", "#Salem",
+  "#HealthHazard", "#EnvironmentalIssue", "#TrafficIssue", "#PublicSafety",
+  "#IllegalDumping", "#NoisePollution", "#AirPollution", "#StreetLightOutage",
+  "#FootpathIssue", "#PedestrianSafety", "#WaterLogging", "#MosquitoBreeding",
 ];
 
-/* ================= TRANSLATION HELPER ================= */
-const translateToTamil = async (text) => {
-  if (!text.trim()) return "";
-  try {
-    const res = await fetch(
-      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ta&dt=t&q=${encodeURIComponent(text)}`,
-    );
-    if (!res.ok) throw new Error("Translation failed");
-    const data = await res.json();
-    return data?.[0]?.[0]?.[0] || text;
-  } catch (err) {
-    console.error("Translation error:", err);
-    return text;
-  }
-};
-
-/* ================= LANGUAGE CONSTANTS ================= */
+/* ================= LANGUAGE CONSTANTS (Static Tamil) ================= */
 const TEXTS = {
   en: {
     title: "Register Public Complaint",
@@ -128,17 +112,15 @@ const TEXTS = {
     selectReason: "Select Reason",
     description: "Description",
     describeIssue: "Describe the issue clearly...",
-    descriptionTamil: "விளக்கம் (தமிழ்)",
+    descriptionTamil: "Description (Tamil)",
     hashtags: "Hashtags",
     addHashtags: "Add hashtags (#Urgent #Chennai ...)",
-    agreement:
-      "I confirm this complaint is genuine and based on facts. False information may lead to legal action.",
+    agreement: "I confirm this complaint is genuine and based on facts. False information may lead to legal action.",
     proceed: "Proceed to Final Verification",
     finalConfirmation: "Final Confirmation – Mandatory",
     falseComplaints: "False complaints are punishable offences",
     importantLegalNotice: "Important Legal Notice",
-    legalText:
-      "Submitting false, misleading or irrelevant information / photographs constitutes a serious offence. Government authorities may initiate legal action under Section 177 IPC and other applicable laws. Misuse of this platform may result in permanent account suspension.",
+    legalText: "Submitting false, misleading or irrelevant information / photographs is a serious offence. Government authorities may impose fines and take legal action under Section 177 IPC and other applicable laws.",
     complaintSummary: "Complaint Summary",
     departmentLabel: "Department",
     locationLabel: "Location",
@@ -150,8 +132,7 @@ const TEXTS = {
     confirmLocation: "The location is correct & accurate.",
     confirmLocationDesc: "Issue location:",
     acceptTerms: "THIS COMPLAINT IS TRUE AND GENUINE",
-    acceptTermsDesc:
-      "I understand that providing false information may result in legal action and account suspension.",
+    acceptTermsDesc: "I understand that providing false information may result in government fines and legal action.",
     goBackEdit: "Go Back & Edit",
     iConfirmSubmit: "I Confirm → Submit Complaint",
     submitting: "Submitting...",
@@ -160,9 +141,8 @@ const TEXTS = {
     duplicatePhoto: "Duplicate photo detected",
     fillAllFields: "Please fill all required fields",
     minPhotosRequired: "Minimum {minImages} photo(s) required for {department}",
-    confirmAllPoints: "Please confirm all points",
-    complaintRegistered:
-      "Complaint registered successfully! Authorities will review it soon.",
+    confirmAllPoints: "Please confirm all required points",
+    complaintRegistered: "Complaint registered successfully! Authorities will review it soon.",
     networkError: "Network error. Please try again.",
     yesThisIsIssue: "✓ Yes, this is a {department} issue",
     save: "Save",
@@ -170,10 +150,9 @@ const TEXTS = {
     english: "English",
     tamil: "தமிழ்",
     both: "Both",
-    translating: "Translating to Tamil...",
-    readyToCapture: "✓ Ready to capture {department} issues",
     enterValidLocation: "Please enter valid location",
     pleaseLogin: "Please login first",
+    searchHashtags: "Search hashtags...",
   },
   ta: {
     title: "பொது புகார் பதிவு",
@@ -193,29 +172,24 @@ const TEXTS = {
     descriptionTamil: "விளக்கம் (தமிழ்)",
     hashtags: "ஹேஷ்டேக்கள்",
     addHashtags: "ஹேஷ்டேக்களை சேர்க்கவும் (#அவசர #சென்னை ...)",
-    agreement:
-      "இந்தப் புகார் உண்மை மற்றும் உண்மையானது என உறுதிப்படுத்துகிறேன். பொய்த் தகவல்கள் சட்ட நடவடிக்கைக்கு வழிவகுக்கும்.",
+    agreement: "இந்தப் புகார் உண்மை மற்றும் உண்மையானது என உறுதிப்படுத்துகிறேன். பொய்த் தகவல்கள் சட்ட நடவடிக்கைக்கு வழிவகுக்கும்.",
     proceed: "இறுதி சரிபார்ப்புக்குச் செல்லவும்",
     finalConfirmation: "இறுதி உறுதிப்படுத்தல் – கட்டாயம்",
     falseComplaints: "பொய் புகார்கள் தண்டனைக்குரிய குற்றங்கள்",
     importantLegalNotice: "முக்கிய சட்ட அறிவிப்பு",
-    legalText:
-      "பொய், தவறான அல்லது தொடர்பில்லாத தகவல்/புகைப்படங்களை சமர்ப்பிப்பது கடுமையான குற்றமாகும். அரசாங்க அதிகாரிகள் பிரிவு 177 IPC மற்றும் பிற பொருந்தக்கூடிய சட்டங்களின் கீழ் சட்ட நடவடிக்கை தொடுக்கலாம். இந்த மேடையின் தவறான பயன்பாடு நிரந்தர கணக்கு நிறுத்தத்திற்கு வழிவகுக்கும்.",
+    legalText: "பொய், தவறான அல்லது தொடர்பில்லாத தகவல்/புகைப்படங்களை சமர்ப்பிப்பது கடுமையான குற்றமாகும். அரசு அதிகாரிகள் பிரிவு 177 IPC மற்றும் பிற சட்டங்களின் கீழ் அபராதம் விதிக்கலாம் மற்றும் சட்ட நடவடிக்கை எடுக்கலாம்.",
     complaintSummary: "புகார் சுருக்கம்",
     departmentLabel: "துறை",
     locationLabel: "இடம்",
     photosLabel: "புகைப்படங்கள்",
     attached: "இணைக்கப்பட்டது",
     iHerebyDeclare: "நான் இதன்மூலம் உறுதியளிக்கிறேன்:",
-    confirmImages:
-      "அனைத்து புகைப்படங்களும் புகாரளிக்கப்பட்ட பிரச்சினையை உண்மையாகக் காட்டுகின்றன.",
-    confirmImagesDesc:
-      "பழைய, தொடர்பில்லாத அல்லது தொடர்பில்லாத படங்கள் பயன்படுத்தப்படவில்லை.",
+    confirmImages: "அனைத்து புகைப்படங்களும் புகாரளிக்கப்பட்ட பிரச்சினையை உண்மையாகக் காட்டுகின்றன.",
+    confirmImagesDesc: "பழைய, தொடர்பில்லாத அல்லது தொடர்பில்லாத படங்கள் பயன்படுத்தப்படவில்லை.",
     confirmLocation: "இடம் சரியானது & துல்லியமானது.",
     confirmLocationDesc: "பிரச்சினை இடம்:",
     acceptTerms: "இந்த புகார் உண்மை மற்றும் உண்மையானது",
-    acceptTermsDesc:
-      "பொய்த் தகவலை வழங்குவது சட்ட நடவடிக்கை மற்றும் கணக்கு நிறுத்தத்திற்கு வழிவகுக்கும் என்பதை நான் புரிந்துகொள்கிறேன்.",
+    acceptTermsDesc: "பொய்த் தகவலை வழங்குவது அரசு அபராதம் மற்றும் சட்ட நடவடிக்கைக்கு வழிவகுக்கும் என்பதை நான் புரிந்துகொள்கிறேன்.",
     goBackEdit: "திரும்பிச் சென்று திருத்தவும்",
     iConfirmSubmit: "நான் உறுதிப்படுத்துகிறேன் → புகாரைச் சமர்ப்பிக்கவும்",
     submitting: "சமர்ப்பிக்கிறது...",
@@ -223,11 +197,9 @@ const TEXTS = {
     cameraDenied: "கேமரா அணுகல் மறுக்கப்பட்டது அல்லது இல்லை",
     duplicatePhoto: "நகல் புகைப்படம் கண்டறியப்பட்டது",
     fillAllFields: "தேவையான அனைத்து புலங்களையும் பூர்த்தி செய்யவும்",
-    minPhotosRequired:
-      "{department} க்கு குறைந்தபடி {minImages} புகைப்பட(ங்கள்) தேவை",
-    confirmAllPoints: "அனைத்து புள்ளிகளையும் உறுதிப்படுத்தவும்",
-    complaintRegistered:
-      "புகார் வெற்றிகரமாக பதிவு செய்யப்பட்டது! அதிகாரிகள் விரைவில் மதிப்பாய்வு செய்வார்கள்.",
+    minPhotosRequired: "{department} க்கு குறைந்தபட்ச {minImages} புகைப்பட(ங்கள்) தேவை",
+    confirmAllPoints: "அனைத்து தேவையான புள்ளிகளையும் உறுதிப்படுத்தவும்",
+    complaintRegistered: "புகார் வெற்றிகரமாக பதிவு செய்யப்பட்டது! அதிகாரிகள் விரைவில் மதிப்பாய்வு செய்வார்கள்.",
     networkError: "பிணையப் பிழை. மீண்டும் முயற்சிக்கவும்.",
     yesThisIsIssue: "✓ ஆம், இது ஒரு {department} பிரச்சினை",
     save: "சேமிக்கவும்",
@@ -235,10 +207,9 @@ const TEXTS = {
     english: "ஆங்கிலம்",
     tamil: "தமிழ்",
     both: "இரண்டும்",
-    translating: "தமிழில் மொழிபெயர்க்கிறது...",
-    readyToCapture: "✓ {department} பிரச்சினைகளைப் பிடிக்கத் தயார்",
     enterValidLocation: "சரியான இடத்தை உள்ளிடவும்",
     pleaseLogin: "முதலில் உள்நுழையவும்",
+    searchHashtags: "ஹேஷ்டேக்களைத் தேடுங்கள்...",
   },
 };
 
@@ -256,7 +227,7 @@ const PostIssue = () => {
   const [department, setDepartment] = useState("");
   const [reason, setReason] = useState("");
   const [descEn, setDescEn] = useState("");
-  const [descTa, setDescTa] = useState("");
+  const [descTa, setDescTa] = useState(""); // Static Tamil - user can edit directly
   const [hashtags, setHashtags] = useState("#peoplevoice ");
   const [images, setImages] = useState([]);
   const [agree, setAgree] = useState(false);
@@ -264,9 +235,7 @@ const PostIssue = () => {
   // UI states
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState("");
-  const [tamilEdited, setTamilEdited] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [cameraAllowed, setCameraAllowed] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
@@ -285,8 +254,7 @@ const PostIssue = () => {
     confirmDescription: false,
     acceptTerms: false,
   });
-  const [isSubmittingVerification, setIsSubmittingVerification] =
-    useState(false);
+  const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
 
   // Language state
   const [language, setLanguage] = useState("en");
@@ -338,18 +306,6 @@ const PostIssue = () => {
     DEPARTMENTS.find((d) => d.id === id) || DEPARTMENTS[5];
 
   const getDepartmentName = (id) => getDepartmentDetails(id).name;
-
-  // Auto-translate English → Tamil
-  useEffect(() => {
-    if (!descEn.trim() || tamilEdited) return;
-    const timer = setTimeout(async () => {
-      setIsTranslating(true);
-      const tamil = await translateToTamil(descEn);
-      setDescTa(tamil);
-      setIsTranslating(false);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [descEn, tamilEdited]);
 
   const getCurrentLocation = () =>
     new Promise((resolve, reject) => {
@@ -429,13 +385,12 @@ const PostIssue = () => {
     }
 
     setIsCameraOpen(true);
-    setError(""); // Clear previous error messages
+    setError("");
 
     try {
-      // More compatible constraints for mobile browsers
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: "environment" }, // prefer rear camera, but not strict
+          facingMode: { ideal: "environment" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -444,49 +399,26 @@ const PostIssue = () => {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Debug: log camera info
-        const track = stream.getVideoTracks()[0];
-        if (track) {
-          console.log("Camera started successfully:", {
-            label: track.label,
-            enabled: track.enabled,
-            kind: track.kind,
-          });
-        }
       }
     } catch (err) {
       console.error("Camera access error:", err.name, err.message, err);
-
       let friendlyMsg = t("cameraDenied");
-
       if (
         err.name === "NotAllowedError" ||
         err.name === "PermissionDeniedError"
       ) {
-        friendlyMsg =
-          language === "en"
-            ? "Camera permission denied. Please allow camera access in your browser settings and try again."
-            : "கேமரா அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் கேமரா அனுமதியை அனுமதித்து மீண்டும் முயற்சிக்கவும்.";
-      } else if (
-        err.name === "NotFoundError" ||
-        err.name === "OverconstrainedError"
-      ) {
-        friendlyMsg =
-          language === "en"
-            ? "No suitable camera found on this device."
-            : "இந்த சாதனத்தில் பொருத்தமான கேமரா இல்லை.";
+        friendlyMsg = language === "en"
+          ? "Camera permission denied. Please allow camera access in your browser settings and try again."
+          : "கேமரா அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் கேமரா அனுமதியை அனுமதித்து மீண்டும் முயற்சிக்கவும்.";
+      } else if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+        friendlyMsg = language === "en"
+          ? "No suitable camera found on this device."
+          : "இந்த சாதனத்தில் பொருத்தமான கேமரா இல்லை.";
       } else if (err.name === "NotReadableError") {
-        friendlyMsg =
-          language === "en"
-            ? "Camera is in use by another app or permission issue."
-            : "கேமரா வேறு செயலியால் பயன்படுத்தப்படுகிறது அல்லது அனுமதி பிரச்சினை.";
-      } else if (err.name === "SecurityError") {
-        friendlyMsg =
-          language === "en"
-            ? "Camera blocked due to insecure page or mixed content."
-            : "பாதுகாப்பற்ற பக்கம் அல்லது mixed content காரணமாக கேமரா தடை செய்யப்பட்டுள்ளது.";
+        friendlyMsg = language === "en"
+          ? "Camera is in use by another app or permission issue."
+          : "கேமரா வேறு செயலியால் பயன்படுத்தப்படுகிறது அல்லது அனுமதி பிரச்சினை.";
       }
-
       setError(friendlyMsg + ` (${err.name})`);
       setIsCameraOpen(false);
     }
@@ -572,26 +504,40 @@ const PostIssue = () => {
     );
   };
 
+  // Enhanced hashtag search
   const handleHashtagChange = (e) => {
     const value = e.target.value;
     setHashtags(value);
-    const last = value.split(/\s+/).pop();
-    if (last?.startsWith("#") && last.length > 2) {
-      setSuggestions(
-        ALL_TAGS.filter(
-          (t) =>
-            t.toLowerCase().includes(last.toLowerCase()) && !value.includes(t),
-        ),
-      );
+
+    const words = value.split(/\s+/);
+    const lastWord = words[words.length - 1];
+
+    if (lastWord?.startsWith("#") && lastWord.length > 1) {
+      const searchTerm = lastWord.toLowerCase();
+      const filtered = ALL_TAGS.filter(
+        (tag) => tag.toLowerCase().includes(searchTerm) && !value.includes(tag),
+      ).slice(0, 10);
+      setSuggestions(filtered);
     } else {
-      setSuggestions([]);
+      if (!lastWord?.startsWith("#") && words.length > 0) {
+        const usedTags = words.filter((w) => w.startsWith("#"));
+        const popularTags = ALL_TAGS.filter(
+          (tag) => !usedTags.includes(tag),
+        ).slice(0, 8);
+        setSuggestions(popularTags);
+      } else {
+        setSuggestions([]);
+      }
     }
   };
 
   const applySuggestion = (tag) => {
     const words = hashtags.split(/\s+/).filter(Boolean);
-    if (words.length > 0 && words.at(-1).startsWith("#")) words.pop();
-    setHashtags([...words, tag, ""].join(" "));
+    if (words.length > 0 && words[words.length - 1].startsWith("#")) {
+      words.pop();
+    }
+    const newHashtags = [...words, tag].join(" ") + " ";
+    setHashtags(newHashtags);
     setSuggestions([]);
   };
 
@@ -666,6 +612,7 @@ const PostIssue = () => {
       });
       const result = await res.json();
       if (res.ok && result.success) {
+        localStorage.setItem("lastCheck", Date.now());
         addNewIssue(result.issue);
         setDistrict("");
         setArea("");
@@ -761,7 +708,7 @@ const PostIssue = () => {
           <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
             <div
               ref={modalRef}
-              className={`rounded-xl sm:rounded-2xl w-full max-w-[95%] sm:max-w-lg md:max-w-xl my-4 sm:my-8 mx-auto shadow-2xl border ${
+              className={`rounded-xl sm:rounded-2xl w-full max-w-[95%] sm:max-w-lg md:max-w-xl mx-auto shadow-2xl border max-h-[90vh] overflow-y-auto ${
                 isDark
                   ? "bg-gray-800 border-gray-700"
                   : "bg-white border-gray-200"
@@ -831,44 +778,26 @@ const PostIssue = () => {
                   </h3>
                   <div className="space-y-1.5 sm:space-y-2">
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span
-                        className={isDark ? "text-gray-400" : "text-gray-600"}
-                      >
+                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>
                         {t("departmentLabel")}
                       </span>
-                      <span
-                        className={`font-medium ${
-                          isDark ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
+                      <span className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
                         {getDepartmentName(department)}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span
-                        className={isDark ? "text-gray-400" : "text-gray-600"}
-                      >
+                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>
                         {t("locationLabel")}
                       </span>
-                      <span
-                        className={`font-medium break-words ${
-                          isDark ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
+                      <span className={`font-medium break-words ${isDark ? "text-gray-200" : "text-gray-800"}`}>
                         {area}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span
-                        className={isDark ? "text-gray-400" : "text-gray-600"}
-                      >
+                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>
                         {t("photosLabel")}
                       </span>
-                      <span
-                        className={`font-medium ${
-                          isDark ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
+                      <span className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
                         {images.length} {t("attached")}
                       </span>
                     </div>
@@ -876,13 +805,10 @@ const PostIssue = () => {
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
-                  <h3
-                    className={`font-semibold text-sm sm:text-base ${
-                      isDark ? "text-gray-200" : "text-gray-800"
-                    }`}
-                  >
+                  <h3 className={`font-semibold text-sm sm:text-base ${isDark ? "text-gray-200" : "text-gray-800"}`}>
                     {t("iHerebyDeclare")}
                   </h3>
+
                   <label className="flex items-start gap-2 sm:gap-3 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -895,18 +821,10 @@ const PostIssue = () => {
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span
-                      className={`text-xs sm:text-sm ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
+                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                       <strong>{t("confirmImages")}</strong>
                       <br />
-                      <span
-                        className={`${
-                          isDark ? "text-gray-400" : "text-gray-600"
-                        } text-[10px] sm:text-xs`}
-                      >
+                      <span className={`${isDark ? "text-gray-400" : "text-gray-600"} text-[10px] sm:text-xs`}>
                         {t("confirmImagesDesc")}
                       </span>
                     </span>
@@ -924,18 +842,10 @@ const PostIssue = () => {
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span
-                      className={`text-xs sm:text-sm ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
+                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                       <strong>{t("confirmLocation")}</strong>
                       <br />
-                      <span
-                        className={`${
-                          isDark ? "text-gray-400" : "text-gray-600"
-                        } text-[10px] sm:text-xs break-words`}
-                      >
+                      <span className={`${isDark ? "text-gray-400" : "text-gray-600"} text-[10px] sm:text-xs break-words`}>
                         {t("confirmLocationDesc")} <strong>{area}</strong>
                       </span>
                     </span>
@@ -956,34 +866,18 @@ const PostIssue = () => {
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span
-                      className={`text-xs sm:text-sm ${
-                        isDark ? "text-gray-300" : "text-gray-700"
-                      }`}
-                    >
-                      <strong
-                        className={`block text-sm sm:text-base ${
-                          isDark ? "text-red-400" : "text-red-700"
-                        }`}
-                      >
+                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                      <strong className={`block text-sm sm:text-base ${isDark ? "text-red-400" : "text-red-700"}`}>
                         {t("acceptTerms")}
                       </strong>
-                      <span
-                        className={`mt-1 block text-[10px] sm:text-xs ${
-                          isDark ? "text-red-400/80" : "text-red-700"
-                        }`}
-                      >
+                      <span className={`mt-1 block text-[10px] sm:text-xs ${isDark ? "text-red-400/80" : "text-red-700"}`}>
                         {t("acceptTermsDesc")}
                       </span>
                     </span>
                   </label>
                 </div>
 
-                <div
-                  className={`flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t ${
-                    isDark ? "border-gray-700" : "border-gray-200"
-                  }`}
-                >
+                <div className={`flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
                   <button
                     type="button"
                     onClick={() => setShowVerification(false)}
@@ -998,9 +892,7 @@ const PostIssue = () => {
                   <button
                     type="button"
                     onClick={handleVerificationSubmit}
-                    disabled={
-                      isSubmittingVerification || !checkVerificationComplete()
-                    }
+                    disabled={isSubmittingVerification || !checkVerificationComplete()}
                     className={`w-full sm:flex-1 py-3 sm:py-3.5 rounded-lg sm:rounded-xl font-bold text-white transition text-sm sm:text-base ${
                       checkVerificationComplete()
                         ? "bg-red-600 hover:bg-red-700"
@@ -1049,10 +941,7 @@ const PostIssue = () => {
                   onClick={takePhoto}
                   className="bg-white p-6 sm:p-8 rounded-full border-4 border-gray-200 shadow-2xl active:scale-95"
                 >
-                  <Circle
-                    size={60}
-                    className="sm:w-20 sm:h-20 text-black fill-white"
-                  />
+                  <Circle size={60} className="sm:w-20 sm:h-20 text-black fill-white" />
                 </button>
                 <button
                   type="button"
@@ -1074,11 +963,9 @@ const PostIssue = () => {
           }`}
         >
           <div>
-            <label
-              className={`block text-xs sm:text-sm font-bold uppercase tracking-wide mb-1 sm:mb-1.5 ${
-                isDark ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
+            <label className={`block text-xs sm:text-sm font-bold uppercase tracking-wide mb-1 sm:mb-1.5 ${
+              isDark ? "text-gray-300" : "text-gray-700"
+            }`}>
               {t("department")} <span className="text-red-600">*</span>
             </label>
             <select
@@ -1099,18 +986,12 @@ const PostIssue = () => {
             </select>
 
             {department && !cameraAllowed && (
-              <div
-                className={`mt-3 sm:mt-4 p-3 sm:p-4 border rounded-lg sm:rounded-xl ${
-                  isDark
-                    ? "bg-blue-900/20 border-blue-800"
-                    : "bg-blue-50 border-blue-200"
-                }`}
-              >
-                <p
-                  className={`font-medium text-sm sm:text-base ${
-                    isDark ? "text-blue-300" : "text-blue-800"
-                  }`}
-                >
+              <div className={`mt-3 sm:mt-4 p-3 sm:p-4 border rounded-lg sm:rounded-xl ${
+                isDark
+                  ? "bg-blue-900/20 border-blue-800"
+                  : "bg-blue-50 border-blue-200"
+              }`}>
+                <p className={`font-medium text-sm sm:text-base ${isDark ? "text-blue-300" : "text-blue-800"}`}>
                   {getDepartmentName(department)} {t("department")}{" "}
                   {language === "en" ? "selected" : "தேர்ந்தெடுக்கப்பட்டது"}
                 </p>
@@ -1119,25 +1000,17 @@ const PostIssue = () => {
                   onClick={confirmDepartmentSelection}
                   className="mt-2 sm:mt-3 px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base w-full sm:w-auto"
                 >
-                  {t("yesThisIsIssue", {
-                    department: getDepartmentName(department),
-                  })}
+                  {t("yesThisIsIssue", { department: getDepartmentName(department) })}
                 </button>
               </div>
             )}
 
             {validationMessage && (
-              <p
-                className={`mt-1.5 sm:mt-2 text-xs sm:text-sm ${
-                  cameraAllowed
-                    ? isDark
-                      ? "text-green-400"
-                      : "text-green-600"
-                    : isDark
-                      ? "text-amber-400"
-                      : "text-amber-600"
-                }`}
-              >
+              <p className={`mt-1.5 sm:mt-2 text-xs sm:text-sm ${
+                cameraAllowed
+                  ? isDark ? "text-green-400" : "text-green-600"
+                  : isDark ? "text-amber-400" : "text-amber-600"
+              }`}>
                 {validationMessage}
               </p>
             )}
@@ -1145,75 +1018,34 @@ const PostIssue = () => {
 
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-              <label
-                className={`text-xs sm:text-sm font-bold ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
+              <label className={`text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                 {t("photos")} <span className="text-red-600">*</span>
               </label>
-              <span
-                className={`text-[10px] sm:text-xs ${
-                  isDark ? "text-gray-400" : "text-gray-500"
-                }`}
-              >
-                {images.length} /{" "}
-                {getDepartmentDetails(department)?.maxImages || 4}
+              <span className={`text-[10px] sm:text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                {images.length} / {getDepartmentDetails(department)?.maxImages || 4}
               </span>
             </div>
             <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={startCamera}
-                disabled={
-                  !cameraAllowed ||
-                  images.length >=
-                    (getDepartmentDetails(department)?.maxImages || 4)
-                }
+                disabled={!cameraAllowed || images.length >= (getDepartmentDetails(department)?.maxImages || 4)}
                 className={`aspect-square border-2 border-dashed rounded-lg sm:rounded-xl flex flex-col items-center justify-center p-2
                   ${
                     cameraAllowed
-                      ? isDark
-                        ? "border-green-700 hover:bg-green-900/20"
-                        : "border-green-400 hover:bg-green-50"
-                      : isDark
-                        ? "border-gray-700 bg-gray-800 opacity-60"
-                        : "border-gray-300 bg-gray-50 opacity-60"
+                      ? isDark ? "border-green-700 hover:bg-green-900/20" : "border-green-400 hover:bg-green-50"
+                      : isDark ? "border-gray-700 bg-gray-800 opacity-60" : "border-gray-300 bg-gray-50 opacity-60"
                   }`}
               >
-                <Camera
-                  className={
-                    cameraAllowed
-                      ? isDark
-                        ? "text-green-400"
-                        : "text-green-600"
-                      : isDark
-                        ? "text-gray-500"
-                        : "text-gray-400"
-                  }
-                  size={24}
-                />
-                <span
-                  className={`text-[10px] sm:text-xs mt-1 font-medium text-center ${
-                    isDark ? "text-gray-400" : "text-gray-600"
-                  }`}
-                >
+                <Camera className={cameraAllowed ? (isDark ? "text-green-400" : "text-green-600") : (isDark ? "text-gray-500" : "text-gray-400")} size={24} />
+                <span className={`text-[10px] sm:text-xs mt-1 font-medium text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                   {cameraAllowed ? t("takePhoto") : t("selectDeptFirst")}
                 </span>
               </button>
 
               {images.map((img, idx) => (
-                <div
-                  key={idx}
-                  className={`relative aspect-square rounded-lg sm:rounded-xl overflow-hidden border ${
-                    isDark ? "border-gray-700" : "border-gray-200"
-                  }`}
-                >
-                  <img
-                    src={img.data}
-                    alt="Complaint"
-                    className="w-full h-full object-cover"
-                  />
+                <div key={idx} className={`relative aspect-square rounded-lg sm:rounded-xl overflow-hidden border ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                  <img src={img.data} alt="Complaint" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => removeImage(idx)}
@@ -1233,11 +1065,7 @@ const PostIssue = () => {
           </div>
 
           <div>
-            <label
-              className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${
-                isDark ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
+            <label className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
               {t("location")} <span className="text-red-600">*</span>
             </label>
             {isEditingLocation ? (
@@ -1283,17 +1111,8 @@ const PostIssue = () => {
                     : "border-gray-300 bg-gray-50 hover:bg-gray-100"
                 }`}
               >
-                <MapPin
-                  className={`flex-shrink-0 ${
-                    isDark ? "text-green-400" : "text-green-600"
-                  }`}
-                  size={16}
-                />
-                <span
-                  className={`text-sm sm:text-base truncate ${
-                    isDark ? "text-gray-300" : "text-gray-600"
-                  }`}
-                >
+                <MapPin className={`flex-shrink-0 ${isDark ? "text-green-400" : "text-green-600"}`} size={16} />
+                <span className={`text-sm sm:text-base truncate ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                   {area || t("clickToEnterLocation")}
                 </span>
               </div>
@@ -1301,11 +1120,7 @@ const PostIssue = () => {
           </div>
 
           <div>
-            <label
-              className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${
-                isDark ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
+            <label className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
               {t("district")} <span className="text-red-600">*</span>
             </label>
             <select
@@ -1327,11 +1142,7 @@ const PostIssue = () => {
           </div>
 
           <div>
-            <label
-              className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${
-                isDark ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
+            <label className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
               {t("reason")} <span className="text-red-600">*</span>
             </label>
             <select
@@ -1354,29 +1165,17 @@ const PostIssue = () => {
 
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-              <label
-                className={`block text-xs sm:text-sm font-bold ${
-                  isDark ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
+              <label className={`block text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                 {t("description")} <span className="text-red-600">*</span>
               </label>
-              <div
-                className={`flex rounded-lg p-1 text-xs sm:text-sm w-full sm:w-auto ${
-                  isDark ? "bg-gray-700" : "bg-gray-100"
-                }`}
-              >
+              <div className={`flex rounded-lg p-1 text-xs sm:text-sm w-full sm:w-auto ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
                 <button
                   type="button"
                   onClick={() => setDescView("english")}
                   className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
                     descView === "english"
-                      ? isDark
-                        ? "bg-gray-600 text-white shadow"
-                        : "bg-white shadow font-medium"
-                      : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                      ? isDark ? "bg-gray-600 text-white shadow" : "bg-white shadow font-medium"
+                      : isDark ? "text-gray-400 hover:bg-gray-600" : "text-gray-600 hover:bg-gray-200"
                   }`}
                 >
                   {t("english")}
@@ -1386,12 +1185,8 @@ const PostIssue = () => {
                   onClick={() => setDescView("tamil")}
                   className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
                     descView === "tamil"
-                      ? isDark
-                        ? "bg-gray-600 text-white shadow"
-                        : "bg-white shadow font-medium"
-                      : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                      ? isDark ? "bg-gray-600 text-white shadow" : "bg-white shadow font-medium"
+                      : isDark ? "text-gray-400 hover:bg-gray-600" : "text-gray-600 hover:bg-gray-200"
                   }`}
                 >
                   {t("tamil")}
@@ -1401,12 +1196,8 @@ const PostIssue = () => {
                   onClick={() => setDescView("both")}
                   className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
                     descView === "both"
-                      ? isDark
-                        ? "bg-gray-600 text-white shadow"
-                        : "bg-white shadow font-medium"
-                      : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                      ? isDark ? "bg-gray-600 text-white shadow" : "bg-white shadow font-medium"
+                      : isDark ? "text-gray-400 hover:bg-gray-600" : "text-gray-600 hover:bg-gray-200"
                   }`}
                 >
                   {t("both")}
@@ -1414,24 +1205,15 @@ const PostIssue = () => {
               </div>
             </div>
 
-            <div
-              className={`grid gap-4 sm:gap-6 ${descView === "both" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}
-            >
+            <div className={`grid gap-4 sm:gap-6 ${descView === "both" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
               {(descView === "english" || descView === "both") && (
                 <div>
-                  <label
-                    className={`block text-[10px] sm:text-xs font-medium mb-1 ${
-                      isDark ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
+                  <label className={`block text-[10px] sm:text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                     {t("description")} ({t("english")})
                   </label>
                   <textarea
                     value={descEn}
-                    onChange={(e) => {
-                      setDescEn(e.target.value);
-                      setTamilEdited(false);
-                    }}
+                    onChange={(e) => setDescEn(e.target.value)}
                     placeholder={t("describeIssue")}
                     rows={descView === "both" ? 4 : 5}
                     className={`w-full border rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base resize-y focus:ring-2 focus:ring-green-500 ${
@@ -1440,29 +1222,17 @@ const PostIssue = () => {
                         : "bg-white border-gray-300 text-gray-900"
                     }`}
                   />
-                  {isTranslating && (
-                    <p className="text-green-600 dark:text-green-400 text-[10px] sm:text-xs mt-1">
-                      {t("translating")}
-                    </p>
-                  )}
                 </div>
               )}
 
               {(descView === "tamil" || descView === "both") && (
                 <div>
-                  <label
-                    className={`block text-[10px] sm:text-xs font-medium mb-1 ${
-                      isDark ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
+                  <label className={`block text-[10px] sm:text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                     {t("descriptionTamil")}
                   </label>
                   <textarea
                     value={descTa}
-                    onChange={(e) => {
-                      setDescTa(e.target.value);
-                      setTamilEdited(true);
-                    }}
+                    onChange={(e) => setDescTa(e.target.value)}
                     placeholder={t("describeIssue")}
                     rows={descView === "both" ? 4 : 5}
                     className={`w-full border rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base resize-y focus:ring-2 focus:ring-green-500 ${
@@ -1477,12 +1247,7 @@ const PostIssue = () => {
           </div>
 
           <div className="relative">
-            <Hash
-              className={`absolute left-3 top-3 ${
-                isDark ? "text-gray-500" : "text-gray-400"
-              }`}
-              size={16}
-            />
+            <Hash className={`absolute left-3 top-3 ${isDark ? "text-gray-500" : "text-gray-400"}`} size={16} />
             <input
               type="text"
               value={hashtags}
@@ -1495,22 +1260,20 @@ const PostIssue = () => {
               }`}
             />
             {suggestions.length > 0 && (
-              <div
-                className={`absolute z-10 w-full border rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex flex-wrap gap-1 sm:gap-2 mt-1 ${
-                  isDark
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-200"
-                }`}
-              >
+              <div className={`absolute z-10 w-full border rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex flex-wrap gap-1 sm:gap-2 mt-1 max-h-40 overflow-y-auto ${
+                isDark
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
+              }`}>
                 {suggestions.map((tag) => (
                   <button
                     key={tag}
                     type="button"
                     onClick={() => applySuggestion(tag)}
-                    className={`px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-sm hover:bg-green-100 dark:hover:bg-green-900 ${
+                    className={`px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-sm hover:bg-green-100 dark:hover:bg-green-900 transition ${
                       isDark
-                        ? "bg-green-900/50 text-green-300"
-                        : "bg-green-50 text-green-700"
+                        ? "bg-green-900/50 text-green-300 hover:bg-green-800/70"
+                        : "bg-green-50 text-green-700 hover:bg-green-100"
                     }`}
                   >
                     {tag}
@@ -1527,22 +1290,14 @@ const PostIssue = () => {
               onChange={(e) => setAgree(e.target.checked)}
               className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 flex-shrink-0"
             />
-            <span
-              className={`text-xs sm:text-sm ${
-                isDark ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
+            <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
               {t("agreement")}
             </span>
           </label>
 
           <button
             type="submit"
-            disabled={
-              isSubmitting ||
-              !cameraAllowed ||
-              images.length < (getDepartmentDetails(department)?.minImages || 1)
-            }
+            disabled={isSubmitting || !cameraAllowed || images.length < (getDepartmentDetails(department)?.minImages || 1)}
             className="w-full bg-green-600 text-white py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {t("proceed")}
