@@ -680,7 +680,7 @@ const getStatusConfig = (status) => {
                     transition={{ duration: 0.15 }}
                     src={images[currentImageIndex]}
                     alt={`Issue ${currentImageIndex + 1}`}
-                    className="w-full h-full object-cover lg:object-contain pointer-events-none" // 🔥 pointer-events-none allows scrolling through image
+                    className="w-full h-full object-cover pointer-events-none" // 🔥 pointer-events-none allows scrolling through image
                     draggable={false}
                     loading="lazy"
                   />
