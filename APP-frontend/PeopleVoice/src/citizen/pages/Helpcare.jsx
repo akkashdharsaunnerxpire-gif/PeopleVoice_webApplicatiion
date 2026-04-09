@@ -16,7 +16,7 @@ import {
 import { useTheme } from "../../Context/ThemeContext";
 import { useNavigate } from "react-router-dom"; // for navigation
 
-const HelpPage = () => {
+const Helpcare = () => {
   const { isDark } = useTheme();
   const [openFaq, setOpenFaq] = useState(null);
   const navigate = useNavigate();
@@ -255,4 +255,4 @@ const HelpPage = () => {
   );
 };
 
-export default HelpPage;
+export default Helpcare;
