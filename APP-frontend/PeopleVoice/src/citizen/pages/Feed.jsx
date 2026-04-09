@@ -557,94 +557,94 @@ const Feed = () => {
   };
 
   const handleLike = useCallback(
-  async (issueId) => {
-    if (!citizenId) return;
+    async (issueId) => {
+      if (!citizenId) return;
 
-    let previousState;
+      let previousState;
 
-    // 🔥 OPTIMISTIC UPDATE
-    setDisplayedIssues((prev) => {
-      previousState = prev;
+      // 🔥 OPTIMISTIC UPDATE
+      setDisplayedIssues((prev) => {
+        previousState = prev;
 
-      return prev.map((issue) => {
-        if (issue._id !== issueId) return issue;
+        return prev.map((issue) => {
+          if (issue._id !== issueId) return issue;
 
-        const alreadyLiked = issue.likes?.includes(citizenId);
+          const alreadyLiked = issue.likes?.includes(citizenId);
 
-        let updatedLikes;
+          let updatedLikes;
 
-        if (alreadyLiked) {
-          updatedLikes = issue.likes.filter((id) => id !== citizenId);
-        } else {
-          updatedLikes = [...(issue.likes || []), citizenId];
-        }
+          if (alreadyLiked) {
+            updatedLikes = issue.likes.filter((id) => id !== citizenId);
+          } else {
+            updatedLikes = [...(issue.likes || []), citizenId];
+          }
 
-        return {
-          ...issue,
-          likes: updatedLikes,
-          likeCount: updatedLikes.length,
-        };
-      });
-    });
-
-    try {
-      const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ citizenId }),
+          return {
+            ...issue,
+            likes: updatedLikes,
+            likeCount: updatedLikes.length,
+          };
+        });
       });
 
-      const data = await res.json();
+      try {
+        const res = await fetch(`${APIURL}/issues/${issueId}/like`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ citizenId }),
+        });
 
-      if (data.success) {
-        setDisplayedIssues((prev) => {
-          const updated = prev.map((issue) =>
-            issue._id === issueId
-              ? {
-                  ...issue,
-                  likes: data.likes,
-                  likeCount: data.likeCount ?? data.likes.length,
-                }
-              : issue
-          );
+        const data = await res.json();
 
-          // 🔥🔥 IMPORTANT: UPDATE CACHE (NOT DELETE)
-          const saved = JSON.parse(sessionStorage.getItem("feedData"));
-
-          if (saved) {
-            const updatedCacheIssues = saved.issues.map((issue) =>
+        if (data.success) {
+          setDisplayedIssues((prev) => {
+            const updated = prev.map((issue) =>
               issue._id === issueId
                 ? {
                     ...issue,
                     likes: data.likes,
                     likeCount: data.likeCount ?? data.likes.length,
                   }
-                : issue
+                : issue,
             );
 
-            sessionStorage.setItem(
-              "feedData",
-              JSON.stringify({
-                ...saved,
-                issues: updatedCacheIssues,
-                timestamp: Date.now(),
-              })
-            );
-          }
+            // 🔥🔥 IMPORTANT: UPDATE CACHE (NOT DELETE)
+            const saved = JSON.parse(sessionStorage.getItem("feedData"));
 
-          return updated;
-        });
-      } else {
+            if (saved) {
+              const updatedCacheIssues = saved.issues.map((issue) =>
+                issue._id === issueId
+                  ? {
+                      ...issue,
+                      likes: data.likes,
+                      likeCount: data.likeCount ?? data.likes.length,
+                    }
+                  : issue,
+              );
+
+              sessionStorage.setItem(
+                "feedData",
+                JSON.stringify({
+                  ...saved,
+                  issues: updatedCacheIssues,
+                  timestamp: Date.now(),
+                }),
+              );
+            }
+
+            return updated;
+          });
+        } else {
+          // 🔁 rollback
+          setDisplayedIssues(previousState);
+        }
+      } catch (err) {
         // 🔁 rollback
         setDisplayedIssues(previousState);
       }
-    } catch (err) {
-      // 🔁 rollback
-      setDisplayedIssues(previousState);
-    }
-  },
-  [citizenId, setDisplayedIssues]
-);
+    },
+    [citizenId, setDisplayedIssues],
+  );
 
   // =============================
   // Render
@@ -792,7 +792,16 @@ const Feed = () => {
                       commentCount={issue.comments?.length || 0}
                       onLike={() => handleLike(issue._id)}
                       onComment={() =>
-                        setCommentModalData({ ...issue, setDisplayedIssues })
+                        setCommentModalData({
+                          open: true,
+                          issueId: issue._id, // 🔥 FIX
+                          comments: issue.comments || [],
+                          images: issue.images_data || [],
+                          citizenId: citizenId,
+                          postOwnerId: issue.citizenId,
+                          district: issue.district,
+                          setDisplayedIssues: setDisplayedIssues,
+                        })
                       }
                       fullWidthMobile={true}
                     />

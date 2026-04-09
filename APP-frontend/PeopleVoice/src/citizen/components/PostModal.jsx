@@ -46,9 +46,6 @@ const PostModal = ({
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
-
-
-
   const allImages = localIssue?.images_data || [];
   const totalImages = allImages.length;
   const comments = localIssue?.comments || [];
@@ -72,27 +69,32 @@ const PostModal = ({
   const handleDeleteClick = (issueId, e) => {
     e.stopPropagation();
     setDeleteModal(issueId); // open popup
+  }; 
+
+  useEffect(() => {
+    setLocalIssue(issue);
+  }, [issue]);
+  
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+
+    try {
+      await axios.delete(`${APIURL}/issues/${deleteModal}`, {
+        data: { citizenId },
+      });
+
+      setDisplayedIssues?.((prev) =>
+        prev.filter((issue) => issue._id !== deleteModal),
+      );
+
+      onClose(); // modal close
+    } catch (err) {
+      console.error("Delete failed:", err);
+    } finally {
+      setDeleteModal(null);
+      setOpenMenuId(null);
+    }
   };
-const confirmDelete = async () => {
-  if (!deleteModal) return;
-
-  try {
-    await axios.delete(`${APIURL}/issues/${deleteModal}`, {
-      data: { citizenId },
-    });
-
-    setDisplayedIssues?.((prev) =>
-      prev.filter((issue) => issue._id !== deleteModal)
-    );
-
-    onClose(); // modal close
-  } catch (err) {
-    console.error("Delete failed:", err);
-  } finally {
-    setDeleteModal(null);
-    setOpenMenuId(null);
-  }
-};
 
   const handleTouchStart = (e) => (touchStartX.current = e.touches[0].clientX);
   const handleTouchMove = (e) => (touchEndX.current = e.touches[0].clientX);
@@ -307,7 +309,7 @@ const confirmDelete = async () => {
     }
   };
 
-  if (!issue) return null;
+  if (!issue || !issue._id) return null;
 
   return (
     <>
@@ -611,8 +613,14 @@ const confirmDelete = async () => {
                       <button
                         onClick={() =>
                           setCommentModalData({
-                            ...localIssue,
-                            setDisplayedIssues,
+                            open: true,
+                            issueId: localIssue?._id,
+                            comments: localIssue.comments || [],
+                            images: localIssue.images_data || [],
+                            citizenId: citizenId,
+                            postOwnerId: localIssue.citizenId, // ✅ IMPORTANT
+                            district: localIssue.district,
+                            setDisplayedIssues: setDisplayedIssues,
                             hideImage: true,
                           })
                         }

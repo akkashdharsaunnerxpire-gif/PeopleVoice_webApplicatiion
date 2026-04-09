@@ -9,6 +9,7 @@ import {
   Bell,
   Settings as SettingsIcon,
   Shield,
+  ArrowLeft,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUserValues } from "../../Context/UserValuesContext";
@@ -59,67 +60,90 @@ const Profile = () => {
   ];
 
   return (
-    <div className={`min-h-screen pb-24 pt-6 px-4 transition-colors
-      ${isDark ? "bg-black/95" : "bg-gray-50"}`}>
-      
+    <div
+      className={`min-h-screen py-6 px-3 transition-colors duration-300 ${
+        isDark ? "bg-black/95" : "bg-gray-50"
+      }`}
+    >
       <div className="max-w-2xl mx-auto">
         <div
-          className={`rounded-3xl shadow-xl p-6 sm:p-8 border transition-all
-            ${isDark 
-              ? "bg-gray-900 border-gray-800 text-gray-100" 
-              : "bg-white border-gray-200 text-gray-900"}`}
+          className={`rounded-2xl shadow-xl p-5 sm:p-6 transition-all ${
+            isDark
+              ? "bg-gray-900/90 border border-gray-800 text-gray-100"
+              : "bg-white border border-gray-200 text-gray-900"
+          }`}
         >
-          {/* Profile Header */}
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8">
-            <div className="w-28 h-28 rounded-full bg-gradient-to-br from-emerald-600 to-green-600 flex items-center justify-center text-white text-4xl font-bold shadow-lg">
+          {/* Optional Back Button (if you want navigation consistency) */}
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={() => navigate(-1)}
+              className={`p-2 rounded-full transition-all duration-200 ${
+                isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"
+              }`}
+              aria-label="Go back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h1 className="text-xl font-semibold">My Profile</h1>
+          </div>
+
+          {/* Profile Header - cleaner layout */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 mt-2">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-600 to-green-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg">
               {firstLetter}
             </div>
 
-            <div className="text-center sm:text-left">
-              <h2 className="text-3xl font-bold">{user.name}</h2>
-              <p className="text-sm opacity-75 mt-1">@{user.username}</p>
-              <div className="flex items-center justify-center sm:justify-start gap-2 mt-3 text-sm opacity-75">
-                <MapPin size={18} />
+            <div className="text-center sm:text-left flex-1">
+              <h2 className="text-2xl font-bold">{user.name}</h2>
+              <p className="text-sm opacity-70 mt-0.5">@{user.username}</p>
+              <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 text-sm opacity-70">
+                <MapPin size={16} />
                 <span>{user.district}</span>
               </div>
-              <p className="text-sm mt-4 opacity-90 leading-relaxed max-w-md">
+              <p className="text-sm mt-3 opacity-80 leading-relaxed max-w-md">
                 {user.bio}
               </p>
             </div>
           </div>
 
-          <h3 className="font-semibold text-lg mb-4 px-1">Quick Actions</h3>
-
-          <div className="space-y-2">
-            {menuItems.map((item, index) => (
-              <button
-                key={index}
-                onClick={() => navigate(item.path)}
-                className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all
-                  ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="text-emerald-500">{item.icon}</div>
-                  <span className="font-medium">{item.label}</span>
-                </div>
-                <ChevronRight size={20} className="opacity-40" />
-              </button>
-            ))}
+          {/* Quick Actions Section */}
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold mb-3 opacity-70 tracking-wide">
+              QUICK ACTIONS
+            </h3>
+            <div className="space-y-2">
+              {menuItems.map((item, index) => (
+                <button
+                  key={index}
+                  onClick={() => navigate(item.path)}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 ${
+                    isDark ? "hover:bg-gray-800/70" : "hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="text-emerald-500">{item.icon}</div>
+                    <span className="font-medium text-sm">{item.label}</span>
+                  </div>
+                  <ChevronRight size={18} className="opacity-40" />
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className={`border-t my-8 ${isDark ? "border-gray-800" : "border-gray-200"}`} />
+          <div className={`border-t my-6 ${isDark ? "border-gray-800" : "border-gray-200"}`} />
 
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className="w-full py-4 bg-red-600 hover:bg-red-700 active:bg-red-800 
-              text-white rounded-2xl font-semibold flex items-center justify-center gap-3 shadow-lg transition-all"
+            className="w-full py-3.5 bg-red-600 hover:bg-red-700 active:bg-red-800 
+              text-white rounded-xl font-semibold flex items-center justify-center gap-3 shadow-md transition-all duration-200"
           >
-            <LogOut size={22} />
+            <LogOut size={20} />
             Logout
           </button>
 
-          <div className="text-center mt-6 text-xs opacity-60 font-mono tracking-wider">
+          {/* Citizen ID */}
+          <div className="text-center mt-5 text-xs opacity-50 font-mono tracking-wider">
             Citizen ID: {citizenId}
           </div>
         </div>

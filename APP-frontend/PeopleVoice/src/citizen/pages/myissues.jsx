@@ -88,7 +88,6 @@ const MyIssues = () => {
     return status === normalizeStatus(statusFilter);
   });
 
-
   // FIXED: Get status display text
   const getStatusDisplay = (status) => {
     const statusLower = normalizeStatus(status);

@@ -12,6 +12,7 @@ import SavedIssues from "../pages/SavedIssues"; // ✅ FIX
 import ForgotPassword from "../pages/Forgetpassword";
 import MyIssues from "../pages/myissues";
 import Settings from "../pages/Settings"
+import HelpPage from "../pages/HelpPage";
 // src/citizen/routes/AppRoutes.jsx
 
 const AppRoutes = () => {
@@ -44,6 +45,7 @@ const AppRoutes = () => {
         <Route path="notifications" element={<Notifications />} />
         <Route path="saved" element={<SavedIssues />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="help" element={<HelpPage />} />
       </Route>
 
      

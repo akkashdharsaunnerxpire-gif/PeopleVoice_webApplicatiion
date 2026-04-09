@@ -9,11 +9,7 @@ import {
   AlertCircle,
   Globe,
   AlertTriangle,
-  Crosshair,
-  Navigation2,
-  Edit,
   Check,
-  ShieldCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../Context/ThemeContext";
@@ -95,7 +91,7 @@ const ALL_TAGS = [
   "#FootpathIssue", "#PedestrianSafety", "#WaterLogging", "#MosquitoBreeding",
 ];
 
-/* ================= LANGUAGE CONSTANTS (Static Tamil) ================= */
+/* ================= LANGUAGE CONSTANTS ================= */
 const TEXTS = {
   en: {
     title: "Register Public Complaint",
@@ -153,6 +149,8 @@ const TEXTS = {
     enterValidLocation: "Please enter valid location",
     pleaseLogin: "Please login first",
     searchHashtags: "Search hashtags...",
+    otherDetailLabel: "What specific problem? (e.g., Road, Streetlight, Water, Footpath, etc.)",
+    otherDetailRequired: "Please specify the problem type",
   },
   ta: {
     title: "பொது புகார் பதிவு",
@@ -210,6 +208,8 @@ const TEXTS = {
     enterValidLocation: "சரியான இடத்தை உள்ளிடவும்",
     pleaseLogin: "முதலில் உள்நுழையவும்",
     searchHashtags: "ஹேஷ்டேக்களைத் தேடுங்கள்...",
+    otherDetailLabel: "குறிப்பிட்ட பிரச்சனை என்ன? (எ.கா. சாலை, தெருவிளக்கு, நீர், நடைபாதை, முதலியன)",
+    otherDetailRequired: "தயவுசெய்து பிரச்சனை வகையைக் குறிப்பிடவும்",
   },
 };
 
@@ -220,14 +220,16 @@ const PostIssue = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const modalRef = useRef(null);
+  const translateTimeoutRef = useRef(null);
 
   // Form states
   const [district, setDistrict] = useState("");
   const [area, setArea] = useState("");
   const [department, setDepartment] = useState("");
+  const [otherDetail, setOtherDetail] = useState("");
   const [reason, setReason] = useState("");
   const [descEn, setDescEn] = useState("");
-  const [descTa, setDescTa] = useState(""); // Static Tamil - user can edit directly
+  const [descTa, setDescTa] = useState("");
   const [hashtags, setHashtags] = useState("#peoplevoice ");
   const [images, setImages] = useState([]);
   const [agree, setAgree] = useState(false);
@@ -259,6 +261,11 @@ const PostIssue = () => {
   // Language state
   const [language, setLanguage] = useState("en");
 
+  // Additional states
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [showThankYou, setShowThankYou] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+
   const t = (key, params = {}) => {
     let text = TEXTS[language][key] || key;
     Object.keys(params).forEach((param) => {
@@ -282,12 +289,12 @@ const PostIssue = () => {
     if (department) {
       setCameraAllowed(false);
       setValidationMessage(
-        t("readyToCapture", { department: getDepartmentName(department) }),
+        t("readyToCapture", { department: getDepartmentName(department) })
       );
+      if (department !== "Other") setOtherDetail("");
     }
   }, [department]);
 
-  // Close modal on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (modalRef.current && !modalRef.current.contains(event.target)) {
@@ -301,6 +308,12 @@ const PostIssue = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showVerification]);
+
+  useEffect(() => {
+    return () => {
+      if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
+    };
+  }, []);
 
   const getDepartmentDetails = (id) =>
     DEPARTMENTS.find((d) => d.id === id) || DEPARTMENTS[5];
@@ -316,7 +329,7 @@ const PostIssue = () => {
           try {
             const res = await fetch(
               `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-              { headers: { "User-Agent": "CivicIssueApp/1.0" } },
+              { headers: { "User-Agent": "CivicIssueApp/1.0" } }
             );
             const data = await res.json();
             const address =
@@ -346,7 +359,7 @@ const PostIssue = () => {
               : "Could not get location";
           reject(new Error(msg));
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     });
 
@@ -377,10 +390,13 @@ const PostIssue = () => {
 
   const startCamera = async () => {
     if (!department) return setError(t("selectDepartment"));
+    if (department === "Other" && !otherDetail.trim()) {
+      return setError(t("otherDetailRequired"));
+    }
     if (!cameraAllowed) return setError(t("selectDeptFirst"));
     if (images.length >= getDepartmentDetails(department).maxImages) {
       return setError(
-        `Max ${getDepartmentDetails(department).maxImages} photos allowed`,
+        `Max ${getDepartmentDetails(department).maxImages} photos allowed`
       );
     }
 
@@ -407,17 +423,23 @@ const PostIssue = () => {
         err.name === "NotAllowedError" ||
         err.name === "PermissionDeniedError"
       ) {
-        friendlyMsg = language === "en"
-          ? "Camera permission denied. Please allow camera access in your browser settings and try again."
-          : "கேமரா அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் கேமரா அனுமதியை அனுமதித்து மீண்டும் முயற்சிக்கவும்.";
-      } else if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
-        friendlyMsg = language === "en"
-          ? "No suitable camera found on this device."
-          : "இந்த சாதனத்தில் பொருத்தமான கேமரா இல்லை.";
+        friendlyMsg =
+          language === "en"
+            ? "Camera permission denied. Please allow camera access in your browser settings and try again."
+            : "கேமரா அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் கேமரா அனுமதியை அனுமதித்து மீண்டும் முயற்சிக்கவும்.";
+      } else if (
+        err.name === "NotFoundError" ||
+        err.name === "OverconstrainedError"
+      ) {
+        friendlyMsg =
+          language === "en"
+            ? "No suitable camera found on this device."
+            : "இந்த சாதனத்தில் பொருத்தமான கேமரா இல்லை.";
       } else if (err.name === "NotReadableError") {
-        friendlyMsg = language === "en"
-          ? "Camera is in use by another app or permission issue."
-          : "கேமரா வேறு செயலியால் பயன்படுத்தப்படுகிறது அல்லது அனுமதி பிரச்சினை.";
+        friendlyMsg =
+          language === "en"
+            ? "Camera is in use by another app or permission issue."
+            : "கேமரா வேறு செயலியால் பயன்படுத்தப்படுகிறது அல்லது அனுமதி பிரச்சினை.";
       }
       setError(friendlyMsg + ` (${err.name})`);
       setIsCameraOpen(false);
@@ -458,7 +480,7 @@ const PostIssue = () => {
         setArea(location.address);
         if (!district) {
           const found = DISTRICTS.find((d) =>
-            location.address.toLowerCase().includes(d.toLowerCase()),
+            location.address.toLowerCase().includes(d.toLowerCase())
           );
           if (found) setDistrict(found);
         }
@@ -498,13 +520,16 @@ const PostIssue = () => {
 
   const confirmDepartmentSelection = () => {
     if (!department) return;
+    if (department === "Other" && !otherDetail.trim()) {
+      setError(t("otherDetailRequired"));
+      return;
+    }
     setCameraAllowed(true);
     setValidationMessage(
-      t("readyToCapture", { department: getDepartmentName(department) }),
+      t("readyToCapture", { department: getDepartmentName(department) })
     );
   };
 
-  // Enhanced hashtag search
   const handleHashtagChange = (e) => {
     const value = e.target.value;
     setHashtags(value);
@@ -515,14 +540,14 @@ const PostIssue = () => {
     if (lastWord?.startsWith("#") && lastWord.length > 1) {
       const searchTerm = lastWord.toLowerCase();
       const filtered = ALL_TAGS.filter(
-        (tag) => tag.toLowerCase().includes(searchTerm) && !value.includes(tag),
+        (tag) => tag.toLowerCase().includes(searchTerm) && !value.includes(tag)
       ).slice(0, 10);
       setSuggestions(filtered);
     } else {
       if (!lastWord?.startsWith("#") && words.length > 0) {
         const usedTags = words.filter((w) => w.startsWith("#"));
         const popularTags = ALL_TAGS.filter(
-          (tag) => !usedTags.includes(tag),
+          (tag) => !usedTags.includes(tag)
         ).slice(0, 8);
         setSuggestions(popularTags);
       } else {
@@ -541,6 +566,38 @@ const PostIssue = () => {
     setSuggestions([]);
   };
 
+  const autoTranslateToTamil = (englishText) => {
+    if (!englishText.trim()) {
+      setDescTa("");
+      return;
+    }
+    if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
+    translateTimeoutRef.current = setTimeout(async () => {
+      setIsTranslating(true);
+      try {
+        const res = await fetch(
+          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+            englishText
+          )}&langpair=en|ta`
+        );
+        const data = await res.json();
+        let translated = data?.responseData?.translatedText || englishText;
+        translated = translated.replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+        setDescTa(translated);
+      } catch (err) {
+        console.error("Auto translation error:", err);
+      } finally {
+        setIsTranslating(false);
+      }
+    }, 800);
+  };
+
+  const handleDescEnChange = (e) => {
+    const newValue = e.target.value;
+    setDescEn(newValue);
+    autoTranslateToTamil(newValue);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const dept = getDepartmentDetails(department);
@@ -548,6 +605,7 @@ const PostIssue = () => {
       !district ||
       !area.trim() ||
       !department ||
+      (department === "Other" && !otherDetail.trim()) ||
       !reason ||
       !agree ||
       images.length === 0 ||
@@ -561,7 +619,7 @@ const PostIssue = () => {
         t("minPhotosRequired", {
           minImages: dept.minImages,
           department: dept.name,
-        }),
+        })
       );
     }
 
@@ -578,7 +636,7 @@ const PostIssue = () => {
   const handleVerificationSubmit = async () => {
     const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
     const allRequiredChecked = requiredChecks.every(
-      (check) => verificationChecks[check],
+      (check) => verificationChecks[check]
     );
     if (!allRequiredChecked) {
       return setError(t("confirmAllPoints"));
@@ -590,6 +648,7 @@ const PostIssue = () => {
       district,
       area: area.trim(),
       department,
+      other_detail: department === "Other" ? otherDetail.trim() : "",
       reason,
       description_en: descEn.trim(),
       description_ta: descTa.trim(),
@@ -617,6 +676,7 @@ const PostIssue = () => {
         setDistrict("");
         setArea("");
         setDepartment("");
+        setOtherDetail("");
         setReason("");
         setDescEn("");
         setDescTa("");
@@ -632,14 +692,18 @@ const PostIssue = () => {
           confirmDescription: false,
           acceptTerms: false,
         });
-        alert(t("complaintRegistered"));
-        navigate("/feed");
+        setIsSubmittingVerification(false);
+        setShowThankYou(true);
+        setTimeout(() => {
+          setShowThankYou(false);
+          navigate("/feed");
+        }, 2000);
       } else {
         setError(result.message || "Submission failed");
+        setIsSubmittingVerification(false);
       }
     } catch {
       setError(t("networkError"));
-    } finally {
       setIsSubmittingVerification(false);
     }
   };
@@ -653,7 +717,6 @@ const PostIssue = () => {
     return requiredChecks.every((check) => verificationChecks[check]);
   };
 
-  /* ================= RENDER ================= */
   return (
     <div
       className={`min-h-screen transition-colors duration-300 ${
@@ -781,15 +844,28 @@ const PostIssue = () => {
                       <span className={isDark ? "text-gray-400" : "text-gray-600"}>
                         {t("departmentLabel")}
                       </span>
-                      <span className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                      <span
+                        className={`font-medium ${
+                          isDark ? "text-gray-200" : "text-gray-800"
+                        }`}
+                      >
                         {getDepartmentName(department)}
+                        {department === "Other" && otherDetail && (
+                          <span className="ml-1 text-xs opacity-70">
+                            ({otherDetail})
+                          </span>
+                        )}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                       <span className={isDark ? "text-gray-400" : "text-gray-600"}>
                         {t("locationLabel")}
                       </span>
-                      <span className={`font-medium break-words ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                      <span
+                        className={`font-medium break-words ${
+                          isDark ? "text-gray-200" : "text-gray-800"
+                        }`}
+                      >
                         {area}
                       </span>
                     </div>
@@ -797,7 +873,11 @@ const PostIssue = () => {
                       <span className={isDark ? "text-gray-400" : "text-gray-600"}>
                         {t("photosLabel")}
                       </span>
-                      <span className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                      <span
+                        className={`font-medium ${
+                          isDark ? "text-gray-200" : "text-gray-800"
+                        }`}
+                      >
                         {images.length} {t("attached")}
                       </span>
                     </div>
@@ -805,7 +885,11 @@ const PostIssue = () => {
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
-                  <h3 className={`font-semibold text-sm sm:text-base ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                  <h3
+                    className={`font-semibold text-sm sm:text-base ${
+                      isDark ? "text-gray-200" : "text-gray-800"
+                    }`}
+                  >
                     {t("iHerebyDeclare")}
                   </h3>
 
@@ -821,10 +905,18 @@ const PostIssue = () => {
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    <span
+                      className={`text-xs sm:text-sm ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
                       <strong>{t("confirmImages")}</strong>
                       <br />
-                      <span className={`${isDark ? "text-gray-400" : "text-gray-600"} text-[10px] sm:text-xs`}>
+                      <span
+                        className={`${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        } text-[10px] sm:text-xs`}
+                      >
                         {t("confirmImagesDesc")}
                       </span>
                     </span>
@@ -842,10 +934,18 @@ const PostIssue = () => {
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    <span
+                      className={`text-xs sm:text-sm ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
                       <strong>{t("confirmLocation")}</strong>
                       <br />
-                      <span className={`${isDark ? "text-gray-400" : "text-gray-600"} text-[10px] sm:text-xs break-words`}>
+                      <span
+                        className={`${
+                          isDark ? "text-gray-400" : "text-gray-600"
+                        } text-[10px] sm:text-xs break-words`}
+                      >
                         {t("confirmLocationDesc")} <strong>{area}</strong>
                       </span>
                     </span>
@@ -866,18 +966,34 @@ const PostIssue = () => {
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      <strong className={`block text-sm sm:text-base ${isDark ? "text-red-400" : "text-red-700"}`}>
+                    <span
+                      className={`text-xs sm:text-sm ${
+                        isDark ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      <strong
+                        className={`block text-sm sm:text-base ${
+                          isDark ? "text-red-400" : "text-red-700"
+                        }`}
+                      >
                         {t("acceptTerms")}
                       </strong>
-                      <span className={`mt-1 block text-[10px] sm:text-xs ${isDark ? "text-red-400/80" : "text-red-700"}`}>
+                      <span
+                        className={`mt-1 block text-[10px] sm:text-xs ${
+                          isDark ? "text-red-400/80" : "text-red-700"
+                        }`}
+                      >
                         {t("acceptTermsDesc")}
                       </span>
                     </span>
                   </label>
                 </div>
 
-                <div className={`flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                <div
+                  className={`flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t ${
+                    isDark ? "border-gray-700" : "border-gray-200"
+                  }`}
+                >
                   <button
                     type="button"
                     onClick={() => setShowVerification(false)}
@@ -892,7 +1008,9 @@ const PostIssue = () => {
                   <button
                     type="button"
                     onClick={handleVerificationSubmit}
-                    disabled={isSubmittingVerification || !checkVerificationComplete()}
+                    disabled={
+                      isSubmittingVerification || !checkVerificationComplete()
+                    }
                     className={`w-full sm:flex-1 py-3 sm:py-3.5 rounded-lg sm:rounded-xl font-bold text-white transition text-sm sm:text-base ${
                       checkVerificationComplete()
                         ? "bg-red-600 hover:bg-red-700"
@@ -910,6 +1028,46 @@ const PostIssue = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {showThankYou && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div
+              className={`rounded-2xl p-6 text-center max-w-sm mx-auto ${
+                isDark ? "bg-gray-800" : "bg-white"
+              } shadow-2xl`}
+            >
+              <div className="flex justify-center mb-4">
+                <Loader2 className="animate-spin text-green-500" size={40} />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Thank You!</h3>
+              <p className="text-sm opacity-80">
+                Thanks for improving our society!
+              </p>
+              <p className="text-xs opacity-60 mt-3">Redirecting to feed...</p>
+            </div>
+          </div>
+        )}
+
+        {previewImage && (
+          <div
+            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-pointer"
+            onClick={() => setPreviewImage(null)}
+          >
+            <div className="relative max-w-full max-h-full">
+              <img
+                src={previewImage}
+                alt="Preview"
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              />
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition"
+              >
+                <X size={24} />
+              </button>
             </div>
           </div>
         )}
@@ -941,7 +1099,10 @@ const PostIssue = () => {
                   onClick={takePhoto}
                   className="bg-white p-6 sm:p-8 rounded-full border-4 border-gray-200 shadow-2xl active:scale-95"
                 >
-                  <Circle size={60} className="sm:w-20 sm:h-20 text-black fill-white" />
+                  <Circle
+                    size={60}
+                    className="sm:w-20 sm:h-20 text-black fill-white"
+                  />
                 </button>
                 <button
                   type="button"
@@ -962,10 +1123,13 @@ const PostIssue = () => {
             isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
           }`}
         >
+          {/* DEPARTMENT SECTION */}
           <div>
-            <label className={`block text-xs sm:text-sm font-bold uppercase tracking-wide mb-1 sm:mb-1.5 ${
-              isDark ? "text-gray-300" : "text-gray-700"
-            }`}>
+            <label
+              className={`block text-xs sm:text-sm font-bold uppercase tracking-wide mb-1 sm:mb-1.5 ${
+                isDark ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
               {t("department")} <span className="text-red-600">*</span>
             </label>
             <select
@@ -985,13 +1149,60 @@ const PostIssue = () => {
               ))}
             </select>
 
+            {department && (
+              <div
+                className={`mt-2 flex items-center gap-2 text-sm ${
+                  isDark ? "text-green-400" : "text-green-700"
+                }`}
+              >
+                <Check size={16} className="flex-shrink-0" />
+                <span>
+                  <strong>Selected complaint:</strong>{" "}
+                  {getDepartmentName(department)}
+                  <span className="text-xs opacity-70 ml-1">
+                    ({getDepartmentDetails(department).description})
+                  </span>
+                </span>
+              </div>
+            )}
+
+            {department === "Other" && (
+              <div className="mt-3">
+                <label
+                  className={`block text-xs sm:text-sm font-medium mb-1 ${
+                    isDark ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  {t("otherDetailLabel")} <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={otherDetail}
+                  onChange={(e) => setOtherDetail(e.target.value)}
+                  placeholder={t("otherDetailLabel")}
+                  className={`w-full border rounded-lg sm:rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base focus:ring-2 focus:ring-green-500 ${
+                    isDark
+                      ? "bg-gray-700 border-gray-600 text-gray-200"
+                      : "bg-white border-gray-300 text-gray-900"
+                  }`}
+                  required
+                />
+              </div>
+            )}
+
             {department && !cameraAllowed && (
-              <div className={`mt-3 sm:mt-4 p-3 sm:p-4 border rounded-lg sm:rounded-xl ${
-                isDark
-                  ? "bg-blue-900/20 border-blue-800"
-                  : "bg-blue-50 border-blue-200"
-              }`}>
-                <p className={`font-medium text-sm sm:text-base ${isDark ? "text-blue-300" : "text-blue-800"}`}>
+              <div
+                className={`mt-3 sm:mt-4 p-3 sm:p-4 border rounded-lg sm:rounded-xl ${
+                  isDark
+                    ? "bg-blue-900/20 border-blue-800"
+                    : "bg-blue-50 border-blue-200"
+                }`}
+              >
+                <p
+                  className={`font-medium text-sm sm:text-base ${
+                    isDark ? "text-blue-300" : "text-blue-800"
+                  }`}
+                >
                   {getDepartmentName(department)} {t("department")}{" "}
                   {language === "en" ? "selected" : "தேர்ந்தெடுக்கப்பட்டது"}
                 </p>
@@ -1000,56 +1211,107 @@ const PostIssue = () => {
                   onClick={confirmDepartmentSelection}
                   className="mt-2 sm:mt-3 px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base w-full sm:w-auto"
                 >
-                  {t("yesThisIsIssue", { department: getDepartmentName(department) })}
+                  {t("yesThisIsIssue", {
+                    department: getDepartmentName(department),
+                  })}
                 </button>
               </div>
             )}
 
             {validationMessage && (
-              <p className={`mt-1.5 sm:mt-2 text-xs sm:text-sm ${
-                cameraAllowed
-                  ? isDark ? "text-green-400" : "text-green-600"
-                  : isDark ? "text-amber-400" : "text-amber-600"
-              }`}>
+              <p
+                className={`mt-1.5 sm:mt-2 text-xs sm:text-sm ${
+                  cameraAllowed
+                    ? isDark
+                      ? "text-green-400"
+                      : "text-green-600"
+                    : isDark
+                    ? "text-amber-400"
+                    : "text-amber-600"
+                }`}
+              >
                 {validationMessage}
               </p>
             )}
           </div>
 
+          {/* PHOTOS SECTION */}
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-              <label className={`text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <label
+                className={`text-xs sm:text-sm font-bold ${
+                  isDark ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
                 {t("photos")} <span className="text-red-600">*</span>
               </label>
-              <span className={`text-[10px] sm:text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                {images.length} / {getDepartmentDetails(department)?.maxImages || 4}
+              <span
+                className={`text-[10px] sm:text-xs ${
+                  isDark ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                {images.length} /{" "}
+                {getDepartmentDetails(department)?.maxImages || 4}
               </span>
             </div>
             <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={startCamera}
-                disabled={!cameraAllowed || images.length >= (getDepartmentDetails(department)?.maxImages || 4)}
+                disabled={
+                  !cameraAllowed ||
+                  images.length >=
+                    (getDepartmentDetails(department)?.maxImages || 4)
+                }
                 className={`aspect-square border-2 border-dashed rounded-lg sm:rounded-xl flex flex-col items-center justify-center p-2
                   ${
                     cameraAllowed
-                      ? isDark ? "border-green-700 hover:bg-green-900/20" : "border-green-400 hover:bg-green-50"
-                      : isDark ? "border-gray-700 bg-gray-800 opacity-60" : "border-gray-300 bg-gray-50 opacity-60"
+                      ? isDark
+                        ? "border-green-700 hover:bg-green-900/20"
+                        : "border-green-400 hover:bg-green-50"
+                      : isDark
+                      ? "border-gray-700 bg-gray-800 opacity-60"
+                      : "border-gray-300 bg-gray-50 opacity-60"
                   }`}
               >
-                <Camera className={cameraAllowed ? (isDark ? "text-green-400" : "text-green-600") : (isDark ? "text-gray-500" : "text-gray-400")} size={24} />
-                <span className={`text-[10px] sm:text-xs mt-1 font-medium text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                <Camera
+                  className={
+                    cameraAllowed
+                      ? isDark
+                        ? "text-green-400"
+                        : "text-green-600"
+                      : isDark
+                      ? "text-gray-500"
+                      : "text-gray-400"
+                  }
+                  size={24}
+                />
+                <span
+                  className={`text-[10px] sm:text-xs mt-1 font-medium text-center ${
+                    isDark ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
                   {cameraAllowed ? t("takePhoto") : t("selectDeptFirst")}
                 </span>
               </button>
 
               {images.map((img, idx) => (
-                <div key={idx} className={`relative aspect-square rounded-lg sm:rounded-xl overflow-hidden border ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-                  <img src={img.data} alt="Complaint" className="w-full h-full object-cover" />
+                <div
+                  key={idx}
+                  className={`relative aspect-square rounded-lg sm:rounded-xl overflow-hidden border ${
+                    isDark ? "border-gray-700" : "border-gray-200"
+                  }`}
+                >
+                  <img
+                    src={img.data}
+                    alt="Complaint"
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => setPreviewImage(img.data)}
+                  />
                   <button
                     type="button"
                     onClick={() => removeImage(idx)}
-                    className="absolute top-1 right-1 sm:top-2 sm:right-2 bg-red-600 text-white rounded-full p-1 shadow"
+                    className="absolute top-1 right-1 sm:top-2 sm:right-2 bg-red-600 text-white rounded-full p-1 shadow z-10"
                   >
                     <X size={12} className="sm:w-4 sm:h-4" />
                   </button>
@@ -1064,8 +1326,13 @@ const PostIssue = () => {
             </div>
           </div>
 
+          {/* LOCATION SECTION */}
           <div>
-            <label className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <label
+              className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${
+                isDark ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
               {t("location")} <span className="text-red-600">*</span>
             </label>
             {isEditingLocation ? (
@@ -1111,16 +1378,30 @@ const PostIssue = () => {
                     : "border-gray-300 bg-gray-50 hover:bg-gray-100"
                 }`}
               >
-                <MapPin className={`flex-shrink-0 ${isDark ? "text-green-400" : "text-green-600"}`} size={16} />
-                <span className={`text-sm sm:text-base truncate ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                <MapPin
+                  className={`flex-shrink-0 ${
+                    isDark ? "text-green-400" : "text-green-600"
+                  }`}
+                  size={16}
+                />
+                <span
+                  className={`text-sm sm:text-base truncate ${
+                    isDark ? "text-gray-300" : "text-gray-600"
+                  }`}
+                >
                   {area || t("clickToEnterLocation")}
                 </span>
               </div>
             )}
           </div>
 
+          {/* DISTRICT */}
           <div>
-            <label className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <label
+              className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${
+                isDark ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
               {t("district")} <span className="text-red-600">*</span>
             </label>
             <select
@@ -1141,8 +1422,13 @@ const PostIssue = () => {
             </select>
           </div>
 
+          {/* REASON */}
           <div>
-            <label className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <label
+              className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${
+                isDark ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
               {t("reason")} <span className="text-red-600">*</span>
             </label>
             <select
@@ -1163,57 +1449,88 @@ const PostIssue = () => {
             </select>
           </div>
 
+          {/* DESCRIPTION (with auto-translation) */}
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-              <label className={`block text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <label
+                className={`block text-xs sm:text-sm font-bold ${
+                  isDark ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
                 {t("description")} <span className="text-red-600">*</span>
               </label>
-              <div className={`flex rounded-lg p-1 text-xs sm:text-sm w-full sm:w-auto ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
-                <button
-                  type="button"
-                  onClick={() => setDescView("english")}
-                  className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
-                    descView === "english"
-                      ? isDark ? "bg-gray-600 text-white shadow" : "bg-white shadow font-medium"
-                      : isDark ? "text-gray-400 hover:bg-gray-600" : "text-gray-600 hover:bg-gray-200"
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                <div
+                  className={`flex rounded-lg p-1 text-xs sm:text-sm ${
+                    isDark ? "bg-gray-700" : "bg-gray-100"
                   }`}
                 >
-                  {t("english")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDescView("tamil")}
-                  className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
-                    descView === "tamil"
-                      ? isDark ? "bg-gray-600 text-white shadow" : "bg-white shadow font-medium"
-                      : isDark ? "text-gray-400 hover:bg-gray-600" : "text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {t("tamil")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDescView("both")}
-                  className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
-                    descView === "both"
-                      ? isDark ? "bg-gray-600 text-white shadow" : "bg-white shadow font-medium"
-                      : isDark ? "text-gray-400 hover:bg-gray-600" : "text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {t("both")}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setDescView("english")}
+                    className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
+                      descView === "english"
+                        ? isDark
+                          ? "bg-gray-600 text-white shadow"
+                          : "bg-white shadow font-medium"
+                        : isDark
+                        ? "text-gray-400 hover:bg-gray-600"
+                        : "text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {t("english")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDescView("tamil")}
+                    className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
+                      descView === "tamil"
+                        ? isDark
+                          ? "bg-gray-600 text-white shadow"
+                          : "bg-white shadow font-medium"
+                        : isDark
+                        ? "text-gray-400 hover:bg-gray-600"
+                        : "text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {t("tamil")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDescView("both")}
+                    className={`flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-md transition ${
+                      descView === "both"
+                        ? isDark
+                          ? "bg-gray-600 text-white shadow"
+                          : "bg-white shadow font-medium"
+                        : isDark
+                        ? "text-gray-400 hover:bg-gray-600"
+                        : "text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {t("both")}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className={`grid gap-4 sm:gap-6 ${descView === "both" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+            <div
+              className={`grid gap-4 sm:gap-6 ${
+                descView === "both" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+              }`}
+            >
               {(descView === "english" || descView === "both") && (
                 <div>
-                  <label className={`block text-[10px] sm:text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                  <label
+                    className={`block text-[10px] sm:text-xs font-medium mb-1 ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
                     {t("description")} ({t("english")})
                   </label>
                   <textarea
                     value={descEn}
-                    onChange={(e) => setDescEn(e.target.value)}
+                    onChange={handleDescEnChange}
                     placeholder={t("describeIssue")}
                     rows={descView === "both" ? 4 : 5}
                     className={`w-full border rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base resize-y focus:ring-2 focus:ring-green-500 ${
@@ -1222,12 +1539,22 @@ const PostIssue = () => {
                         : "bg-white border-gray-300 text-gray-900"
                     }`}
                   />
+                  {isTranslating && (
+                    <div className="flex items-center gap-1 text-xs text-blue-500 mt-1">
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Translating to Tamil...</span>
+                    </div>
+                  )}
                 </div>
               )}
 
               {(descView === "tamil" || descView === "both") && (
                 <div>
-                  <label className={`block text-[10px] sm:text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                  <label
+                    className={`block text-[10px] sm:text-xs font-medium mb-1 ${
+                      isDark ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
                     {t("descriptionTamil")}
                   </label>
                   <textarea
@@ -1246,8 +1573,14 @@ const PostIssue = () => {
             </div>
           </div>
 
+          {/* HASHTAGS */}
           <div className="relative">
-            <Hash className={`absolute left-3 top-3 ${isDark ? "text-gray-500" : "text-gray-400"}`} size={16} />
+            <Hash
+              className={`absolute left-3 top-3 ${
+                isDark ? "text-gray-500" : "text-gray-400"
+              }`}
+              size={16}
+            />
             <input
               type="text"
               value={hashtags}
@@ -1260,11 +1593,13 @@ const PostIssue = () => {
               }`}
             />
             {suggestions.length > 0 && (
-              <div className={`absolute z-10 w-full border rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex flex-wrap gap-1 sm:gap-2 mt-1 max-h-40 overflow-y-auto ${
-                isDark
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-200"
-              }`}>
+              <div
+                className={`absolute z-10 w-full border rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex flex-wrap gap-1 sm:gap-2 mt-1 max-h-40 overflow-y-auto ${
+                  isDark
+                    ? "bg-gray-800 border-gray-700"
+                    : "bg-white border-gray-200"
+                }`}
+              >
                 {suggestions.map((tag) => (
                   <button
                     key={tag}
@@ -1283,6 +1618,7 @@ const PostIssue = () => {
             )}
           </div>
 
+          {/* AGREEMENT */}
           <label className="flex items-start gap-2 sm:gap-3 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -1290,14 +1626,23 @@ const PostIssue = () => {
               onChange={(e) => setAgree(e.target.checked)}
               className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 flex-shrink-0"
             />
-            <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <span
+              className={`text-xs sm:text-sm ${
+                isDark ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
               {t("agreement")}
             </span>
           </label>
 
+          {/* SUBMIT BUTTON */}
           <button
             type="submit"
-            disabled={isSubmitting || !cameraAllowed || images.length < (getDepartmentDetails(department)?.minImages || 1)}
+            disabled={
+              isSubmitting ||
+              !cameraAllowed ||
+              images.length < (getDepartmentDetails(department)?.minImages || 1)
+            }
             className="w-full bg-green-600 text-white py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {t("proceed")}

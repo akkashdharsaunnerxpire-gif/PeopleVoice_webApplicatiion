@@ -81,21 +81,21 @@ const AppLayout = () => {
         <AnimatePresence>
           {commentModalData && (
             <CommentModal
-              open={true}
-              onClose={() => setCommentModalData(null)}
-              issueId={commentModalData._id}
-              comments={commentModalData.comments}
-              images={
-                commentModalData.hideImage
-                  ? [] // ❌ MyIssues → no image
-                  : commentModalData.images_data // ✅ Feed → normal
-              }
-              citizenId={localStorage.getItem("citizenId")}
-              postOwnerId={commentModalData.citizenId}
-              district={commentModalData.district}
-              setDisplayedIssues={commentModalData.setDisplayedIssues}
-              isDark={isDark}
-            />
+  open={true}
+  onClose={() => setCommentModalData(null)}
+  issueId={commentModalData.issueId} // ✅ FIXED
+  comments={commentModalData.comments}
+  images={
+    commentModalData.hideImage
+      ? []
+      : commentModalData.images || commentModalData.images_data
+  }
+  citizenId={localStorage.getItem("citizenId")}
+  postOwnerId={commentModalData.postOwnerId} // ✅ FIXED
+  district={commentModalData.district}
+  setDisplayedIssues={commentModalData.setDisplayedIssues}
+  isDark={isDark}
+/>
           )}
         </AnimatePresence>
       </div>

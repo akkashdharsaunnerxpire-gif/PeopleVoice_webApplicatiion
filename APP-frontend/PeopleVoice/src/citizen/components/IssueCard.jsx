@@ -720,7 +720,7 @@ const getStatusConfig = (status) => {
                       }}
                       className={`w-2 h-2 rounded-full transition-all ${
                         i === currentImageIndex
-                          ? "bg-green-500 scale-125"
+                          ? "bg-white scale-125"
                           : isDark
                             ? "bg-zinc-600"
                             : "bg-gray-400"
