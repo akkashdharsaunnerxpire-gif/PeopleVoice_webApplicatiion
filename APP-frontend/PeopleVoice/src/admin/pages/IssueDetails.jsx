@@ -418,38 +418,65 @@ export default function IssueDetails() {
 
   const action = getActionConfig();
 
-  const handleResolveSubmit = async () => {
-    // Clear previous errors
-    setDetailsError("");
-    setUploadError("");
+ const handleResolveSubmit = async () => {
+  setDetailsError("");
+  setUploadError("");
 
-    // Validate images
-    if (afterImages.length === 0) {
-      setUploadError("Please upload at least one after-resolution image");
-      return;
-    }
+  if (afterImages.length === 0) {
+    setUploadError("Please upload at least one after-resolution image");
+    return;
+  }
 
-    // Validate resolution details (minimum 10 characters)
-    const trimmedDetails = resolutionDetails.trim();
-    if (trimmedDetails.length < 10) {
-      setDetailsError("Please provide at least 10 characters describing the resolution");
-      modalDescriptionRef.current?.focus();
-      return;
-    }
+  const trimmedDetails = resolutionDetails.trim();
+  if (trimmedDetails.length < 10) {
+    setDetailsError("Please provide at least 10 characters describing the resolution");
+    modalDescriptionRef.current?.focus();
+    return;
+  }
 
-    setActionLoading(true);
-    try {
-      const base64Images = await filesToBase64(afterImages);
-      await updateStatus("Resolved", {
-        afterImages: base64Images,
-        resolutionDetails: trimmedDetails,
+  setActionLoading(true);
+
+  try {
+    const uploadedUrls = [];
+
+    for (let file of afterImages) {
+      // convert to base64 (for API send only)
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
       });
-    } catch (err) {
-      showToast("error", "Failed to submit resolution");
-    } finally {
-      setActionLoading(false);
+
+      // 🔥 upload to backend → cloudinary
+      const res = await fetch(`${API_BASE}/api/upload/admin`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image: base64 }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        uploadedUrls.push(data.url);
+      }
     }
-  };
+
+    // ✅ save only URLs
+    await updateStatus("Resolved", {
+      afterImages: uploadedUrls,
+      resolutionDetails: trimmedDetails,
+    });
+
+  } catch (err) {
+    console.error(err);
+    showToast("error", "Failed to submit resolution");
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   if (loading) {
     return (

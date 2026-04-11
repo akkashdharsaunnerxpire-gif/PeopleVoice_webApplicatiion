@@ -46,7 +46,7 @@ const PostModal = ({
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
-  const allImages = localIssue?.images_data || [];
+  const allImages = localIssue?.images || [];
   const totalImages = allImages.length;
   const comments = localIssue?.comments || [];
 
@@ -69,12 +69,12 @@ const PostModal = ({
   const handleDeleteClick = (issueId, e) => {
     e.stopPropagation();
     setDeleteModal(issueId); // open popup
-  }; 
+  };
 
   useEffect(() => {
     setLocalIssue(issue);
   }, [issue]);
-  
+
   const confirmDelete = async () => {
     if (!deleteModal) return;
 
@@ -616,7 +616,9 @@ const PostModal = ({
                             open: true,
                             issueId: localIssue?._id,
                             comments: localIssue.comments || [],
-                            images: localIssue.images_data || [],
+                            images: localIssue.images?.length
+                              ? localIssue.images
+                              : localIssue.images_data || [],
                             citizenId: citizenId,
                             postOwnerId: localIssue.citizenId, // ✅ IMPORTANT
                             district: localIssue.district,

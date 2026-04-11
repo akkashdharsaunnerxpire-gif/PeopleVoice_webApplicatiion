@@ -633,16 +633,46 @@ const PostIssue = () => {
     setShowVerification(true);
   };
 
-  const handleVerificationSubmit = async () => {
-    const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
-    const allRequiredChecked = requiredChecks.every(
-      (check) => verificationChecks[check]
-    );
-    if (!allRequiredChecked) {
-      return setError(t("confirmAllPoints"));
+ const uploadImage = async (base64) => {
+  const res = await fetch(`${APIURL}/upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: base64 }),
+  });
+
+  const data = await res.json();
+  if (!data.url) throw new Error("Image upload failed");
+  return data.url;
+};
+
+const handleVerificationSubmit = async () => {
+  const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
+  const allRequiredChecked = requiredChecks.every(
+    (check) => verificationChecks[check]
+  );
+
+  if (!allRequiredChecked) {
+    return setError(t("confirmAllPoints"));
+  }
+
+  setIsSubmittingVerification(true);
+
+  try {
+    // 🔥 Upload all images safely
+    const imageUrls = [];
+
+    for (let img of images) {
+      try {
+        const url = await uploadImage(img.data);
+        imageUrls.push(url);
+      } catch (err) {
+        console.error("Image upload failed:", err);
+        setError("Image upload failed. Try again.");
+        setIsSubmittingVerification(false);
+        return;
+      }
     }
 
-    setIsSubmittingVerification(true);
     const payload = {
       citizenId,
       district,
@@ -653,7 +683,7 @@ const PostIssue = () => {
       description_en: descEn.trim(),
       description_ta: descTa.trim(),
       hashtags: hashtags.split(" ").filter((h) => h.startsWith("#")),
-      images_data: images.map((i) => i.data),
+      images: imageUrls, // ✅ FIXED
       device_fingerprint,
       photo_locations: images.map((i) => i.location),
       verification_metadata: {
@@ -663,50 +693,56 @@ const PostIssue = () => {
       },
     };
 
-    try {
-      const res = await fetch(`${APIURL}/post-issue-data`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+    const res = await fetch(`${APIURL}/post-issue-data`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await res.json();
+
+    if (res.ok && result.success) {
+      localStorage.setItem("lastCheck", Date.now());
+      addNewIssue(result.issue);
+
+      // 🔥 reset
+      setDistrict("");
+      setArea("");
+      setDepartment("");
+      setOtherDetail("");
+      setReason("");
+      setDescEn("");
+      setDescTa("");
+      setHashtags("#peoplevoice ");
+      setImages([]);
+      setAgree(false);
+      setCameraAllowed(false);
+      setShowVerification(false);
+      setVerificationChecks({
+        confirmImages: false,
+        confirmLocation: false,
+        confirmDepartment: false,
+        confirmDescription: false,
+        acceptTerms: false,
       });
-      const result = await res.json();
-      if (res.ok && result.success) {
-        localStorage.setItem("lastCheck", Date.now());
-        addNewIssue(result.issue);
-        setDistrict("");
-        setArea("");
-        setDepartment("");
-        setOtherDetail("");
-        setReason("");
-        setDescEn("");
-        setDescTa("");
-        setHashtags("#peoplevoice ");
-        setImages([]);
-        setAgree(false);
-        setCameraAllowed(false);
-        setShowVerification(false);
-        setVerificationChecks({
-          confirmImages: false,
-          confirmLocation: false,
-          confirmDepartment: false,
-          confirmDescription: false,
-          acceptTerms: false,
-        });
-        setIsSubmittingVerification(false);
-        setShowThankYou(true);
-        setTimeout(() => {
-          setShowThankYou(false);
-          navigate("/feed");
-        }, 2000);
-      } else {
-        setError(result.message || "Submission failed");
-        setIsSubmittingVerification(false);
-      }
-    } catch {
-      setError(t("networkError"));
+
+      setIsSubmittingVerification(false);
+      setShowThankYou(true);
+
+      setTimeout(() => {
+        setShowThankYou(false);
+        navigate("/feed");
+      }, 2000);
+    } else {
+      setError(result.message || "Submission failed");
       setIsSubmittingVerification(false);
     }
-  };
+  } catch (err) {
+    console.error(err);
+    setError(t("networkError"));
+    setIsSubmittingVerification(false);
+  }
+};
 
   const toggleLanguage = () => {
     setLanguage(language === "en" ? "ta" : "en");

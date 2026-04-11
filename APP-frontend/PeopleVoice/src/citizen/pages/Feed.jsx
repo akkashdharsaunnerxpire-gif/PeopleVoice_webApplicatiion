@@ -3,9 +3,18 @@ import {
   useSearchParams,
   useOutletContext,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Filter, X, AlertCircle, Users, Loader2 } from "lucide-react";
+import {
+  Filter,
+  X,
+  AlertCircle,
+  Users,
+  Loader2,
+  Bell,
+  BellDot,
+} from "lucide-react";
 import { useUserValues } from "../../Context/UserValuesContext";
 import IssueCard from "../components/IssueCard";
 import FilterBar from "../components/FilterBar";
@@ -17,12 +26,13 @@ import {
   themeColors,
 } from "../components/constants";
 import { useTheme } from "../../Context/ThemeContext";
+import axios from "axios";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const APIURL = `${BACKEND_URL}/api`;
+const BASE = "/peopleVoice";
 
-// Cache TTL: 5 minutes
-const CACHE_TTL_MS = 30 * 1000;
+
 
 // =============================
 // Helper Components
@@ -158,6 +168,7 @@ const Feed = () => {
   const { setCommentModalData } = useOutletContext();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const { isDark } = useTheme();
   const theme = isDark ? themeColors.dark : themeColors.light;
 
@@ -171,6 +182,9 @@ const Feed = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [error, setError] = useState(null);
+
+  // Notification state for mobile
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Advanced loader for ANY filter change
   const [showAdvancedLoader, setShowAdvancedLoader] = useState(false);
@@ -189,86 +203,51 @@ const Feed = () => {
   const scrollRestoredRef = useRef(false);
   const initialDataLoaded = useRef(false);
   const advancedLoaderTimer = useRef(null);
-  const prevFiltersRef = useRef(null); // Track previous filters to detect real changes
+  const prevFiltersRef = useRef(null);
 
   const ITEMS_PER_PAGE = 5;
   const citizenId = localStorage.getItem("citizenId") || "CID-XXXX";
 
   // =============================
+  // Notification Functions (Mobile)
+  // =============================
+  const fetchUnreadCount = useCallback(async () => {
+    if (!citizenId) return;
+    try {
+      const res = await axios.get(
+        `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`,
+      );
+      const unread = (res.data || []).filter((n) => n.read === false).length;
+      setUnreadCount(unread);
+    } catch (err) {
+      console.log("Error fetching notifications:", err);
+    }
+  }, [citizenId]);
+
+  // Initial fetch + polling for notifications
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
+
+  // Listen for notification updates
+  useEffect(() => {
+    const handleUpdate = () => fetchUnreadCount();
+    window.addEventListener("notification_update", handleUpdate);
+    return () =>
+      window.removeEventListener("notification_update", handleUpdate);
+  }, [fetchUnreadCount]);
+
+  // =============================
   // Cache Helpers (with TTL)
   // =============================
-  const saveFeedState = useCallback(
-    (issuesData, pageNum = 1) => {
-      if (!issuesData || issuesData.length === 0) return;
 
-      const stateToSave = {
-        issues: issuesData,
-        page: pageNum,
-        filters: {
-          district,
-          department,
-          status,
-          sortBy,
-          onlyWithImages,
-          onlyMyIssues,
-        },
-        timestamp: Date.now(),
-      };
-
-      sessionStorage.setItem("feedData", JSON.stringify(stateToSave));
-    },
-    [district, department, status, sortBy, onlyWithImages, onlyMyIssues],
-  );
-
-  const clearCache = useCallback(() => {
-    sessionStorage.removeItem("feedData");
-  }, []);
-
-  // Expose clearCache globally for post/update/delete events
-  useEffect(() => {
-    const handleClearCache = () => clearCache();
-    window.addEventListener("clearFeedCache", handleClearCache);
-    return () => window.removeEventListener("clearFeedCache", handleClearCache);
-  }, [clearCache]);
+  // Expose clearCache globally for post/update/delete event
 
   // =============================
   // Scroll Restoration Helpers
   // =============================
-  const saveScrollPosition = useCallback(() => {
-    const scrollKey = `feedScroll_${location.pathname}`;
-    sessionStorage.setItem(scrollKey, window.scrollY);
-  }, [location.pathname]);
-
-  const restoreScrollPosition = useCallback(() => {
-    const scrollKey = `feedScroll_${location.pathname}`;
-    const saved = sessionStorage.getItem(scrollKey);
-    if (saved) {
-      window.scrollTo(0, parseInt(saved, 10));
-    }
-  }, [location.pathname]);
-
-  // Save scroll on unmount
-  useEffect(() => {
-    return () => {
-      saveScrollPosition();
-    };
-  }, [saveScrollPosition]);
-
-  // Debounced scroll saving
-  useEffect(() => {
-    let timeoutId;
-    const handleScroll = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        saveScrollPosition();
-      }, 100);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [saveScrollPosition]);
 
   // =============================
   // Normalisation & Data Fetching
@@ -279,160 +258,125 @@ const Feed = () => {
   });
 
   const fetchIssues = useCallback(
-    async (pageNum, append = false) => {
-      if (append && isFetchingRef.current) return;
-      if (abortControllerRef.current) abortControllerRef.current.abort();
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-      isFetchingRef.current = true;
+  async (pageNum, append = false) => {
+    if (append && isFetchingRef.current) return;
 
-      try {
-        if (!append) {
-          setLoading(true);
-          setError(null);
-        } else {
-          setLoadingMore(true);
-        }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-        const params = new URLSearchParams({
-          page: pageNum,
-          limit: ITEMS_PER_PAGE,
-        });
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    isFetchingRef.current = true;
 
-        if (district !== DISTRICTS[0]) params.append("district", district);
-        if (department !== DEPARTMENTS[0])
-          params.append("department", department);
-        if (status !== STATUSES[0]) params.append("status", status);
-        if (sortBy !== SORT_OPTIONS[0])
-          params.append("sortBy", sortBy.toLowerCase().replace(" ", ""));
-        if (onlyWithImages) params.append("onlyWithImages", true);
-        if (onlyMyIssues) params.append("citizenId", citizenId);
-
-        const res = await fetch(`${APIURL}/issues?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json();
-
-        if (!data.success) throw new Error(data.message);
-
-        const rawIssues = data.issues || [];
-        const newIssues = rawIssues.map(normalizeIssue);
-
-        if (newIssues.length === 0) {
-          setHasMore(false);
-          return;
-        }
-
-        if (append) {
-          setDisplayedIssues((prev) => {
-            const existingIds = new Set(prev.map((i) => i._id));
-            const uniqueNew = newIssues.filter((i) => !existingIds.has(i._id));
-            const updated = [...prev, ...uniqueNew];
-
-            saveFeedState(updated, pageNum);
-
-            return updated;
-          });
-
-          // ✅ ADD THIS
-          setHasMore(data.hasMore);
-
-          // ✅ ADD THIS
-          pageRef.current = pageNum;
-          setPage(pageNum);
-        } else {
-          setDisplayedIssues(newIssues);
-          setHasMore(data.hasMore);
-          pageRef.current = 1;
-          setPage(1);
-          // Save fresh data to cache
-          saveFeedState(newIssues, 1);
-        }
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          setError(err.message);
-          if (!append) {
-            setDisplayedIssues([]);
-            setHasMore(false);
-          }
-        }
-      } finally {
-        if (!append) setLoading(false);
-        else setLoadingMore(false);
-        isFetchingRef.current = false;
-        abortControllerRef.current = null;
-        // Turn off the advanced loader when done
-        setShowAdvancedLoader(false);
+    try {
+      if (!append) {
+        setLoading(true);
+        setError(null);
+      } else {
+        setLoadingMore(true);
       }
-    },
-    [
-      district,
-      department,
-      status,
-      sortBy,
-      onlyWithImages,
-      onlyMyIssues,
-      citizenId,
-      setDisplayedIssues,
-      saveFeedState,
-    ],
-  );
+
+      const params = new URLSearchParams({
+        page: pageNum,
+        limit: ITEMS_PER_PAGE,
+      });
+
+      if (district !== DISTRICTS[0]) params.append("district", district);
+      if (department !== DEPARTMENTS[0])
+        params.append("department", department);
+      if (status !== STATUSES[0]) params.append("status", status);
+      if (sortBy !== SORT_OPTIONS[0])
+        params.append("sortBy", sortBy.toLowerCase().replace(" ", ""));
+      if (onlyWithImages) params.append("onlyWithImages", true);
+      if (onlyMyIssues) params.append("citizenId", citizenId);
+
+      const res = await fetch(`${APIURL}/issues?${params.toString()}`, {
+        signal: controller.signal,
+      });
+
+      const data = await res.json();
+
+      console.log("🔥 API RESPONSE:", data);
+
+      if (!data.success) throw new Error(data.message);
+
+      const rawIssues = data.issues || [];
+      const newIssues = rawIssues.map(normalizeIssue);
+
+      console.log("🔥 NEW ISSUES:", newIssues);
+
+      // ✅ REMOVE EARLY RETURN
+      if (newIssues.length === 0) {
+        setHasMore(false);
+      }
+
+      if (append) {
+        setDisplayedIssues((prev) => {
+          const existingIds = new Set(prev.map((i) => i._id));
+          const uniqueNew = newIssues.filter((i) => !existingIds.has(i._id));
+          return [...prev, ...uniqueNew];
+        });
+
+        setHasMore(data.hasMore);
+        pageRef.current = pageNum;
+        setPage(pageNum);
+      } else {
+        // 🔥 IMPORTANT: ALWAYS SET DATA
+        setDisplayedIssues(newIssues);
+
+        setHasMore(data.hasMore);
+        pageRef.current = 1;
+        setPage(1);
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("❌ Fetch error:", err);
+        setError(err.message);
+
+        if (!append) {
+          setDisplayedIssues([]);
+          setHasMore(false);
+        }
+      }
+    } finally {
+      if (!append) setLoading(false);
+      else setLoadingMore(false);
+
+      isFetchingRef.current = false;
+      abortControllerRef.current = null;
+      setShowAdvancedLoader(false);
+    }
+  },
+  [
+    district,
+    department,
+    status,
+    sortBy,
+    onlyWithImages,
+    onlyMyIssues,
+    citizenId,
+    setDisplayedIssues,
+  ],
+);
+
+  useEffect(() => {
+  if (!initialDataLoaded.current) {
+    fetchIssues(1, false);   // 🔥 FIRST API CALL
+    initialDataLoaded.current = true;
+    console.log(displayedIssues);
+  }
+}, [fetchIssues]);
 
   // =============================
   // Initial load & restoration (with TTL)
   // =============================
-  useEffect(() => {
-    const savedStateStr = sessionStorage.getItem("feedData");
-    if (savedStateStr) {
-      try {
-        const savedState = JSON.parse(savedStateStr);
-        const savedFilters = savedState.filters;
-        const currentFilters = {
-          district,
-          department,
-          status,
-          sortBy,
-          onlyWithImages,
-          onlyMyIssues,
-        };
-        const filtersMatch =
-          JSON.stringify(savedFilters) === JSON.stringify(currentFilters);
-        const isCacheValid =
-          Date.now() - (savedState.timestamp || 0) < CACHE_TTL_MS;
-
-        if (filtersMatch && isCacheValid && savedState.issues?.length) {
-          setDisplayedIssues(savedState.issues);
-          setPage(savedState.page);
-          pageRef.current = savedState.page;
-          setHasMore(true);
-          scrollRestoredRef.current = false;
-
-          initialDataLoaded.current = true;
-
-          // 🔥 IMPORTANT FIX
-          prevFiltersRef.current = JSON.stringify(savedState.filters);
-
-          console.log("⚡ Loaded from cache (TTL valid)");
-          return;
-        } else {
-          sessionStorage.removeItem("feedData");
-        }
-      } catch (e) {
-        console.error("Failed to parse saved feed data", e);
-      }
-    }
-    // No cached data or cache expired / filters mismatch – fetch fresh
-    fetchIssues(1, false).then(() => {
-      initialDataLoaded.current = true;
-    });
-  }, []); // runs only once on mount
 
   // =============================
   // Real-time Updates: New Issue Created
   // =============================
   useEffect(() => {
-    const handleNewIssue = (event) => {
-      clearCache(); // Invalidate cache on new issue
+    const handleNewIssue = () => {
       const currentScroll = window.scrollY;
       fetchIssues(1, false).then(() => {
         window.scrollTo(0, currentScroll);
@@ -441,15 +385,14 @@ const Feed = () => {
 
     window.addEventListener("newIssueCreated", handleNewIssue);
     return () => window.removeEventListener("newIssueCreated", handleNewIssue);
-  }, [fetchIssues, clearCache]);
+  }, [fetchIssues]);
 
   // =============================
-  // Filter Changes – show Advanced Loader and fetch (only if filters actually changed)
+  // Filter Changes
   // =============================
   useEffect(() => {
     if (!initialDataLoaded.current) return;
 
-    // 🔥 NEW FIX (IMPORTANT)
     if (prevFiltersRef.current === null) {
       prevFiltersRef.current = JSON.stringify({
         district,
@@ -459,10 +402,9 @@ const Feed = () => {
         onlyWithImages,
         onlyMyIssues,
       });
-      return; // ❌ STOP first execution
+      return;
     }
 
-    // Get current filter values as a string for comparison
     const currentFilters = JSON.stringify({
       district,
       department,
@@ -472,20 +414,16 @@ const Feed = () => {
       onlyMyIssues,
     });
 
-    // Skip if filters haven't changed from previous render
     if (prevFiltersRef.current === currentFilters) return;
     prevFiltersRef.current = currentFilters;
 
-    // Clear any pending timer
     if (filterTimeout.current) clearTimeout(filterTimeout.current);
     if (advancedLoaderTimer.current) clearTimeout(advancedLoaderTimer.current);
 
-    // Clear existing data and show loader
     setDisplayedIssues([]);
     setShowAdvancedLoader(true);
     setError(null);
 
-    // Debounce filter changes (300ms)
     filterTimeout.current = setTimeout(() => {
       pageRef.current = 1;
       setPage(1);
@@ -511,22 +449,9 @@ const Feed = () => {
   // =============================
   // Scroll Restoration after Initial Load
   // =============================
-  useEffect(() => {
-    if (!loading && displayedIssues.length > 0 && !scrollRestoredRef.current) {
-      setTimeout(() => {
-        restoreScrollPosition();
-        scrollRestoredRef.current = true;
-      }, 100);
-    }
-  }, [loading, displayedIssues, restoreScrollPosition]);
-
   const loadMoreIssues = useCallback(async () => {
     if (isFetchingRef.current || loading || loadingMore || !hasMore) return;
-
     const nextPage = pageRef.current + 1;
-
-    console.log("👉 Fetching page:", nextPage);
-
     await fetchIssues(nextPage, true);
   }, [hasMore, loading, loadingMore, fetchIssues]);
 
@@ -562,23 +487,17 @@ const Feed = () => {
 
       let previousState;
 
-      // 🔥 OPTIMISTIC UPDATE
       setDisplayedIssues((prev) => {
         previousState = prev;
-
         return prev.map((issue) => {
           if (issue._id !== issueId) return issue;
-
           const alreadyLiked = issue.likes?.includes(citizenId);
-
           let updatedLikes;
-
           if (alreadyLiked) {
             updatedLikes = issue.likes.filter((id) => id !== citizenId);
           } else {
             updatedLikes = [...(issue.likes || []), citizenId];
           }
-
           return {
             ...issue,
             likes: updatedLikes,
@@ -607,39 +526,12 @@ const Feed = () => {
                   }
                 : issue,
             );
-
-            // 🔥🔥 IMPORTANT: UPDATE CACHE (NOT DELETE)
-            const saved = JSON.parse(sessionStorage.getItem("feedData"));
-
-            if (saved) {
-              const updatedCacheIssues = saved.issues.map((issue) =>
-                issue._id === issueId
-                  ? {
-                      ...issue,
-                      likes: data.likes,
-                      likeCount: data.likeCount ?? data.likes.length,
-                    }
-                  : issue,
-              );
-
-              sessionStorage.setItem(
-                "feedData",
-                JSON.stringify({
-                  ...saved,
-                  issues: updatedCacheIssues,
-                  timestamp: Date.now(),
-                }),
-              );
-            }
-
             return updated;
           });
         } else {
-          // 🔁 rollback
           setDisplayedIssues(previousState);
         }
       } catch (err) {
-        // 🔁 rollback
         setDisplayedIssues(previousState);
       }
     },
@@ -653,7 +545,7 @@ const Feed = () => {
     <div
       className={`min-h-screen transition-colors duration-700 ${theme.bg} pb-20`}
     >
-      {/* Mobile Header */}
+      {/* Mobile Header with Filter Button and Notification Bell */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30">
         <div
           className={`backdrop-blur-xl border-b ${
@@ -664,9 +556,9 @@ const Feed = () => {
         >
           <div className="px-4 py-3 flex items-center justify-between">
             <div>
-              <h1 className={`text-lg font-black tracking-tight ${theme.text}`}>
+              {/* <h1 className={`text-lg font-black tracking-tight ${theme.text}`}>
                 PEOPLE VOICE
-              </h1>
+              </h1> */}
               <p
                 className={`text-[10px] uppercase tracking-wider ${
                   isDark ? "text-violet-400" : "text-green-600"
@@ -675,18 +567,38 @@ const Feed = () => {
                 Public Reports
               </p>
             </div>
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              onClick={() => setIsMobileFilterOpen(true)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium shadow-md ${
-                isDark
-                  ? "bg-violet-700/80 text-violet-100 hover:bg-violet-600"
-                  : "bg-green-600 text-white hover:bg-green-700"
-              } transition-colors`}
-            >
-              <Filter size={18} />
-              <span className="text-sm">Filter</span>
-            </motion.button>
+            <div className="flex items-center gap-3">
+              {/* Notification Bell - Mobile only */}
+
+              {/* Filter Button */}
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={() => setIsMobileFilterOpen(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium shadow-md ${
+                  isDark
+                    ? "bg-violet-700/80 text-violet-100 hover:bg-violet-600"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                } transition-colors`}
+              >
+                <Filter size={18} />
+                <span className="text-sm">Filter</span>
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={() => navigate(`${BASE}/notifications`)}
+                className="relative p-2 rounded-xl"
+              >
+                <Bell
+                  size={22}
+                  className={isDark ? "text-violet-300" : "text-gray-700"}
+                />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </motion.button>
+            </div>
           </div>
         </div>
       </div>
@@ -794,9 +706,9 @@ const Feed = () => {
                       onComment={() =>
                         setCommentModalData({
                           open: true,
-                          issueId: issue._id, // 🔥 FIX
+                          issueId: issue._id,
                           comments: issue.comments || [],
-                          images: issue.images_data || [],
+                          images: issue.images || [],
                           citizenId: citizenId,
                           postOwnerId: issue.citizenId,
                           district: issue.district,

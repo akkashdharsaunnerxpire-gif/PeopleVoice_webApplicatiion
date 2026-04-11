@@ -1,9 +1,20 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { 
-  Bell, CheckCircle2, Info, AlertCircle, Eye, 
-  Clock, MapPin, ChevronRight, Volume2, VolumeX
+import {
+  Bell,
+  CheckCircle2,
+  Info,
+  AlertCircle,
+  Eye,
+  Clock,
+  MapPin,
+  ChevronRight,
+  Volume2,
+  VolumeX,
+  Trash2,
+  RefreshCw,
+  FileText,
 } from "lucide-react";
 import { useTheme } from "../../Context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,11 +24,14 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 const Notifications = () => {
   const { isDark } = useTheme();
   const navigate = useNavigate();
+  const [selectedProofId, setSelectedProofId] = useState(null);
 
   const [notifications, setNotifications] = useState([]);
+  const [clickedProofs, setClickedProofs] = useState({});
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [newNotificationCount, setNewNotificationCount] = useState(0);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const pollingInterval = useRef(null);
   const lastNotificationIds = useRef(new Set());
@@ -35,14 +49,32 @@ const Notifications = () => {
   }, [soundEnabled]);
 
   /* ================= BROWSER NOTIFICATION ================= */
-  const showBrowserNotification = useCallback((title, body) => {
+  const showBrowserNotification = useCallback((title, body, imageUrl) => {
     if (!("Notification" in window)) return;
 
     if (Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/logo.png" });
+      new Notification(title, {
+        body,
+        icon: imageUrl || "/logo.png",
+        image: imageUrl,
+      });
     } else if (Notification.permission !== "denied") {
       Notification.requestPermission();
     }
+  }, []);
+
+  /* ================= GET NOTIFICATION IMAGE ================= */
+  const getNotificationImage = useCallback((notification) => {
+    if (notification.issueId?.after_images?.[0]) {
+      return notification.issueId.after_images[0];
+    }
+    if (notification.issueId?.images_data?.[0]) {
+      return notification.issueId.images_data[0];
+    }
+    if (notification.image) {
+      return notification.image;
+    }
+    return null;
   }, []);
 
   /* ================= LOAD NOTIFICATIONS ================= */
@@ -51,32 +83,53 @@ const Notifications = () => {
 
     try {
       const res = await axios.get(
-        `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`
+        `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`,
       );
 
       const newData = res.data || [];
 
       const currentIds = lastNotificationIds.current;
-      const freshNew = newData.filter(n => !currentIds.has(n._id));
+      const freshNew = newData.filter((n) => !currentIds.has(n._id));
 
       if (freshNew.length > 0 && currentIds.size > 0) {
-        setNewNotificationCount(prev => prev + freshNew.length);
+        setNewNotificationCount((prev) => prev + freshNew.length);
         playNotificationSound();
 
-        freshNew.forEach(n => {
-          showBrowserNotification("New Update", n.message);
+        freshNew.forEach((n) => {
+          const notificationImage = getNotificationImage(n);
+          showBrowserNotification(
+            "PeopleVoice Update",
+            n.message,
+            notificationImage,
+          );
         });
       }
 
-      lastNotificationIds.current = new Set(newData.map(n => n._id));
+      lastNotificationIds.current = new Set(newData.map((n) => n._id));
       setNotifications(newData);
     } catch (err) {
       console.error("Fetch notifications error:", err);
     } finally {
       setLoading(false);
     }
-  }, [citizenId, playNotificationSound, showBrowserNotification]);
+  }, [
+    citizenId,
+    playNotificationSound,
+    showBrowserNotification,
+    getNotificationImage,
+  ]);
 
+  useEffect(() => {
+  const handleMessage = (event) => {
+    if (event.data?.type === "CLOSE_PROOF_POPUP") {
+      setSelectedProofId(null);
+    }
+  };
+
+  window.addEventListener("message", handleMessage);
+
+  return () => window.removeEventListener("message", handleMessage);
+}, []);
   /* ================= INITIAL LOAD + POLLING ================= */
   useEffect(() => {
     loadNotifications();
@@ -88,7 +141,7 @@ const Notifications = () => {
     return () => {
       clearInterval(pollingInterval.current);
     };
-  }, []);
+  }, [loadNotifications]);
 
   /* ================= REQUEST PERMISSION ================= */
   useEffect(() => {
@@ -102,9 +155,10 @@ const Notifications = () => {
     if (!id) return;
     try {
       await axios.put(`${BACKEND_URL}/api/notifications/read/${id}`);
-      setNotifications(prev =>
-        prev.map(n => (n._id === id ? { ...n, read: true } : n))
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, read: true } : n)),
       );
+      setNewNotificationCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       console.error("Mark as read error:", err);
     }
@@ -112,61 +166,123 @@ const Notifications = () => {
 
   /* ================= MARK ALL ================= */
   const markAllAsRead = async () => {
-    const unread = notifications.filter(n => !n.read);
-    await Promise.all(unread.map(n => markAsRead(n._id)));
+    const unread = notifications.filter((n) => !n.read);
+    await Promise.all(unread.map((n) => markAsRead(n._id)));
     setNewNotificationCount(0);
   };
 
-  /* ================= CLICK ================= */
-  const handleNotificationClick = async (id, notification) => {
-    if (!notification.read) {
-      await markAsRead(id);
+  /* ================= DELETE NOTIFICATION ================= */
+  const deleteNotification = async (id, e) => {
+    e.stopPropagation();
+    try {
+      await axios.delete(`${BACKEND_URL}/api/notifications/${id}`);
+      setNotifications((prev) => prev.filter((n) => n._id !== id));
+      lastNotificationIds.current.delete(id);
+    } catch (err) {
+      console.error("Delete error:", err);
     }
-    navigate("/peopleVoice/my-issues");
   };
 
-  /* ================= HELPERS ================= */
-  const getImage = (n) => n.issueId?.images_data?.[0] || n.image || null;
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const diff = Date.now() - date;
-    const mins = Math.floor(diff / 60000);
-    const hrs = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (mins < 1) return "Just now";
-    if (mins < 60) return `${mins}m ago`;
-    if (hrs < 24) return `${hrs}h ago`;
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  };
-
-  const getStatusIcon = (status) => {
+  /* ================= GET STATUS STYLE ================= */
+  const getStatusStyle = (status) => {
     const statusLower = status?.toLowerCase() || "";
-    if (statusLower.includes("solved") || statusLower.includes("resolved")) {
-      return { icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10" };
+    if (statusLower.includes("resolved") || statusLower.includes("solved")) {
+      return {
+        icon: CheckCircle2,
+        color: "text-green-500",
+        bg: "bg-green-500/10",
+        label: "Resolved",
+      };
     }
-    if (statusLower.includes("progress")) {
-      return { icon: Info, color: "text-blue-500", bg: "bg-blue-500/10" };
+    if (
+      statusLower.includes("progress") ||
+      statusLower.includes("processing")
+    ) {
+      return {
+        icon: Info,
+        color: "text-blue-500",
+        bg: "bg-blue-500/10",
+        label: "In Progress",
+      };
     }
     if (statusLower.includes("viewed")) {
-      return { icon: Eye, color: "text-purple-500", bg: "bg-purple-500/10" };
+      return {
+        icon: Eye,
+        color: "text-purple-500",
+        bg: "bg-purple-500/10",
+        label: "Viewed",
+      };
     }
-    return { icon: AlertCircle, color: "text-amber-500", bg: "bg-amber-500/10" };
+    if (statusLower.includes("pending")) {
+      return {
+        icon: Clock,
+        color: "text-amber-500",
+        bg: "bg-amber-500/10",
+        label: "Pending",
+      };
+    }
+    return {
+      icon: AlertCircle,
+      color: "text-gray-500",
+      bg: "bg-gray-500/10",
+      label: status || "Update",
+    };
   };
 
-  const truncateText = (text, maxLength = 70) => {
-    if (!text) return "";
-    return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+  /* ================= FORMAT DATE ================= */
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  /* ================= CLICK HANDLER ================= */
+  const handleNotificationClick = async (id, notification) => {
+    try {
+      if (!notification.read) {
+        await markAsRead(id);
+      }
+
+      if (notification.issueId) {
+        const status = notification.status?.toLowerCase();
+        if (status === "resolved" && notification.issueId) {
+          navigate(`/peopleVoice/proofpop/${notification.issueId}`);
+        } else {
+          navigate(`/peopleVoice/my-issues`);
+        }
+      } else {
+        navigate("/peopleVoice/my-issues");
+      }
+    } catch (err) {
+      console.error("Navigation error:", err);
+    }
+  };
+
+  /* ================= GET MESSAGE PREVIEW ================= */
+  const getMessagePreview = (message, maxLength = 70) => {
+    if (!message) return "";
+    if (message.length <= maxLength) return message;
+    return message.substring(0, maxLength) + "...";
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className={`min-h-screen pb-20 ${isDark ? "bg-black" : "bg-gray-50"}`}>
-      
+    <div className={`min-h-screen pb-10 ${isDark ? "bg-black" : "bg-gray-50"}`}>
       {/* Floating New Notification Badge */}
       <AnimatePresence>
         {newNotificationCount > 0 && (
@@ -181,12 +297,12 @@ const Notifications = () => {
                 setNewNotificationCount(0);
                 loadNotifications();
               }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full shadow-lg ${
-                isDark ? "bg-emerald-600 text-white" : "bg-emerald-500 text-white"
-              }`}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full shadow-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white"
             >
               <Bell size={14} />
-              <span className="text-xs font-medium">{newNotificationCount} new</span>
+              <span className="text-xs font-medium">
+                {newNotificationCount} new
+              </span>
               <ChevronRight size={12} />
             </button>
           </motion.div>
@@ -194,13 +310,17 @@ const Notifications = () => {
       </AnimatePresence>
 
       {/* Header */}
-      <div className={`sticky top-0 z-20 backdrop-blur-xl border-b ${
-        isDark ? "bg-black/80 border-gray-800" : "bg-white/80 border-gray-100"
-      }`}>
+      <div
+        className={`sticky top-0 z-20 backdrop-blur-xl border-b ${
+          isDark ? "bg-black/80 border-gray-800" : "bg-white/80 border-gray-100"
+        }`}
+      >
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 lg:gap-3">
-              <div className={`relative p-1.5 lg:p-2 rounded-full ${isDark ? "bg-emerald-950" : "bg-emerald-100"}`}>
+              <div
+                className={`relative p-1.5 lg:p-2 rounded-full ${isDark ? "bg-emerald-950" : "bg-emerald-100"}`}
+              >
                 <Bell size={18} className="lg:w-5 lg:h-5 text-emerald-500" />
                 {unreadCount > 0 && (
                   <motion.span
@@ -213,43 +333,17 @@ const Notifications = () => {
                 )}
               </div>
               <div>
-                <h1 className={`text-base lg:text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                <h1
+                  className={`text-base lg:text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                >
                   Notifications
                 </h1>
-                <p className={`text-[10px] lg:text-xs ${isDark ? "text-gray-400" : "text-gray-500"} hidden sm:block`}>
+                <p
+                  className={`text-[10px] lg:text-xs ${isDark ? "text-gray-400" : "text-gray-500"} hidden sm:block`}
+                >
                   Stay updated with your issue status
                 </p>
               </div>
-            </div>
-
-            <div className="flex items-center gap-1 lg:gap-2">
-              {/* Sound Toggle */}
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`p-1.5 lg:p-2 rounded-full transition-colors ${
-                  isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"
-                }`}
-              >
-                {soundEnabled ? (
-                  <Volume2 size={16} className="lg:w-4 lg:h-4 text-gray-500" />
-                ) : (
-                  <VolumeX size={16} className="lg:w-4 lg:h-4 text-gray-400" />
-                )}
-              </button>
-
-              {/* Mark All Read Button */}
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className={`text-[10px] lg:text-xs px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg font-medium transition-colors ${
-                    isDark 
-                      ? "bg-gray-800 text-gray-300 hover:bg-gray-700" 
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  Mark all read
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -257,10 +351,12 @@ const Notifications = () => {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-3 lg:px-4 py-3 lg:py-4">
-        {loading ? (
+        {loading && notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 lg:py-20">
             <div className="animate-spin h-6 w-6 lg:h-8 lg:w-8 border-2 lg:border-3 border-emerald-500 border-t-transparent rounded-full" />
-            <p className={`text-xs lg:text-sm mt-3 lg:mt-4 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <p
+              className={`text-xs lg:text-sm mt-3 lg:mt-4 ${isDark ? "text-gray-400" : "text-gray-500"}`}
+            >
               Loading notifications...
             </p>
           </div>
@@ -272,13 +368,19 @@ const Notifications = () => {
               isDark ? "bg-gray-900/50" : "bg-white"
             }`}
           >
-            <div className={`inline-flex p-3 lg:p-4 rounded-full mb-3 lg:mb-4 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
+            <div
+              className={`inline-flex p-3 lg:p-4 rounded-full mb-3 lg:mb-4 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+            >
               <Bell size={36} className="lg:w-12 lg:h-12 text-gray-400" />
             </div>
-            <h3 className={`text-base lg:text-lg font-semibold mb-1 lg:mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+            <h3
+              className={`text-base lg:text-lg font-semibold mb-1 lg:mb-2 ${isDark ? "text-white" : "text-gray-900"}`}
+            >
               No notifications yet
             </h3>
-            <p className={`text-xs lg:text-sm ${isDark ? "text-gray-400" : "text-gray-500"} px-4`}>
+            <p
+              className={`text-xs lg:text-sm ${isDark ? "text-gray-400" : "text-gray-500"} px-4`}
+            >
               We'll notify you when there are updates on your issues
             </p>
           </motion.div>
@@ -287,13 +389,9 @@ const Notifications = () => {
             <AnimatePresence mode="popLayout">
               {notifications.map((n, index) => {
                 const unread = !n.read;
-                const image = getImage(n);
-                const { icon: StatusIcon, color, bg } = getStatusIcon(n.status);
-                
-                let displayMessage = n.message;
-                if (n.status?.toLowerCase() === "viewed") {
-                  displayMessage = "Officer has viewed your issue";
-                }
+                const notificationImage = getNotificationImage(n);
+                const statusStyle = getStatusStyle(n.status);
+                const StatusIcon = statusStyle.icon;
 
                 return (
                   <motion.div
@@ -306,23 +404,47 @@ const Notifications = () => {
                     onClick={() => handleNotificationClick(n._id, n)}
                     className={`
                       cursor-pointer rounded-lg lg:rounded-xl border transition-all duration-200
-                      ${unread
-                        ? isDark
-                          ? "bg-gradient-to-r from-gray-900 to-gray-900/95 border-l-3 lg:border-l-4 border-l-emerald-500 border-gray-800 shadow-lg shadow-emerald-500/10"
-                          : "bg-white border-l-3 lg:border-l-4 border-l-emerald-500 border-gray-200 shadow-md"
-                        : isDark
-                          ? "bg-gray-800/40 border-gray-700 opacity-60"
-                          : "bg-gray-100 border-gray-200 opacity-60"
+                      ${
+                        unread
+                          ? isDark
+                            ? "bg-gradient-to-r from-gray-900 to-gray-900/95 border-l-3 lg:border-l-4 border-l-emerald-500 border-gray-800 shadow-lg shadow-emerald-500/10"
+                            : "bg-white border-l-3 lg:border-l-4 border-l-emerald-500 border-gray-200 shadow-md"
+                          : isDark
+                            ? "bg-gray-800/40 border-gray-700 opacity-60"
+                            : "bg-gray-100 border-gray-200 opacity-60"
                       }
                       hover:shadow-md active:scale-[0.98]
                     `}
                   >
                     <div className="flex gap-2 lg:gap-3 p-3 lg:p-4">
-                      {/* Status Icon */}
+                      {/* Status Icon / Image Section */}
                       <div className="flex-shrink-0">
-                        <div className={`p-1.5 lg:p-2 rounded-full ${bg} ${color}`}>
-                          <StatusIcon size={14} className="lg:w-4 lg:h-4" />
-                        </div>
+                        {notificationImage ? (
+                          <div
+                            className={`
+                              w-10 h-10 lg:w-12 lg:h-12 rounded-lg overflow-hidden
+                              border ${isDark ? "border-gray-700" : "border-gray-200"}
+                              cursor-zoom-in
+                              ${!unread ? "opacity-60 grayscale-[0.3]" : ""}
+                            `}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedImage(notificationImage);
+                            }}
+                          >
+                            <img
+                              src={notificationImage}
+                              alt="Issue"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className={`p-1.5 lg:p-2 rounded-full ${statusStyle.bg} ${statusStyle.color}`}
+                          >
+                            <StatusIcon size={14} className="lg:w-4 lg:h-4" />
+                          </div>
+                        )}
                       </div>
 
                       {/* Content */}
@@ -333,10 +455,12 @@ const Notifications = () => {
                               NEW
                             </span>
                           )}
-                          <span className={`text-[8px] lg:text-[9px] font-medium px-1.5 lg:px-2 py-0.5 rounded-full ${bg} ${color}`}>
-                            {n.status === "Viewed" ? "Viewed" : (n.status || "Pending")}
+                          <span
+                            className={`text-[8px] lg:text-[9px] font-medium px-1.5 lg:px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.color}`}
+                          >
+                            {statusStyle.label}
                           </span>
-                          
+
                           {/* Read Badge - shows when notification is read */}
                           {!unread && (
                             <span className="text-[8px] font-medium px-1.5 py-0.5 bg-gray-500/20 text-gray-500 rounded-full">
@@ -344,50 +468,112 @@ const Notifications = () => {
                             </span>
                           )}
                         </div>
-                        
-                        <p className={`text-[12px] lg:text-[13px] leading-relaxed font-medium
-                          ${unread
-                            ? isDark ? "text-white font-semibold" : "text-gray-900 font-semibold"
-                            : isDark ? "text-gray-400" : "text-gray-500"
-                          }`}
+
+                        <p
+                          className={`text-[12px] lg:text-[13px] leading-relaxed font-medium
+    ${
+      unread
+        ? isDark
+          ? "text-white font-semibold"
+          : "text-gray-900 font-semibold"
+        : isDark
+          ? "text-gray-400"
+          : "text-gray-500"
+    }`}
                         >
-                          {displayMessage}
+                          {getMessagePreview(n.message)}
+
+                          {n.issueId &&
+                            n.status?.toLowerCase().includes("resolved") && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  const issueId =
+                                    typeof n.issueId === "string"
+                                      ? n.issueId
+                                      : n.issueId?._id;
+
+                                  setClickedProofs((prev) => ({
+                                    ...prev,
+                                    [issueId]: true,
+                                  }));
+
+                                  setSelectedProofId(issueId);
+                                }}
+                                className={`ml-2 cursor-pointer font-semibold underline-offset-2 hover:underline transition
+        ${
+          !clickedProofs[
+            typeof n.issueId === "string" ? n.issueId : n.issueId?._id
+          ]
+            ? "text-red-500 animate-pulse"
+            : "text-emerald-500"
+        }
+      `}
+                              >
+                                <Eye size={12} className="inline mr-1" />
+                                View Proof
+                              </span>
+                            )}
                         </p>
 
                         {n.location && (
                           <div className="flex items-start gap-1 mt-1.5 lg:mt-2">
-                            <MapPin size={10} className={`lg:w-3 lg:h-3 mt-0.5 ${unread ? "text-gray-400" : "text-gray-500"}`} />
-                            <p className={`text-[9px] lg:text-[10px] ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : (isDark ? "text-gray-600" : "text-gray-400")} break-words`}>
-                              {truncateText(n.location, 80)}
+                            <MapPin
+                              size={10}
+                              className={`lg:w-3 lg:h-3 mt-0.5 ${unread ? "text-gray-400" : "text-gray-500"}`}
+                            />
+                            <p
+                              className={`text-[9px] lg:text-[10px] ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"} break-words`}
+                            >
+                              {getMessagePreview(n.location, 80)}
                             </p>
                           </div>
                         )}
 
-                        <div className="flex items-center gap-1 mt-1.5 lg:mt-2">
-                          <Clock size={9} className={`lg:w-2.5 lg:h-2.5 ${unread ? "text-gray-400" : "text-gray-500"}`} />
-                          <span className={`text-[9px] lg:text-[10px] ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : (isDark ? "text-gray-600" : "text-gray-400")}`}>
+                        <div className="flex items-center gap-2 mt-1.5 lg:mt-2">
+                          <Clock
+                            size={9}
+                            className={`lg:w-2.5 lg:h-2.5 ${unread ? "text-gray-400" : "text-gray-500"}`}
+                          />
+                          <span
+                            className={`text-[9px] lg:text-[10px] ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"}`}
+                          >
                             {formatDate(n.createdAt)}
                           </span>
+
+                          {n.issueId && (
+                            <>
+                              <span
+                                className={`text-[8px] ${unread ? "text-gray-500" : "text-gray-600"}`}
+                              >
+                                •
+                              </span>
+                              <span
+                                className={`text-[9px] lg:text-[10px] ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"}`}
+                              >
+                                Issue #
+                                {typeof n.issueId === "string"
+                                  ? n.issueId.slice(-6)
+                                  : n.issueId?._id?.slice(-6)}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
 
-                      {/* Image */}
-                      {image && (
-                        <div className="flex-shrink-0">
-                          <div className="relative">
-                            <img
-                              src={image}
-                              alt="Issue"
-                              className={`w-10 h-10 lg:w-12 lg:h-12 rounded-lg object-cover transition-all duration-200
-                                ${!unread ? "opacity-60 grayscale-[0.3]" : ""}
-                              `}
-                            />
-                            {unread && (
-                              <div className="absolute -top-1 -right-1 w-1.5 h-1.5 lg:w-2 lg:h-2 bg-emerald-500 rounded-full ring-1 lg:ring-2 ring-white dark:ring-gray-900 animate-pulse" />
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => deleteNotification(n._id, e)}
+                        className={`
+                          opacity-0 group-hover:opacity-100 transition-opacity
+                          p-1 rounded-lg
+                          ${isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-400"}
+                          hover:text-red-500
+                        `}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </motion.div>
                 );
@@ -396,6 +582,68 @@ const Notifications = () => {
           </div>
         )}
       </div>
+
+      {/* Image Zoom Modal */}
+      <AnimatePresence>
+        {selectedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+            onClick={() => setSelectedImage(null)}
+          >
+            <motion.img
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              src={selectedImage}
+              alt="Full size"
+              className="max-w-full max-h-full rounded-lg shadow-2xl object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition"
+              onClick={() => setSelectedImage(null)}
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selectedProofId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
+            onClick={() => setSelectedProofId(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+             className="w-[90%] sm:w-[75%] md:w-[60%] lg:w-[50%] h-[85%] bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* CLOSE BUTTON */}
+              <button
+                onClick={() => setSelectedProofId(null)}
+                className="absolute top-4 right-4 z-50 bg-black/70 hover:bg-black text-white rounded-full w-10 h-10 flex items-center justify-center text-lg"
+              >
+                ✕
+              </button>
+
+              {/* PROOF CONTENT */}
+              <iframe
+                src={`/peopleVoice/proofpop/${selectedProofId}`}
+                className="w-full h-full"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

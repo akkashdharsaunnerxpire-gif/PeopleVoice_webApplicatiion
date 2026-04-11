@@ -268,8 +268,7 @@ const MyIssues = () => {
                   <div className="aspect-square relative overflow-hidden">
                     <img
                       src={
-                        issue.images_data?.[0] ||
-                        "https://via.placeholder.com/400"
+                        issue.images?.[0] || "https://via.placeholder.com/400"
                       }
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       alt=""

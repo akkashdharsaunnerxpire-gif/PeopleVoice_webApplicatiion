@@ -322,7 +322,7 @@ const Issues = () => {
                           <td className="px-6 py-4">
                             <div className="relative w-12 h-12 rounded-lg overflow-hidden shadow-md group-hover:scale-105 transition-transform">
                               <img
-                                src={issue.images?.[0] || "https://via.placeholder.com/150"}
+                               src={issue?.images?.[0]}
                                 className="w-full h-full object-cover"
                                 alt="issue"
                               />

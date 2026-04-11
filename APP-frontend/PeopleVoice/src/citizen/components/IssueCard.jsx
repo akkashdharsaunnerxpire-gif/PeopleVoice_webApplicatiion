@@ -62,7 +62,7 @@ const IssueCard = ({
   // ========== STATE ==========
   const [showMenu, setShowMenu] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const images = issue.images_data || [];
+  const images = issue.images || [];
   const totalImages = images.length;
 
   const [isSaved, setIsSaved] = useState(false);
@@ -680,7 +680,7 @@ const getStatusConfig = (status) => {
                     transition={{ duration: 0.15 }}
                     src={images[currentImageIndex]}
                     alt={`Issue ${currentImageIndex + 1}`}
-                    className="w-full h-full object-cover lg:object-contain pointer-events-none" // 🔥 pointer-events-none allows scrolling through image
+                    className="w-full h-full object-cover lg:object-contain" // 🔥 Allows scrolling through image
                     draggable={false}
                     loading="lazy"
                   />

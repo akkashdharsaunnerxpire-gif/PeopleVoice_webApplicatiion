@@ -12,6 +12,7 @@ import {
   Sun,
   ChevronRight,
   Bookmark,
+  FileCheck,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -62,7 +63,8 @@ const Navigation = () => {
   useEffect(() => {
     const handleUpdate = () => fetchUnreadCount();
     window.addEventListener("notification_update", handleUpdate);
-    return () => window.removeEventListener("notification_update", handleUpdate);
+    return () =>
+      window.removeEventListener("notification_update", handleUpdate);
   }, []);
 
   // route change refetch
@@ -91,8 +93,11 @@ const Navigation = () => {
     if (path.startsWith(`${BASE}/feed`)) setActiveNav("home");
     else if (path.startsWith(`${BASE}/my-issues`)) setActiveNav("myissues");
     else if (path.startsWith(`${BASE}/post-issue`)) setActiveNav("post");
-    else if (path.startsWith(`${BASE}/notifications`)) setActiveNav("notifications");
+    else if (path.startsWith(`${BASE}/notifications`))
+      setActiveNav("notifications");
     else if (path.startsWith(`${BASE}/profile`)) setActiveNav("profile");
+    else if (path.startsWith(`${BASE}/proofspage`))
+      setActiveNav("complaintproofs");
     setShowMoreMenu(false);
   }, [location.pathname]);
 
@@ -202,6 +207,12 @@ const Navigation = () => {
             label="My Issues"
             to="/my-issues"
             nav="myissues"
+          />
+          <NavItem
+            icon={FileText}
+            label="complaintproofs"
+            to="/proofspage"
+            nav="complaintproofs"
           />
           <NavItem
             icon={PlusCircle}
@@ -374,19 +385,17 @@ const Navigation = () => {
             </span>
           </div>
 
-          {/* Notifications */}
+          {/* Proofs */}
           <div className="flex-1 flex flex-col items-center">
             <NavItem
-              icon={Bell}
-              activeIcon={BellDot}
-              to="/notifications"
-              nav="notifications"
-              badge={unreadCount}
+              icon={FileCheck}
+              to="/proofspage"
+              nav="complaintproofs"
               isMobile
             />
             <span
               className={`text-[10px] mt-1 font-medium ${
-                activeNav === "notifications"
+                activeNav === "complaintproofs"
                   ? isDark
                     ? "text-green-400"
                     : "text-green-600"
@@ -395,7 +404,7 @@ const Navigation = () => {
                     : "text-gray-500"
               }`}
             >
-              Notifications
+              Proofs
             </span>
           </div>
 
