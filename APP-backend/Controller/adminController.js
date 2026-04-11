@@ -95,7 +95,7 @@ exports.loginAdmin = async (req, res) => {
 exports.getAllIssues = async (req, res) => {
   try {
     const {
-      search, 
+      search,
       status,
       department,
       district,
@@ -132,7 +132,7 @@ exports.getAllIssues = async (req, res) => {
       area: issue.area, // 🔥 IMPORTANT
       status: issue.status,
       createdAt: issue.createdAt,
-      images: issue.images_data || [],
+      images: issue.images,
       citizenId: issue.citizenId,
       likes: issue.likes?.length || 0,
       comments: issue.comments?.length || 0,
@@ -178,9 +178,20 @@ exports.updateIssueStatus = async (req, res) => {
     const { status, afterImages, resolutionDetails } = req.body;
     const { id } = req.params;
 
-    console.log("🔄 Updating issue status:", { id, status, hasAfterImages: !!afterImages?.length, resolutionDetails });
+    console.log("🔄 Updating issue status:", {
+      id,
+      status,
+      hasAfterImages: !!afterImages?.length,
+      resolutionDetails,
+    });
 
-    const validStatuses = ["Sent", "In Progress", "Resolved", "Closed", "solved"];
+    const validStatuses = [
+      "Sent",
+      "In Progress",
+      "Resolved",
+      "Closed",
+      "solved",
+    ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status value" });
     }
@@ -212,11 +223,10 @@ exports.updateIssueStatus = async (req, res) => {
       updateFields.closedDate = new Date();
     }
 
-    const issue = await Issue.findByIdAndUpdate(
-      id,
-      updateFields,
-      { new: true, runValidators: true }
-    );
+    const issue = await Issue.findByIdAndUpdate(id, updateFields, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!issue) {
       return res.status(404).json({ message: "Issue not found" });
@@ -226,18 +236,18 @@ exports.updateIssueStatus = async (req, res) => {
 
     // Save notification for status changes (except "Sent")
     if (status !== "Sent") {
-      let message;
-      if (status === "solved" || status === "Closed") {
-        message = `✅ Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" has been closed`;
-      } else if (status === "Resolved") {
-        message = `✅ Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" has been resolved`;
+      let msg;
+      if (status === "Resolved") {
+        msg = `✅ Your issue "${issue.reason || "Report"}" has been resolved.`;
+      } else if (status === "Closed" || status === "solved") {
+        msg = `🎉 Your issue "${issue.reason || "Report"}" has been closed.`;
       } else if (status === "In Progress") {
-        message = `🔄 Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" is now In Progress`;
+        msg = `🔄 Your issue "${issue.reason || "Report"}" is in progress.`;
       } else {
-        message = `📢 Your issue "${issue.reason || issue.description_en?.substring(0, 50)}" is now ${status}`;
+        msg = customMessage || `Your issue update: ${status}`;
       }
 
-      await saveNotification(issue, status, message);
+      await saveNotification(issue, status, msg);
     }
 
     res.json({
@@ -250,7 +260,6 @@ exports.updateIssueStatus = async (req, res) => {
     res.status(500).json({ message: "Status update failed: " + error.message });
   }
 };
-
 
 /* ================= GET ALL DISTRICTS + CLOSED ISSUE POINTS ================= */
 exports.getDistrictPoints = async (req, res) => {

@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-
 const CommentSchema = new mongoose.Schema(
   {
     citizenId: {
@@ -26,9 +25,8 @@ const CommentSchema = new mongoose.Schema(
 
     editedAt: Date,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
-
 
 const PostIssueSchema = new mongoose.Schema(
   {
@@ -47,10 +45,10 @@ const PostIssueSchema = new mongoose.Schema(
     description_ta: String,
     hashtags: [String],
 
-    /* 📸 BEFORE images */
-    images_data: {
+    /* 📸 BEFORE images (Cloudinary URLs) */
+    images: {
       type: [String],
-      required: true,
+      default: [],
     },
 
     /* ✅ AFTER images (Admin only) */

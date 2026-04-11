@@ -13,6 +13,7 @@ const {
   getMyIssues,
   deleteComment,
   updateComment,
+  verifyIssue,
 } = require("../Controller/PostIssueController");
 
 // POST ISSUE
@@ -46,5 +47,7 @@ router.put("/issues/:issueId/comment/:commentId", updateComment);
 
 // DELETE ISSUE
 router.delete("/issues/:id", deleteIssue);
+
+router.post("/issues/verify/:id", verifyIssue);
 
 module.exports = router;  
