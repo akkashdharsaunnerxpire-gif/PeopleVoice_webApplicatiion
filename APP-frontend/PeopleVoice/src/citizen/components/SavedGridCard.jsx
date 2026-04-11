@@ -5,7 +5,7 @@ import { Heart, MessageCircle } from "lucide-react";
 const SavedGridCard = ({ post, onClick, isDark }) => {
   if (!post) return null;
 
-  const image = post.images_data?.[0];
+  const image = post.images?.[0];
   const likeCount = post.likes?.length || 0;
   const commentCount = post.comments?.length || 0;
 
