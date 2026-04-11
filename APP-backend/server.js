@@ -24,6 +24,8 @@ app.use("/api/auth", require("./Routes/authRoutes"));
 app.use("/api/admin", require("./Routes/adminRoutes"));
 app.use("/api/saved", require("./Routes/savedRoutes"));
 app.use("/api/notifications", require("./Routes/notificationRoutes"));
+app.use("/api/proofs", require("./Routes/proofRoutes"));
+app.use("/api", require("./Routes/uploadRoutes"));
 
 // Catch-all for debugging
 app.use((req, res) => {

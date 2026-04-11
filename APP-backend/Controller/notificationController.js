@@ -93,6 +93,40 @@ const deleteNotification = async (req, res) => {
     res.status(500).json({ message: "Delete failed" });
   }
 };
+// verify issue
+exports.verifyIssue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { response, citizenId } = req.body;
+
+    const issue = await Issue.findById(id);
+    if (!issue) return res.status(404).json({ message: "Not found" });
+
+    if (!issue.verifications) issue.verifications = [];
+
+    issue.verifications.push({
+      citizenId,
+      response,
+      time: new Date(),
+    });
+
+    // Logic
+    if (response === "yes") {
+      issue.status = "Closed";
+    }
+
+    if (response === "no") {
+      issue.status = "In Progress";
+    }
+
+    await issue.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error verifying" });
+  }
+};
 
 module.exports = {
   saveNotification,
