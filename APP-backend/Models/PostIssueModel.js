@@ -46,16 +46,20 @@ const PostIssueSchema = new mongoose.Schema(
     hashtags: [String],
 
     /* 📸 BEFORE images (Cloudinary URLs) */
-    images: {
-      type: [String],
-      default: [],
-    },
+    images: [
+      {
+        url: String,
+        publicId: String, // 🔥 MUST
+      },
+    ],
 
     /* ✅ AFTER images (Admin only) */
-    after_images: {
-      type: [String],
-      default: [],
-    },
+    after_images: [
+      {
+        url: String,
+        publicId: String, // 🔥 MUST
+      },
+    ],
 
     resolution_details: String,
 

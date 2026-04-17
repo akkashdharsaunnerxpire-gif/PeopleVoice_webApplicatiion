@@ -70,8 +70,8 @@ const GradientButton = styled(Button)(({ theme, colorType = "primary" }) => ({
     colorType === "success"
       ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
       : colorType === "warning"
-      ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
-      : "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+        ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+        : "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
   color: "white",
   borderRadius: "16px",
   padding: "12px 28px",
@@ -232,7 +232,10 @@ export default function IssueDetails() {
       setUploadError("");
       setDetailsError("");
     } catch (err) {
-      showToast("error", err.response?.data?.message || "Failed to update status");
+      showToast(
+        "error",
+        err.response?.data?.message || "Failed to update status",
+      );
     } finally {
       setActionLoading(false);
     }
@@ -280,7 +283,12 @@ export default function IssueDetails() {
     if (issue.status === "solved") displayStatus = "Closed";
     return {
       ...issue,
-      beforeImages: (issue.images_data || issue.images || issue.before_images || [])
+      beforeImages: (
+        issue.images_data ||
+        issue.images ||
+        issue.before_images ||
+        []
+      )
         .map((item) => (typeof item === "string" ? item : item?.url || ""))
         .filter(Boolean),
       afterImages: (issue.after_images || [])
@@ -365,7 +373,8 @@ export default function IssueDetails() {
 
   const progressValue = useMemo(() => {
     if (!normalized) return 0;
-    if (normalized.status === "Closed" || normalized.status === "solved") return 100;
+    if (normalized.status === "Closed" || normalized.status === "solved")
+      return 100;
     if (normalized.status === "Resolved") return 80;
     if (normalized.status === "In Progress") return 50;
     return 25;
@@ -373,17 +382,40 @@ export default function IssueDetails() {
 
   const getProgressColor = () => {
     if (!normalized) return "primary";
-    if (normalized.status === "Closed" || normalized.status === "solved") return "success";
+    if (normalized.status === "Closed" || normalized.status === "solved")
+      return "success";
     if (normalized.status === "Resolved") return "success";
     if (normalized.status === "In Progress") return "warning";
     return "info";
   };
 
   const timelineSteps = [
-    { label: "Reported", status: "Sent", date: normalized?.reportedDate, icon: AlertCircle },
-    { label: "In Progress", status: "In Progress", date: normalized?.municipalityInformedDate, icon: Clock },
-    { label: "Resolved", status: "Resolved", date: normalized?.resolvedDate, icon: CheckCircle },
-    { label: "Closed", status: "Closed", date: normalized?.closedDate || (normalized?.status === "solved" ? normalized?.updatedAt : null), icon: Award },
+    {
+      label: "Reported",
+      status: "Sent",
+      date: normalized?.reportedDate,
+      icon: AlertCircle,
+    },
+    {
+      label: "In Progress",
+      status: "In Progress",
+      date: normalized?.municipalityInformedDate,
+      icon: Clock,
+    },
+    {
+      label: "Resolved",
+      status: "Resolved",
+      date: normalized?.resolvedDate,
+      icon: CheckCircle,
+    },
+    {
+      label: "Closed",
+      status: "Closed",
+      date:
+        normalized?.closedDate ||
+        (normalized?.status === "solved" ? normalized?.updatedAt : null),
+      icon: Award,
+    },
   ];
 
   const getStepState = (stepStatus) => {
@@ -403,14 +435,30 @@ export default function IssueDetails() {
 
   const getActionConfig = () => {
     if (!normalized) return null;
-    if (normalized.status === "Closed" || normalized.status === "solved") return null;
+    if (normalized.status === "Closed" || normalized.status === "solved")
+      return null;
     switch (normalized.status) {
       case "Sent":
-        return { label: "Start Progress", colorType: "primary", onClick: () => updateStatus("In Progress"), loading: "Notifying..." };
+        return {
+          label: "Start Progress",
+          colorType: "primary",
+          onClick: () => updateStatus("In Progress"),
+          loading: "Notifying...",
+        };
       case "In Progress":
-        return { label: "Mark Resolved", colorType: "success", onClick: () => setShowResolveModal(true), loading: "Processing..." };
+        return {
+          label: "Mark Resolved",
+          colorType: "success",
+          onClick: () => setShowResolveModal(true),
+          loading: "Processing...",
+        };
       case "Resolved":
-        return { label: "Close Issue", colorType: "warning", onClick: () => updateStatus("Closed"), loading: "Closing..." };
+        return {
+          label: "Close Issue",
+          colorType: "warning",
+          onClick: () => updateStatus("Closed"),
+          loading: "Closing...",
+        };
       default:
         return null;
     }
@@ -418,72 +466,82 @@ export default function IssueDetails() {
 
   const action = getActionConfig();
 
- const handleResolveSubmit = async () => {
-  setDetailsError("");
-  setUploadError("");
+  const handleResolveSubmit = async () => {
+    setDetailsError("");
+    setUploadError("");
 
-  if (afterImages.length === 0) {
-    setUploadError("Please upload at least one after-resolution image");
-    return;
-  }
-
-  const trimmedDetails = resolutionDetails.trim();
-  if (trimmedDetails.length < 10) {
-    setDetailsError("Please provide at least 10 characters describing the resolution");
-    modalDescriptionRef.current?.focus();
-    return;
-  }
-
-  setActionLoading(true);
-
-  try {
-    const uploadedUrls = [];
-
-    for (let file of afterImages) {
-      // convert to base64 (for API send only)
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-      });
-
-      // 🔥 upload to backend → cloudinary
-      const res = await fetch(`${API_BASE}/api/upload/admin`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image: base64 }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        uploadedUrls.push(data.url);
-      }
+    if (afterImages.length === 0) {
+      setUploadError("Please upload at least one after-resolution image");
+      return;
     }
 
-    // ✅ save only URLs
-    await updateStatus("Resolved", {
-      afterImages: uploadedUrls,
-      resolutionDetails: trimmedDetails,
-    });
+    const trimmedDetails = resolutionDetails.trim();
+    if (trimmedDetails.length < 10) {
+      setDetailsError(
+        "Please provide at least 10 characters describing the resolution",
+      );
+      modalDescriptionRef.current?.focus();
+      return;
+    }
 
-  } catch (err) {
-    console.error(err);
-    showToast("error", "Failed to submit resolution");
-  } finally {
-    setActionLoading(false);
-  }
-};
+    setActionLoading(true);
+
+    try {
+      const uploadedImages = [];
+
+      for (let file of afterImages) {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+        });
+
+        const res = await fetch(`${API_BASE}/api/upload/admin`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: base64 }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          uploadedImages.push({
+            url: data.url,
+            publicId: data.publicId, // 🔥 ADD THIS
+          });
+        }
+      }
+
+      // ✅ save only URLs
+      await updateStatus("Resolved", {
+        afterImages: uploadedImages, // 🔥 FIXED
+        resolutionDetails: trimmedDetails,
+      });
+    } catch (err) {
+      console.error(err);
+      showToast("error", "Failed to submit resolution");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   if (loading) {
     return (
       <Container maxWidth="xl" sx={{ py: 4 }}>
         <Stack spacing={3}>
-          <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 3 }} />
-          <Skeleton variant="rectangular" height={500} sx={{ borderRadius: 3 }} />
+          <Skeleton
+            variant="rectangular"
+            height={80}
+            sx={{ borderRadius: 3 }}
+          />
+          <Skeleton
+            variant="rectangular"
+            height={500}
+            sx={{ borderRadius: 3 }}
+          />
         </Stack>
       </Container>
     );
@@ -493,10 +551,24 @@ export default function IssueDetails() {
     return (
       <Container maxWidth="sm" sx={{ py: 8 }}>
         <Paper sx={{ p: 5, textAlign: "center", borderRadius: 4 }}>
-          <AlertTriangle size={60} color="#ef4444" style={{ marginBottom: 16 }} />
-          <Typography variant="h5" fontWeight="bold" color="error" gutterBottom>Issue Not Found</Typography>
-          <Typography color="text.secondary" sx={{ mb: 4 }}>The issue could not be found or you don't have permission.</Typography>
-          <Button variant="contained" startIcon={<ArrowLeft />} onClick={() => navigate(-1)}>Go Back</Button>
+          <AlertTriangle
+            size={60}
+            color="#ef4444"
+            style={{ marginBottom: 16 }}
+          />
+          <Typography variant="h5" fontWeight="bold" color="error" gutterBottom>
+            Issue Not Found
+          </Typography>
+          <Typography color="text.secondary" sx={{ mb: 4 }}>
+            The issue could not be found or you don't have permission.
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<ArrowLeft />}
+            onClick={() => navigate(-1)}
+          >
+            Go Back
+          </Button>
         </Paper>
       </Container>
     );
@@ -506,50 +578,167 @@ export default function IssueDetails() {
     <Box sx={{ minHeight: "100vh", bgcolor: "#f9fafc", py: 4 }}>
       {toast && (
         <Fade in>
-          <Paper sx={{ position: "fixed", top: 24, right: 24, zIndex: 9999, minWidth: 300, p: 2, borderRadius: 2, bgcolor: toast.type === "success" ? "#10b981" : "#ef4444", color: "white", display: "flex", alignItems: "center", gap: 1.5, boxShadow: "0 8px 20px rgba(0,0,0,0.2)" }}>
-            {toast.type === "success" ? <CheckCircle size={20} /> : <XCircle size={20} />}
+          <Paper
+            sx={{
+              position: "fixed",
+              top: 24,
+              right: 24,
+              zIndex: 9999,
+              minWidth: 300,
+              p: 2,
+              borderRadius: 2,
+              bgcolor: toast.type === "success" ? "#10b981" : "#ef4444",
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
+            }}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle size={20} />
+            ) : (
+              <XCircle size={20} />
+            )}
             <Typography sx={{ flex: 1 }}>{toast.message}</Typography>
-            <IconButton size="small" onClick={() => setToast(null)} sx={{ color: "white" }}><X size={18} /></IconButton>
+            <IconButton
+              size="small"
+              onClick={() => setToast(null)}
+              sx={{ color: "white" }}
+            >
+              <X size={18} />
+            </IconButton>
           </Paper>
         </Fade>
       )}
 
       <Container maxWidth="xl">
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 3,
+          }}
+        >
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <IconButton onClick={() => navigate(-1)} sx={{ bgcolor: "white", boxShadow: 1 }}><ArrowLeft size={20} /></IconButton>
+            <IconButton
+              onClick={() => navigate(-1)}
+              sx={{ bgcolor: "white", boxShadow: 1 }}
+            >
+              <ArrowLeft size={20} />
+            </IconButton>
             <Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5 }}>
-                <Typography variant="h5" fontWeight="bold">Issue #{id?.slice(-8)}</Typography>
-                <StatusChip label={normalized.displayStatus || normalized.status} status={normalized.status} size="small" />
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  mb: 0.5,
+                }}
+              >
+                <Typography variant="h5" fontWeight="bold">
+                  Issue #{id?.slice(-8)}
+                </Typography>
+                <StatusChip
+                  label={normalized.displayStatus || normalized.status}
+                  status={normalized.status}
+                  size="small"
+                />
               </Box>
-              <Typography variant="body2" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <Calendar size={14} /> Reported: {formatDate(normalized.reportedDate)}
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+              >
+                <Calendar size={14} /> Reported:{" "}
+                {formatDate(normalized.reportedDate)}
               </Typography>
             </Box>
           </Box>
-          <Tooltip title="Download Report"><IconButton sx={{ bgcolor: "white", boxShadow: 1 }}><Download size={20} /></IconButton></Tooltip>
+          <Tooltip title="Download Report">
+            <IconButton sx={{ bgcolor: "white", boxShadow: 1 }}>
+              <Download size={20} />
+            </IconButton>
+          </Tooltip>
         </Box>
 
         <StyledCard>
           <CardContent sx={{ p: 4 }}>
             <Box sx={{ mb: 4 }}>
-              <Typography variant="subtitle1" fontWeight="600" gutterBottom>Progress Status</Typography>
-              <LinearProgress variant="determinate" value={progressValue} color={getProgressColor()} sx={{ height: 8, borderRadius: 4, mb: 3, backgroundColor: "#e9ecef" }} />
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+              <Typography variant="subtitle1" fontWeight="600" gutterBottom>
+                Progress Status
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={progressValue}
+                color={getProgressColor()}
+                sx={{
+                  height: 8,
+                  borderRadius: 4,
+                  mb: 3,
+                  backgroundColor: "#e9ecef",
+                }}
+              />
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 1,
+                }}
+              >
                 {timelineSteps.map((step, index) => {
                   const state = getStepState(step.status);
                   const Icon = step.icon;
                   return (
                     <React.Fragment key={step.label}>
                       <Box sx={{ textAlign: "center", minWidth: 90 }}>
-                        <Avatar sx={{ width: 40, height: 40, mx: "auto", mb: 0.5, bgcolor: state === "completed" ? "#10b981" : state === "active" ? "#f59e0b" : "#e9ecef", color: state === "pending" ? "#9ca3af" : "white" }}>
-                          {state === "completed" ? <Check size={20} /> : <Icon size={20} />}
+                        <Avatar
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            mx: "auto",
+                            mb: 0.5,
+                            bgcolor:
+                              state === "completed"
+                                ? "#10b981"
+                                : state === "active"
+                                  ? "#f59e0b"
+                                  : "#e9ecef",
+                            color: state === "pending" ? "#9ca3af" : "white",
+                          }}
+                        >
+                          {state === "completed" ? (
+                            <Check size={20} />
+                          ) : (
+                            <Icon size={20} />
+                          )}
                         </Avatar>
-                        <Typography variant="caption" fontWeight={state === "active" ? 600 : 400}>{step.label}</Typography>
-                        {step.date && <Typography variant="caption" display="block" color="text.secondary">{formatShortDate(step.date)}</Typography>}
+                        <Typography
+                          variant="caption"
+                          fontWeight={state === "active" ? 600 : 400}
+                        >
+                          {step.label}
+                        </Typography>
+                        {step.date && (
+                          <Typography
+                            variant="caption"
+                            display="block"
+                            color="text.secondary"
+                          >
+                            {formatShortDate(step.date)}
+                          </Typography>
+                        )}
                       </Box>
-                      {index < 3 && <ChevronRight size={20} color="#d1d5db" style={{ flexShrink: 0 }} />}
+                      {index < 3 && (
+                        <ChevronRight
+                          size={20}
+                          color="#d1d5db"
+                          style={{ flexShrink: 0 }}
+                        />
+                      )}
                     </React.Fragment>
                   );
                 })}
@@ -558,28 +747,149 @@ export default function IssueDetails() {
 
             <Divider sx={{ my: 3 }} />
 
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 4 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                gap: 4,
+              }}
+            >
               <Box>
-                <Typography variant="subtitle1" fontWeight="600" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}><AlertCircle size={18} /> Issue Details</Typography>
-                <InfoRow><MapPin size={18} color="#6b7280" /><Box><Typography variant="caption" color="text.secondary">Location</Typography><Typography variant="body2">{normalized.area || "—"}, {normalized.district || "—"}</Typography></Box></InfoRow>
-                <InfoRow><Tag size={18} color="#6b7280" /><Box><Typography variant="caption" color="text.secondary">Category</Typography><Typography variant="body2">{normalized.category || "General"}</Typography></Box></InfoRow>
-                <InfoRow><Building2 size={18} color="#6b7280" /><Box><Typography variant="caption" color="text.secondary">Department</Typography><Typography variant="body2">{normalized.department || "Unassigned"}</Typography></Box></InfoRow>
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="600"
+                  gutterBottom
+                  sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}
+                >
+                  <AlertCircle size={18} /> Issue Details
+                </Typography>
+                <InfoRow>
+                  <MapPin size={18} color="#6b7280" />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Location
+                    </Typography>
+                    <Typography variant="body2">
+                      {normalized.area || "—"}, {normalized.district || "—"}
+                    </Typography>
+                  </Box>
+                </InfoRow>
+                <InfoRow>
+                  <Tag size={18} color="#6b7280" />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Category
+                    </Typography>
+                    <Typography variant="body2">
+                      {normalized.category || "General"}
+                    </Typography>
+                  </Box>
+                </InfoRow>
+                <InfoRow>
+                  <Building2 size={18} color="#6b7280" />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      Department
+                    </Typography>
+                    <Typography variant="body2">
+                      {normalized.department || "Unassigned"}
+                    </Typography>
+                  </Box>
+                </InfoRow>
                 <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle1" fontWeight="600" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1 }}><FileText size={18} /> Description</Typography>
-                  <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f9f9fc", borderRadius: 2, mb: 2 }}><Typography variant="caption" color="primary" fontWeight={600}>ENGLISH</Typography><Typography variant="body2">{normalized.description_en || "No description"}</Typography></Paper>
-                  <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f9f9fc", borderRadius: 2 }}><Typography variant="caption" color="success" fontWeight={600}>தமிழ்</Typography><Typography variant="body2">{normalized.description_ta || "விளக்கம் இல்லை"}</Typography></Paper>
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight="600"
+                    gutterBottom
+                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                  >
+                    <FileText size={18} /> Description
+                  </Typography>
+                  <Paper
+                    variant="outlined"
+                    sx={{ p: 2, bgcolor: "#f9f9fc", borderRadius: 2, mb: 2 }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="primary"
+                      fontWeight={600}
+                    >
+                      ENGLISH
+                    </Typography>
+                    <Typography variant="body2">
+                      {normalized.description_en || "No description"}
+                    </Typography>
+                  </Paper>
+                  <Paper
+                    variant="outlined"
+                    sx={{ p: 2, bgcolor: "#f9f9fc", borderRadius: 2 }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="success"
+                      fontWeight={600}
+                    >
+                      தமிழ்
+                    </Typography>
+                    <Typography variant="body2">
+                      {normalized.description_ta || "விளக்கம் இல்லை"}
+                    </Typography>
+                  </Paper>
                 </Box>
               </Box>
 
               <Box>
-                <Typography variant="subtitle1" fontWeight="600" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}><ImageIcon size={18} /> Images</Typography>
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="600"
+                  gutterBottom
+                  sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}
+                >
+                  <ImageIcon size={18} /> Images
+                </Typography>
                 {normalized.beforeImages.length > 0 && (
                   <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 2 }}>BEFORE IMAGES</Typography>
-                    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 2 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      fontWeight={600}
+                      sx={{ display: "block", mb: 2 }}
+                    >
+                      BEFORE IMAGES
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fill, minmax(180px, 1fr))",
+                        gap: 2,
+                      }}
+                    >
                       {normalized.beforeImages.map((src, i) => (
-                        <Box key={i} onClick={() => openImagePreview(src)} sx={{ borderRadius: 2, overflow: "hidden", cursor: "pointer", border: "1px solid #e5e7eb", transition: "all 0.2s", "&:hover": { opacity: 0.9, transform: "scale(1.02)" } }}>
-                          <img src={src} alt={`Before ${i + 1}`} style={{ width: "100%", height: 160, objectFit: "cover" }} />
+                        <Box
+                          key={i}
+                          onClick={() => openImagePreview(src)}
+                          sx={{
+                            borderRadius: 2,
+                            overflow: "hidden",
+                            cursor: "pointer",
+                            border: "1px solid #e5e7eb",
+                            transition: "all 0.2s",
+                            "&:hover": {
+                              opacity: 0.9,
+                              transform: "scale(1.02)",
+                            },
+                          }}
+                        >
+                          <img
+                            src={src}
+                            alt={`Before ${i + 1}`}
+                            style={{
+                              width: "100%",
+                              height: 160,
+                              objectFit: "cover",
+                            }}
+                          />
                         </Box>
                       ))}
                     </Box>
@@ -588,35 +898,152 @@ export default function IssueDetails() {
               </Box>
             </Box>
 
-            {(normalized.afterImages.length > 0 || normalized.resolution_details || normalized.status === "Resolved" || normalized.status === "Closed" || normalized.status === "solved") && (
+            {(normalized.afterImages.length > 0 ||
+              normalized.resolution_details ||
+              normalized.status === "Resolved" ||
+              normalized.status === "Closed" ||
+              normalized.status === "solved") && (
               <>
                 <Divider sx={{ my: 4 }} />
                 <Box>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}><CheckCircle size={20} color="#059669" /><Typography variant="subtitle1" fontWeight="600" sx={{ color: "#059669" }}>Proof of Completion</Typography></Box>
-                    <Typography variant="subtitle2" fontWeight="600" sx={{ color: "#059669" }}>After Resolution Images</Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 3,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <CheckCircle size={20} color="#059669" />
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="600"
+                        sx={{ color: "#059669" }}
+                      >
+                        Proof of Completion
+                      </Typography>
+                    </Box>
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight="600"
+                      sx={{ color: "#059669" }}
+                    >
+                      After Resolution Images
+                    </Typography>
                   </Box>
                   <Box sx={{ mb: 4 }}>
                     {normalized.afterImages.length > 0 ? (
-                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 2 }}>
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fill, minmax(200px, 1fr))",
+                          gap: 2,
+                        }}
+                      >
                         {normalized.afterImages.map((src, i) => (
-                          <Box key={i} onClick={() => openImagePreview(src)} sx={{ borderRadius: 2, overflow: "hidden", cursor: "pointer", border: "2px solid #10b981", transition: "all 0.2s", "&:hover": { opacity: 0.9, transform: "scale(1.02)" } }}>
-                            <img src={src} alt={`After ${i + 1}`} style={{ width: "100%", height: 160, objectFit: "cover" }} />
+                          <Box
+                            key={i}
+                            onClick={() => openImagePreview(src)}
+                            sx={{
+                              borderRadius: 2,
+                              overflow: "hidden",
+                              cursor: "pointer",
+                              border: "2px solid #10b981",
+                              transition: "all 0.2s",
+                              "&:hover": {
+                                opacity: 0.9,
+                                transform: "scale(1.02)",
+                              },
+                            }}
+                          >
+                            <img
+                              src={src}
+                              alt={`After ${i + 1}`}
+                              style={{
+                                width: "100%",
+                                height: 160,
+                                objectFit: "cover",
+                              }}
+                            />
                           </Box>
                         ))}
                       </Box>
                     ) : (
-                      <Paper sx={{ p: 3, textAlign: "center", bgcolor: "#f9fafc", borderRadius: 2 }}><ImageIcon size={32} color="#9ca3af" /><Typography color="text.secondary">No after images uploaded</Typography></Paper>
+                      <Paper
+                        sx={{
+                          p: 3,
+                          textAlign: "center",
+                          bgcolor: "#f9fafc",
+                          borderRadius: 2,
+                        }}
+                      >
+                        <ImageIcon size={32} color="#9ca3af" />
+                        <Typography color="text.secondary">
+                          No after images uploaded
+                        </Typography>
+                      </Paper>
                     )}
                   </Box>
-                  <Box sx={{ bgcolor: "#f0fdf4", borderRadius: 3, p: 3, border: "1px solid #a7f3d0" }}>
-                    <Typography variant="subtitle2" fontWeight="600" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1, color: "#059669" }}><FileText size={18} /> Resolution Details</Typography>
+                  <Box
+                    sx={{
+                      bgcolor: "#f0fdf4",
+                      borderRadius: 3,
+                      p: 3,
+                      border: "1px solid #a7f3d0",
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight="600"
+                      gutterBottom
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        color: "#059669",
+                      }}
+                    >
+                      <FileText size={18} /> Resolution Details
+                    </Typography>
                     {normalized.resolution_details ? (
                       <>
-                        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6, mb: 2 }}>{normalized.resolution_details}</Typography>
-                        {normalized.resolvedDate && (<Box sx={{ display: "flex", alignItems: "center", gap: 1, pt: 2, borderTop: "1px dashed #a7f3d0" }}><Calendar size={14} color="#059669" /><Typography variant="caption" color="text.secondary">Resolved on: {formatDate(normalized.resolvedDate)}</Typography></Box>)}
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            whiteSpace: "pre-wrap",
+                            lineHeight: 1.6,
+                            mb: 2,
+                          }}
+                        >
+                          {normalized.resolution_details}
+                        </Typography>
+                        {normalized.resolvedDate && (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              pt: 2,
+                              borderTop: "1px dashed #a7f3d0",
+                            }}
+                          >
+                            <Calendar size={14} color="#059669" />
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Resolved on: {formatDate(normalized.resolvedDate)}
+                            </Typography>
+                          </Box>
+                        )}
                       </>
-                    ) : (<Typography color="text.secondary">No resolution details added</Typography>)}
+                    ) : (
+                      <Typography color="text.secondary">
+                        No resolution details added
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
               </>
@@ -624,18 +1051,56 @@ export default function IssueDetails() {
 
             {action && (
               <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-                <GradientButton colorType={action.colorType} disabled={actionLoading} onClick={action.onClick} startIcon={actionLoading ? <CircularProgress size={18} color="inherit" /> : null} endIcon={!actionLoading && <ChevronRight size={18} />} sx={{ minWidth: 200 }}>
+                <GradientButton
+                  colorType={action.colorType}
+                  disabled={actionLoading}
+                  onClick={action.onClick}
+                  startIcon={
+                    actionLoading ? (
+                      <CircularProgress size={18} color="inherit" />
+                    ) : null
+                  }
+                  endIcon={!actionLoading && <ChevronRight size={18} />}
+                  sx={{ minWidth: 200 }}
+                >
                   {actionLoading ? action.loading : action.label}
                 </GradientButton>
               </Box>
             )}
 
-            {(normalized.status === "Closed" || normalized.status === "solved") && (
-              <Paper sx={{ p: 4, textAlign: "center", bgcolor: "#f0fdf4", borderRadius: 3, mt: 4 }}>
-                <CheckCircle size={48} color="#10b981" style={{ marginBottom: 12 }} />
-                <Typography variant="h6" fontWeight="bold" color="success.dark">Issue Closed Successfully</Typography>
-                <Typography variant="body2" color="text.secondary">{normalized.status === "solved" ? "Issue has been solved and closed" : "Thank you message sent to citizen"}</Typography>
-                {normalized.closedDate && (<Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>Closed on: {formatDate(normalized.closedDate)}</Typography>)}
+            {(normalized.status === "Closed" ||
+              normalized.status === "solved") && (
+              <Paper
+                sx={{
+                  p: 4,
+                  textAlign: "center",
+                  bgcolor: "#f0fdf4",
+                  borderRadius: 3,
+                  mt: 4,
+                }}
+              >
+                <CheckCircle
+                  size={48}
+                  color="#10b981"
+                  style={{ marginBottom: 12 }}
+                />
+                <Typography variant="h6" fontWeight="bold" color="success.dark">
+                  Issue Closed Successfully
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {normalized.status === "solved"
+                    ? "Issue has been solved and closed"
+                    : "Thank you message sent to citizen"}
+                </Typography>
+                {normalized.closedDate && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 1, display: "block" }}
+                  >
+                    Closed on: {formatDate(normalized.closedDate)}
+                  </Typography>
+                )}
               </Paper>
             )}
           </CardContent>
@@ -670,15 +1135,39 @@ export default function IssueDetails() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Gradient Header */}
-            <Box sx={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", p: 3, color: "white" }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Box
+              sx={{
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                p: 3,
+                color: "white",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <Box>
-                  <Typography variant="h5" fontWeight="bold" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography
+                    variant="h5"
+                    fontWeight="bold"
+                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                  >
                     <CheckCircle size={28} /> Resolve Issue
                   </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>Provide proof of completion to mark this issue as resolved</Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
+                    Provide proof of completion to mark this issue as resolved
+                  </Typography>
                 </Box>
-                <IconButton onClick={() => !actionLoading && setShowResolveModal(false)} disabled={actionLoading} sx={{ color: "white" }}><X size={24} /></IconButton>
+                <IconButton
+                  onClick={() => !actionLoading && setShowResolveModal(false)}
+                  disabled={actionLoading}
+                  sx={{ color: "white" }}
+                >
+                  <X size={24} />
+                </IconButton>
               </Box>
             </Box>
 
@@ -686,9 +1175,14 @@ export default function IssueDetails() {
               {/* Upload Section */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="subtitle1" fontWeight="600" gutterBottom>
-                  After-Resolution Images <span style={{ color: "#ef4444" }}>*</span>
+                  After-Resolution Images{" "}
+                  <span style={{ color: "#ef4444" }}>*</span>
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mb: 2 }}
+                >
                   Maximum 4 images · JPG, PNG, WebP · Max 5MB each
                 </Typography>
                 <DropZone
@@ -698,25 +1192,73 @@ export default function IssueDetails() {
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <input ref={fileInputRef} type="file" multiple accept="image/*" onChange={(e) => handleImageUpload(e.target.files)} hidden disabled={actionLoading} />
-                  <ImageUp size={48} color="#94a3b8" style={{ marginBottom: 12 }} />
-                  <Typography variant="body1" fontWeight={500}>Drag & drop images here or click to browse</Typography>
-                  <Typography variant="caption" color="text.secondary">Supports JPG, PNG, WebP (Max 5MB each) · Max 4 images</Typography>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e.target.files)}
+                    hidden
+                    disabled={actionLoading}
+                  />
+                  <ImageUp
+                    size={48}
+                    color="#94a3b8"
+                    style={{ marginBottom: 12 }}
+                  />
+                  <Typography variant="body1" fontWeight={500}>
+                    Drag & drop images here or click to browse
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Supports JPG, PNG, WebP (Max 5MB each) · Max 4 images
+                  </Typography>
                 </DropZone>
-                {uploadError && <Alert severity="error" sx={{ mt: 2 }}>{uploadError}</Alert>}
+                {uploadError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {uploadError}
+                  </Alert>
+                )}
               </Box>
 
               {/* Image Previews */}
               {afterImages.length > 0 && (
                 <Box sx={{ mb: 4 }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                    <Typography variant="subtitle2" fontWeight={600}>Uploaded Images ({afterImages.length}/4)</Typography>
-                    <Chip label={`${afterImages.length} of 4 used`} size="small" color={afterImages.length === 4 ? "warning" : "success"} />
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 2,
+                    }}
+                  >
+                    <Typography variant="subtitle2" fontWeight={600}>
+                      Uploaded Images ({afterImages.length}/4)
+                    </Typography>
+                    <Chip
+                      label={`${afterImages.length} of 4 used`}
+                      size="small"
+                      color={afterImages.length === 4 ? "warning" : "success"}
+                    />
                   </Box>
-                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 2 }}>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(140px, 1fr))",
+                      gap: 2,
+                    }}
+                  >
                     {afterImages.map((file, idx) => (
                       <ImagePreviewCard key={idx}>
-                        <img src={file.preview} alt="preview" style={{ width: "100%", height: 140, objectFit: "cover" }} />
+                        <img
+                          src={file.preview}
+                          alt="preview"
+                          style={{
+                            width: "100%",
+                            height: 140,
+                            objectFit: "cover",
+                          }}
+                        />
                         <IconButton
                           className="delete-btn"
                           size="small"
@@ -735,8 +1277,22 @@ export default function IssueDetails() {
                         >
                           <Trash2 size={14} />
                         </IconButton>
-                        <Box sx={{ position: "absolute", bottom: 0, left: 0, right: 0, bgcolor: "rgba(0,0,0,0.5)", p: 0.5, textAlign: "center" }}>
-                          <Typography variant="caption" sx={{ color: "white" }}>{file.name.length > 20 ? file.name.slice(0, 17) + "..." : file.name}</Typography>
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            bgcolor: "rgba(0,0,0,0.5)",
+                            p: 0.5,
+                            textAlign: "center",
+                          }}
+                        >
+                          <Typography variant="caption" sx={{ color: "white" }}>
+                            {file.name.length > 20
+                              ? file.name.slice(0, 17) + "..."
+                              : file.name}
+                          </Typography>
                         </Box>
                       </ImagePreviewCard>
                     ))}
@@ -749,7 +1305,11 @@ export default function IssueDetails() {
                 <Typography variant="subtitle1" fontWeight="600" gutterBottom>
                   Resolution Details <span style={{ color: "#ef4444" }}>*</span>
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mb: 2 }}
+                >
                   Minimum 10 characters describing the action taken
                 </Typography>
                 <TextField
@@ -772,14 +1332,32 @@ export default function IssueDetails() {
 
               {/* Action Buttons */}
               <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
-                <Button variant="outlined" onClick={() => setShowResolveModal(false)} disabled={actionLoading}>Cancel</Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => setShowResolveModal(false)}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
                 <GradientButton
                   colorType="success"
                   onClick={handleResolveSubmit}
-                  disabled={actionLoading || afterImages.length === 0 || resolutionDetails.trim().length < 10}
-                  startIcon={actionLoading ? <CircularProgress size={18} color="inherit" /> : <CheckCircle size={18} />}
+                  disabled={
+                    actionLoading ||
+                    afterImages.length === 0 ||
+                    resolutionDetails.trim().length < 10
+                  }
+                  startIcon={
+                    actionLoading ? (
+                      <CircularProgress size={18} color="inherit" />
+                    ) : (
+                      <CheckCircle size={18} />
+                    )
+                  }
                 >
-                  {actionLoading ? "Submitting Resolution..." : "Confirm & Mark Resolved"}
+                  {actionLoading
+                    ? "Submitting Resolution..."
+                    : "Confirm & Mark Resolved"}
                 </GradientButton>
               </Box>
             </Box>
@@ -789,10 +1367,45 @@ export default function IssueDetails() {
 
       {/* Image Preview Modal */}
       {imagePreview && (
-        <Box sx={{ position: "fixed", inset: 0, bgcolor: "rgba(0,0,0,0.95)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", p: 2 }} onClick={() => setImagePreview(null)}>
-          <Box sx={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }}>
-            <img src={imagePreview} alt="Preview" style={{ maxWidth: "100%", maxHeight: "90vh", borderRadius: 8, boxShadow: "0 8px 30px rgba(0,0,0,0.5)" }} />
-            <IconButton onClick={() => setImagePreview(null)} sx={{ position: "absolute", top: 8, right: 8, bgcolor: "error.main", color: "white", "&:hover": { bgcolor: "error.dark" } }}><X size={20} /></IconButton>
+        <Box
+          sx={{
+            position: "fixed",
+            inset: 0,
+            bgcolor: "rgba(0,0,0,0.95)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            p: 2,
+          }}
+          onClick={() => setImagePreview(null)}
+        >
+          <Box
+            sx={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }}
+          >
+            <img
+              src={imagePreview}
+              alt="Preview"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "90vh",
+                borderRadius: 8,
+                boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
+              }}
+            />
+            <IconButton
+              onClick={() => setImagePreview(null)}
+              sx={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                bgcolor: "error.main",
+                color: "white",
+                "&:hover": { bgcolor: "error.dark" },
+              }}
+            >
+              <X size={20} />
+            </IconButton>
           </Box>
         </Box>
       )}

@@ -1,53 +1,52 @@
 const express = require("express");
 const router = express.Router();
 
-const {
-  postIssue,
-  getAllIssues,
-  toggleLike,
-  addComment,
-  toggleCommentLike,
-  checkNewPosts,
-  getIssue,
-  deleteIssue,
-  getMyIssues,
-  deleteComment,
-  updateComment,
-  verifyIssue,
-} = require("../Controller/PostIssueController");
+// 🔥 IMPORT FULL CONTROLLER (NO DESTRUCTURE)
+const issueController = require("../Controller/PostIssueController");
 
 // POST ISSUE
-router.post("/post-issue-data", postIssue);
+router.post("/post-issue-data", issueController.postIssue);
 
 // GET ALL ISSUES (with pagination & filters)
-router.get("/issues", getAllIssues);
+router.get("/issues", issueController.getAllIssues);
 
 // CHECK NEW POSTS (smart polling)
-router.get("/issues/check-new", checkNewPosts);
+router.get("/issues/check-new", issueController.checkNewPosts);
 
 // GET SINGLE ISSUE
-router.get("/issues/:id", getIssue);
+router.get("/issues/:id", issueController.getIssue);
 
-router.get("/my-issues", getMyIssues);
+// GET MY ISSUES
+router.get("/my-issues", issueController.getMyIssues);
 
 // LIKE/UNLIKE POST
-router.post("/issues/:id/like", toggleLike);
+router.post("/issues/:id/like", issueController.toggleLike);
 
 // ADD COMMENT
-router.post("/issues/:id/comment", addComment);
+router.post("/issues/:id/comment", issueController.addComment);
 
 // LIKE/UNLIKE COMMENT
-router.post("/issues/:issueId/comment/:commentId/like", toggleCommentLike);
+router.post(
+  "/issues/:issueId/comment/:commentId/like",
+  issueController.toggleCommentLike
+);
 
 // DELETE COMMENT
-router.delete("/issues/:issueId/comment/:commentId", deleteComment);
+router.delete(
+  "/issues/:issueId/comment/:commentId",
+  issueController.deleteComment
+);
 
 // UPDATE COMMENT
-router.put("/issues/:issueId/comment/:commentId", updateComment);
+router.put(
+  "/issues/:issueId/comment/:commentId",
+  issueController.updateComment
+);
 
 // DELETE ISSUE
-router.delete("/issues/:id", deleteIssue);
+router.delete("/issues/:id", issueController.deleteIssue);
 
-router.post("/issues/verify/:id", verifyIssue);
+// VERIFY ISSUE
+router.post("/issues/verify/:id", issueController.verifyIssue);
 
-module.exports = router;  
+module.exports = router;

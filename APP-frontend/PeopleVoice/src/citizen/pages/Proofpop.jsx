@@ -4,59 +4,102 @@ import axios from "axios";
 import jsPDF from "jspdf";
 import {
   CheckCircle,
-  XCircle,
   MapPin,
-  FileText,
   ArrowLeft,
   BookmarkPlus,
   CheckCheck,
   Calendar,
   Building2,
-  AlertTriangle,
-  ZoomIn,
   Clock,
-  UserCheck,
-  ChevronDown,
-  ChevronUp,
-  ShieldCheck,
-  Printer,
   Download,
   Share2,
-  Heart,
-  MessageCircle,
-  ExternalLink,
-  Copy,
-  Check,
-  Maximize2,
-  Minimize2,
+  ThumbsUp,
+  X,
+  ChevronRight,
 } from "lucide-react";
 import { useTheme } from "../../Context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
+// Helper: Convert image URL to base64
+const getBase64FromUrl = async (url) => {
+  if (!url) return null;
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("Failed to convert image:", error);
+    return null;
+  }
+};
+
+// ======================= IMAGE GALLERY COMPONENT =======================
+const ImageGallery = ({ images, label, onImageClick }) => {
+  if (!images || images.length === 0) {
+    return (
+      <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-6 text-center text-gray-500 dark:text-gray-400">
+        No {label.toLowerCase()} images available
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 pb-2">
+        <div className="flex gap-3">
+          {images.map((img, idx) => (
+            <div
+              key={idx}
+              onClick={() => onImageClick(img)}
+              className="relative flex-shrink-0 w-48 h-48 rounded-xl overflow-hidden cursor-pointer bg-gray-100 dark:bg-gray-800 shadow-md hover:scale-105 transition duration-300"
+            >
+              <img
+                src={img}
+                alt={`${label} ${idx + 1}`}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                {label} {idx + 1}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {images.length > 2 && (
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 bg-gradient-to-l from-gray-900/50 to-transparent w-12 h-full pointer-events-none flex items-center justify-end pr-2">
+          <ChevronRight className="text-white w-5 h-5 opacity-70" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ======================= MAIN PROOFPOP COMPONENT =======================
 const Proofpop = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isDark } = useTheme();
+
   const [issue, setIssue] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [savedToProofs, setSavedToProofs] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savedToProofs, setSavedToProofs] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [isImageFullscreen, setIsImageFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [expandedSections, setExpandedSections] = useState({
-    details: true,
-    original: false,
-  });
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   useEffect(() => {
     if (id) {
       fetchIssue();
       checkIfProofSaved();
+      checkIfReviewAlreadySubmitted();
     } else {
       setError("No issue ID provided");
       setLoading(false);
@@ -66,20 +109,15 @@ const Proofpop = () => {
   const fetchIssue = async () => {
     try {
       setLoading(true);
-      setError(null);
       const res = await axios.get(`${BACKEND_URL}/api/issues/${id}`);
-      if (res.data.success && res.data.issue) {
-        setIssue(res.data.issue);
-      } else {
-        setError("Issue not found");
-      }
+      if (res.data.success && res.data.issue) setIssue(res.data.issue);
+      else setError("Issue not found");
     } catch (err) {
-      console.error(err);
-      if (err.response?.status === 404) {
-        setError("Issue not found. It may have been deleted.");
-      } else {
-        setError("Failed to load issue details");
-      }
+      setError(
+        err.response?.status === 404
+          ? "Issue not found"
+          : "Failed to load issue",
+      );
     } finally {
       setLoading(false);
     }
@@ -98,20 +136,40 @@ const Proofpop = () => {
     }
   };
 
+  const checkIfReviewAlreadySubmitted = async () => {
+    try {
+      const citizenId = localStorage.getItem("citizenId");
+      if (!citizenId) return;
+      const res = await axios.get(
+        `${BACKEND_URL}/api/reviews/check/${id}?citizenId=${citizenId}`,
+      );
+      setReviewSubmitted(res.data.submitted);
+    } catch (err) {
+      setReviewSubmitted(false);
+    }
+  };
+
   const saveProofToCollection = async () => {
-    if (saving || !issue) return;
+    if (saving || !issue || savedToProofs) return;
     setSaving(true);
     try {
       const citizenId = localStorage.getItem("citizenId");
       const proofData = {
         issueId: id,
-        citizenId: citizenId,
+        citizenId,
         title: `Issue #${id.slice(-6)} - Resolution Report`,
         department: issue.department,
         status: issue.status,
         resolutionDetails: issue.resolution_details,
-        beforeImage: issue.images?.[0] || null,
-        afterImage: issue.after_images?.[0] || null,
+        beforeImage:
+          typeof issue.images?.[0] === "string"
+            ? issue.images?.[0]
+            : issue.images?.[0]?.url || null,
+
+        afterImage:
+          typeof issue.after_images?.[0] === "string"
+            ? issue.after_images?.[0]
+            : issue.after_images?.[0]?.url || null,
         resolvedAt: issue.updatedAt,
         location: issue.location,
         description: issue.description,
@@ -119,546 +177,483 @@ const Proofpop = () => {
       await axios.post(`${BACKEND_URL}/api/proofs/save`, proofData);
       setSavedToProofs(true);
     } catch (err) {
-      console.error(err);
-      alert("Failed to save proof");
+      alert("Failed to save to proofs");
     } finally {
       setSaving(false);
     }
   };
 
+  const handleAddToMyProofs = () => {
+    if (!savedToProofs && !saving) saveProofToCollection();
+  };
+
   const downloadPDF = async () => {
     if (!issue) return;
+
     try {
       const pdf = new jsPDF("p", "mm", "a4");
-      let y = 10;
+      let y = 20;
 
-      pdf.setFillColor(34, 197, 94);
-      pdf.rect(0, 0, 210, 40, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(20);
-      pdf.text("RESOLUTION REPORT", 105, 25, { align: "center" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const margin = 20;
+      const maxImageWidth = pageWidth - margin * 2;
 
-      y = 50;
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(11);
+      // Calculate available space on single page (A4 = 297mm height)
+      const maxY = 280; // Max Y position on single page
+      let currentY = y;
 
-      pdf.setFillColor(245, 245, 245);
-      pdf.rect(10, y, 190, 35, "F");
-      pdf.text(`Issue ID: ${id}`, 15, y + 8);
-      pdf.text(`Department: ${issue.department || "-"}`, 15, y + 18);
-      pdf.text(`Status: ${issue.status}`, 15, y + 28);
-      pdf.text(`Date: ${new Date(issue.updatedAt).toLocaleString()}`, 120, y + 8);
-      y += 45;
+      // TEXT WRAP function
+      const addWrappedText = (text, fontSize, fontStyle = "normal") => {
+        pdf.setFontSize(fontSize);
+        pdf.setFont("helvetica", fontStyle);
+        const lines = pdf.splitTextToSize(text, maxImageWidth);
+        const spaceNeeded = lines.length * (fontSize * 0.35) + 4;
+
+        // If running out of space, scale down further
+        if (currentY + spaceNeeded > maxY) {
+          pdf.setFontSize(fontSize - 1);
+          const smallerLines = pdf.splitTextToSize(text, maxImageWidth);
+          pdf.text(smallerLines, margin, currentY);
+          currentY += smallerLines.length * ((fontSize - 1) * 0.35) + 4;
+        } else {
+          pdf.text(lines, margin, currentY);
+          currentY += spaceNeeded;
+        }
+      };
+
+      // IMAGE ADD - Auto scale based on number of images
+      const addHorizontalImages = async (images, label) => {
+        try {
+          const gap = 5;
+          const availableWidth = maxImageWidth;
+          const imgWidth = (availableWidth - gap) / 2;
+          const maxHeight = 60;
+
+          let x1 = margin;
+          let x2 = margin + imgWidth + gap;
+
+          for (let i = 0; i < images.length; i += 2) {
+            const img1 = await getBase64FromUrl(images[i]);
+            const img2 = images[i + 1]
+              ? await getBase64FromUrl(images[i + 1])
+              : null;
+
+            let height1 = maxHeight;
+            let height2 = maxHeight;
+
+            // PAGE BREAK
+            if (currentY + maxHeight > 270) {
+              pdf.addPage();
+              currentY = 20;
+            }
+
+            // IMAGE 1
+            if (img1) {
+              let format1 = img1.startsWith("data:image/png") ? "PNG" : "JPEG";
+              pdf.addImage(img1, format1, x1, currentY, imgWidth, height1);
+
+              pdf.text(
+                `${label} ${i + 1}`,
+                x1 + imgWidth / 2,
+                currentY + height1 + 4,
+                {
+                  align: "center",
+                },
+              );
+            }
+
+            // IMAGE 2
+            if (img2) {
+              let format2 = img2.startsWith("data:image/png") ? "PNG" : "JPEG";
+              pdf.addImage(img2, format2, x2, currentY, imgWidth, height2);
+
+              pdf.text(
+                `${label} ${i + 2}`,
+                x2 + imgWidth / 2,
+                currentY + height2 + 4,
+                {
+                  align: "center",
+                },
+              );
+            }
+
+            currentY += maxHeight + 10;
+          }
+        } catch (err) {
+          console.error("Horizontal image error:", err);
+        }
+      };
+
+      // ================= HEADER =================
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Resolution Report", margin, currentY);
+      currentY += 8;
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Issue ID: #${id.slice(-6)}`, margin, currentY);
+      pdf.text(`Status: RESOLVED`, pageWidth - margin - 30, currentY);
+      currentY += 6;
 
       pdf.setFontSize(12);
-      pdf.setTextColor(34, 197, 94);
-      pdf.text("RESOLUTION DETAILS", 10, y);
-      y += 8;
-      pdf.setFontSize(10);
-      pdf.setTextColor(0, 0, 0);
-      const splitDetails = pdf.splitTextToSize(issue.resolution_details || "", 180);
-      pdf.text(splitDetails, 10, y);
-      y += splitDetails.length * 5 + 10;
+      pdf.setFont("helvetica", "bold");
+      const titleLines = pdf.splitTextToSize(
+        issue.title || "Resolution Report",
+        maxImageWidth,
+      );
+      pdf.text(titleLines, margin, currentY);
+      currentY += titleLines.length * 5 + 6;
 
-      if (issue.images?.[0]) {
-        const beforeImg = await getBase64FromUrl(issue.images[0]);
-        pdf.setTextColor(34, 197, 94);
-        pdf.text("BEFORE IMAGE", 10, y);
-        y += 5;
-        pdf.addImage(beforeImg, "JPEG", 10, y, 85, 60);
-        y += 65;
+      // ================= BEFORE SECTION =================
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("📋 BEFORE RESOLUTION", margin, currentY);
+      currentY += 6;
+
+      const beforeImages = (issue.images || []).map((img) =>
+        typeof img === "string" ? img : img.url,
+      );
+
+      const afterImages = (issue.after_images || []).map((img) =>
+        typeof img === "string" ? img : img.url,
+      );
+      const totalImages = beforeImages.length + afterImages.length;
+
+      // Add before images
+      if (beforeImages.length > 0) {
+        await addHorizontalImages(beforeImages, "Before Image");
       }
 
-      if (issue.after_images?.[0]) {
-        const afterImg = await getBase64FromUrl(issue.after_images[0]);
-        pdf.setTextColor(34, 197, 94);
-        pdf.text("AFTER IMAGE", 105, y);
-        y += 5;
-        pdf.addImage(afterImg, "JPEG", 105, y, 85, 60);
-        y += 65;
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+
+      addWrappedText(
+        `Description: ${issue.description_en || issue.description_ta || "No description provided"}`,
+        9,
+      );
+      addWrappedText(`Location: ${issue.area || "Not specified"}`, 9);
+      addWrappedText(`Department: ${issue.department || "Not specified"}`, 9);
+      addWrappedText(
+        `Reported Date: ${new Date(issue.createdAt).toLocaleDateString()}`,
+        9,
+      );
+
+      currentY += 4;
+
+      // ================= AFTER SECTION =================
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("✅ AFTER RESOLUTION", margin, currentY);
+      currentY += 6;
+
+      if (afterImages.length > 0) {
+        await addHorizontalImages(afterImages, "After Image");
       }
 
-      pdf.setFillColor(34, 197, 94);
-      pdf.rect(0, 280, 210, 10, "F");
-      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+
+      addWrappedText(
+        `Resolution: ${issue.resolution_details || "No resolution details provided"}`,
+        9,
+      );
+      addWrappedText(
+        `Resolved Date: ${new Date(issue.updatedAt).toLocaleDateString()}`,
+        9,
+      );
+
+      // ================= FOOTER =================
       pdf.setFontSize(8);
-      pdf.text("Official Resolution Document", 105, 286, { align: "center" });
+      pdf.text("Generated by PeopleVoice Proof System", margin, 285);
 
-      pdf.save(`Issue_${id.slice(-6)}_Report.pdf`);
+      pdf.save(`Resolution_${id.slice(-6)}.pdf`);
     } catch (error) {
-      console.error(error);
-      alert("PDF Download Failed");
+      console.error("PDF error:", error);
+      alert("Failed to generate PDF");
     }
-  };
-
-  const getBase64FromUrl = async (url) => {
-    const data = await fetch(url);
-    const blob = await data.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = () => resolve(reader.result);
-    });
-  };
-
-  const handleVerify = async (type) => {
-    if (!issue) return;
-    setSubmitting(true);
-    try {
-      await axios.post(`${BACKEND_URL}/api/issues/verify/${id}`, {
-        response: type,
-        citizenId: localStorage.getItem("citizenId"),
-      });
-
-      if (type === "yes") {
-        await saveProofToCollection();
-      }
-
-      window.parent.postMessage({ type: "CLOSE_PROOF_POPUP" }, "*");
-      navigate("/peopleVoice/my-issues");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to submit response");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const copyIssueId = () => {
-    navigator.clipboard.writeText(id);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const shareIssue = () => {
     if (navigator.share) {
       navigator.share({
-        title: issue?.title || "Resolution Report",
-        text: `Check out this resolution report for issue #${id?.slice(-6)}`,
+        title: "Resolution Report",
+        text: `Issue #${id?.slice(-6)}`,
         url: window.location.href,
       });
     } else {
-      copyIssueId();
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const toggleSection = (section) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  const handleClose = () => {
+    window.parent.postMessage({ type: "CLOSE_PROOF_POPUP" }, "*");
+    navigate("/peopleVoice/proofspage");
+  };
+
+  // Handle "Yes, Resolved" – navigate to review page
+  const handleYesResolved = () => {
+    navigate(`/peopleVoice/resolution-review/${id}`);
   };
 
   if (loading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-gradient-to-br from-gray-950 to-black" : "bg-gradient-to-br from-gray-50 to-white"}`}>
-        <div className="relative">
-          <div className="animate-spin h-16 w-16 border-4 border-emerald-500 border-t-transparent rounded-full" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-3 w-3 bg-emerald-500 rounded-full animate-pulse" />
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? "bg-gradient-to-br from-gray-950 to-black" : "bg-gradient-to-br from-gray-50 to-white"}`}>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center max-w-md"
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <h2 className="text-red-500 text-2xl mb-4">Oops!</h2>
+        <p>{error}</p>
+        <button
+          onClick={handleClose}
+          className="mt-8 px-8 py-3 bg-gray-900 text-white rounded-2xl"
         >
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isDark ? "bg-red-950/50" : "bg-red-100"}`}>
-            <AlertTriangle size={40} className="text-red-500" />
-          </div>
-          <h2 className={`text-2xl font-bold mb-3 ${isDark ? "text-white" : "text-gray-900"}`}>Oops! Something went wrong</h2>
-          <p className={`mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>{error}</p>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => navigate("/peopleVoice/proofspage")}
-              className="px-6 py-3 rounded-xl bg-gray-500 text-white font-medium hover:bg-gray-600 transition"
-            >
-              Go Back
-            </button>
-            <button
-              onClick={fetchIssue}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium hover:shadow-lg transition"
-            >
-              Try Again
-            </button>
-          </div>
-        </motion.div>
+          Close
+        </button>
       </div>
     );
   }
 
-  if (!issue) return null;
+  const citizenId = localStorage.getItem("citizenId");
 
   return (
-    <div className={`min-h-screen ${isDark ? "bg-gradient-to-br from-gray-950 via-gray-900 to-black" : "bg-gradient-to-br from-gray-50 via-white to-gray-100"}`}>
+    <div
+      className={`min-h-screen pb-24 ${
+        isDark ? "dark bg-gray-950 text-white" : "bg-gray-50 text-gray-900"
+      }`}
+    >
       {/* Header */}
-      <motion.div
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className={`sticky top-0 z-30 backdrop-blur-xl border-b ${isDark ? "bg-black/80 border-gray-800" : "bg-white/80 border-gray-100"}`}
+      <div
+        className={`fixed top-0 left-0 right-0 ${
+          isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
+        } border-b z-50 px-5 py-4 flex items-center justify-between shadow-sm`}
       >
-        <div className="max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <h1 className={`text-base sm:text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-              Resolution Report
-            </h1>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={shareIssue}
-                className={`p-2 rounded-xl transition-all duration-200 ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}
-              >
-                <Share2 size={18} />
-              </button>
-              <button
-                onClick={downloadPDF}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${isDark ? "bg-emerald-950 text-emerald-400 hover:bg-emerald-900" : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"}`}
-              >
-                <Printer size={14} />
-                <span className="hidden sm:inline">PDF</span>
-              </button>
+        <button
+          onClick={handleClose}
+          className="flex items-center gap-2 text-gray-600 dark:text-gray-400 active:scale-95 transition"
+        >
+          <ArrowLeft size={24} />
+          <span className="font-medium">Back</span>
+        </button>
+        <h1 className="font-bold text-lg">Resolution Report</h1>
+        <div className="w-8"></div>
+      </div>
+
+      <div className="pt-20 px-4 max-w-2xl mx-auto">
+        {/* Status & ID */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <div
+            className={`bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-5 py-2 rounded-full flex items-center gap-2 font-semibold text-sm`}
+          >
+            <CheckCircle size={18} />
+            RESOLVED
+          </div>
+          <div
+            onClick={() => navigator.clipboard.writeText(id)}
+            className="text-xs font-mono bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+          >
+            #{id?.slice(-6)}
+          </div>
+          {copied && (
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 animate-pulse">
+              Copied!
+            </span>
+          )}
+        </div>
+
+        {/* Title */}
+        <h2 className="text-2xl font-bold leading-tight mb-6">
+          {issue.title || "Resolution Report"}
+        </h2>
+
+        {/* BEFORE & AFTER CARDS */}
+        <div className="space-y-6 mb-8">
+          {/* BEFORE CARD */}
+          <div
+            className={`rounded-2xl overflow-hidden shadow-sm ${
+              isDark
+                ? "bg-gray-900 border border-gray-800"
+                : "bg-white border border-gray-100"
+            }`}
+          >
+            <div className="bg-amber-50 dark:bg-amber-950/30 px-5 py-3 border-b border-amber-200 dark:border-amber-800/50">
+              <h3 className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                <Clock size={18} /> Before Resolution
+              </h3>
+            </div>
+            <div className="p-5 space-y-4">
+              <ImageGallery
+                images={(issue.images || []).map((img) =>
+                  typeof img === "string" ? img : img.url,
+                )}
+                label="BEFORE"
+              />
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {issue.description_en || "No description provided."}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {issue?.description_ta}
+                </p>
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 pt-2">
+                  <MapPin size={14} />
+                  <span>{issue.area || "Area not specified"}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <Building2 size={14} />
+                  <span>{issue.department || "Department not specified"}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <Calendar size={14} />
+                  <span>
+                    Reported: {new Date(issue.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* AFTER CARD */}
+          <div
+            className={`rounded-2xl overflow-hidden shadow-sm ${
+              isDark
+                ? "bg-gray-900 border border-gray-800"
+                : "bg-white border border-gray-100"
+            }`}
+          >
+            <div className="bg-emerald-50 dark:bg-emerald-950/30 px-5 py-3 border-b border-emerald-200 dark:border-emerald-800/50">
+              <h3 className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                <CheckCircle size={18} /> After Resolution
+              </h3>
+            </div>
+            <div className="p-5 space-y-4">
+              <ImageGallery
+                images={(issue.after_images || []).map((img) =>
+                  typeof img === "string" ? img : img.url,
+                )}
+                label="AFTER"
+                onImageClick={setSelectedImage}
+              />
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {issue.resolution_details ||
+                    "No resolution details provided."}
+                </p>
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 pt-2">
+                  <Calendar size={14} />
+                  <span>
+                    Resolved on:{" "}
+                    {new Date(issue.updatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <CheckCheck size={14} />
+                  <span>Status: Resolved</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </motion.div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6 pb-32">
-        {/* Main Report Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className={`rounded-2xl sm:rounded-3xl overflow-hidden border ${isDark ? "border-gray-800 bg-gray-900/50 backdrop-blur-sm" : "border-gray-200 bg-white/80 backdrop-blur-sm"} shadow-xl`}
+        {/* ADD TO PROOFS BUTTON */}
+        <button
+          onClick={handleAddToMyProofs}
+          disabled={savedToProofs || saving}
+          className={`w-full py-4 rounded-2xl font-semibold text-base flex items-center justify-center gap-3 mb-5 transition-all shadow-md ${
+            savedToProofs
+              ? "bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed"
+              : "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg active:scale-[0.98]"
+          }`}
         >
-          {/* Hero Section */}
-          <div className={`relative p-5 sm:p-6 ${isDark ? "bg-gradient-to-r from-emerald-950/30 to-transparent" : "bg-gradient-to-r from-emerald-50 to-transparent"}`}>
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${issue.status === "resolved" ? "bg-green-500/20 text-green-500 border border-green-500/30" : "bg-blue-500/20 text-blue-500 border border-blue-500/30"}`}>
-                    {issue.status?.toUpperCase()}
-                  </span>
-                  <button
-                    onClick={copyIssueId}
-                    className={`px-2.5 py-1 rounded-full text-xs font-mono flex items-center gap-1 transition-all ${isDark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-                  >
-                    #{id?.slice(-6)}
-                    {copied ? <Check size={12} /> : <Copy size={12} />}
-                  </button>
-                </div>
-                <h2 className={`text-xl sm:text-2xl font-bold leading-tight mb-3 ${isDark ? "text-white" : "text-gray-900"}`}>
-                  {issue.title || "Resolution Report"}
-                </h2>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <Building2 size={14} className="text-emerald-500" />
-                    <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                      {issue.department || "General Department"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar size={14} className="text-emerald-500" />
-                    <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                      {new Date(issue.updatedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className={`p-3 rounded-full w-fit ${isDark ? "bg-emerald-950/50" : "bg-emerald-100"}`}>
-                <ShieldCheck size={28} className="text-emerald-500" />
-              </div>
-            </div>
-          </div>
-
-          {/* Images Section */}
-          {(issue.images?.[0] || issue.after_images?.[0]) && (
-            <div className="p-5 sm:p-6 border-t border-b border-gray-200 dark:border-gray-800">
-              <h3 className={`text-sm font-semibold mb-4 flex items-center gap-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                <FileText size={16} />
-                Evidence Documentation
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {issue.images?.[0] && (
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="group">
-                    <div className={`rounded-xl overflow-hidden border-2 ${isDark ? "border-gray-700 hover:border-emerald-500" : "border-gray-200 hover:border-emerald-400"} transition-all duration-300 cursor-pointer bg-gray-50 dark:bg-gray-800/50`}>
-                      <div className="relative aspect-video">
-                        <img
-                          src={issue.images[0]}
-                          alt="Before"
-                          className="w-full h-full object-cover"
-                          onClick={() => setSelectedImage(issue.images[0])}
-                        />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center" onClick={() => setSelectedImage(issue.images[0])}>
-                          <ZoomIn size={28} className="text-white" />
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                          <p className="text-white text-sm font-medium">BEFORE</p>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-                {issue.after_images?.[0] && (
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="group">
-                    <div className={`rounded-xl overflow-hidden border-2 ${isDark ? "border-gray-700 hover:border-emerald-500" : "border-gray-200 hover:border-emerald-400"} transition-all duration-300 cursor-pointer bg-gray-50 dark:bg-gray-800/50`}>
-                      <div className="relative aspect-video">
-                        <img
-                          src={issue.after_images[0]}
-                          alt="After"
-                          className="w-full h-full object-cover"
-                          onClick={() => setSelectedImage(issue.after_images[0])}
-                        />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center" onClick={() => setSelectedImage(issue.after_images[0])}>
-                          <ZoomIn size={28} className="text-white" />
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                          <p className="text-white text-sm font-medium">AFTER</p>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            </div>
+          {saving ? (
+            "Saving..."
+          ) : savedToProofs ? (
+            <>
+              <CheckCheck size={22} /> Already in My Proofs
+            </>
+          ) : (
+            <>
+              <BookmarkPlus size={22} /> Add to My Proofs
+            </>
           )}
+        </button>
 
-          {/* Resolution Details */}
-          {issue.resolution_details && (
-            <div className="border-b border-gray-200 dark:border-gray-800">
-              <button
-                onClick={() => toggleSection("details")}
-                className="w-full p-5 sm:p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <CheckCheck size={18} className="text-emerald-500" />
-                  <h3 className={`text-base font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Resolution Details
-                  </h3>
-                </div>
-                <motion.div animate={{ rotate: expandedSections.details ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                  <ChevronDown size={20} className={isDark ? "text-gray-400" : "text-gray-500"} />
-                </motion.div>
-              </button>
-              <AnimatePresence>
-                {expandedSections.details && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden px-5 sm:px-6 pb-5 sm:pb-6"
-                  >
-                    <div className={`p-4 rounded-xl ${isDark ? "bg-gray-800/50 border border-gray-700" : "bg-gray-50 border border-gray-100"}`}>
-                      <p className={`text-base leading-relaxed ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        {issue.resolution_details}
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-
-          {/* Original Complaint */}
-          {issue.description && (
-            <div className="border-b border-gray-200 dark:border-gray-800">
-              <button
-                onClick={() => toggleSection("original")}
-                className="w-full p-5 sm:p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <FileText size={18} className="text-emerald-500" />
-                  <h3 className={`text-base font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Original Complaint
-                  </h3>
-                </div>
-                <motion.div animate={{ rotate: expandedSections.original ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                  <ChevronDown size={20} className={isDark ? "text-gray-400" : "text-gray-500"} />
-                </motion.div>
-              </button>
-              <AnimatePresence>
-                {expandedSections.original && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden px-5 sm:px-6 pb-5 sm:pb-6"
-                  >
-                    <div className={`p-4 rounded-xl ${isDark ? "bg-gray-800/50 border border-gray-700" : "bg-gray-50 border border-gray-100"}`}>
-                      <p className={`text-base leading-relaxed ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        {issue.description}
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-
-          {/* Location & Date */}
-          <div className="p-5 sm:p-6 space-y-4">
-            {issue.location && (
-              <div className="flex items-start gap-3">
-                <div className={`p-2.5 rounded-xl ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
-                  <MapPin size={18} className="text-emerald-500" />
-                </div>
-                <div>
-                  <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                    Incident Location
-                  </p>
-                  <p className={`text-base ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    {issue.location}
-                  </p>
-                </div>
-              </div>
-            )}
-            <div className="flex items-start gap-3">
-              <div className={`p-2.5 rounded-xl ${isDark ? "bg-gray-800" : "bg-gray-100"}`}>
-                <Clock size={18} className="text-emerald-500" />
-              </div>
-              <div>
-                <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  Resolution Date & Time
-                </p>
-                <p className={`text-base font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  {new Date(issue.updatedAt).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Verification Section */}
-        {issue.status?.toLowerCase() !== "resolved" && issue.status?.toLowerCase() !== "closed" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className={`mt-5 p-5 sm:p-6 rounded-2xl border ${isDark ? "border-gray-800 bg-gray-900/50 backdrop-blur-sm" : "border-gray-200 bg-white/80 backdrop-blur-sm"}`}
+        {/* DOWNLOAD & SHARE BUTTONS */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          <button
+            onClick={downloadPDF}
+            className={`py-3 rounded-2xl border flex items-center justify-center gap-2 font-medium text-sm ${
+              isDark
+                ? "border-gray-700 bg-gray-900 hover:bg-gray-800 text-white"
+                : "border-gray-200 bg-white hover:bg-gray-50 text-gray-800"
+            } transition active:scale-95`}
           >
-            <div className="flex items-center gap-2 mb-4">
-              <UserCheck size={18} className="text-emerald-500" />
-              <h3 className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
-                Confirm Resolution Status
-              </h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleVerify("yes")}
-                disabled={submitting}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-medium hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                <CheckCircle size={18} />
-                Yes, Resolved
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleVerify("no")}
-                disabled={submitting}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white text-sm font-medium hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                <XCircle size={18} />
-                Not Resolved
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleVerify("not_here")}
-                disabled={submitting}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-medium hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                <MapPin size={18} />
-                Wrong Location
-              </motion.button>
-            </div>
-          </motion.div>
+            <Download size={18} /> Download PDF
+          </button>
+          <button
+            onClick={shareIssue}
+            className={`py-3 rounded-2xl border flex items-center justify-center gap-2 font-medium text-sm ${
+              isDark
+                ? "border-gray-700 bg-gray-900 hover:bg-gray-800 text-white"
+                : "border-gray-200 bg-white hover:bg-gray-50 text-gray-800"
+            } transition active:scale-95`}
+          >
+            <Share2 size={18} /> Share
+          </button>
+        </div>
+
+        {/* YES, RESOLVED BUTTON – navigates to review page */}
+        {citizenId && !reviewSubmitted && (
+          <div className="mt-4">
+            <button
+              onClick={handleYesResolved}
+              className="w-full py-4 rounded-2xl font-semibold text-base bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg active:scale-[0.98] transition flex items-center justify-center gap-2"
+            >
+              <ThumbsUp size={22} /> Yes, Resolved
+            </button>
+          </div>
         )}
 
-        {/* Save Button */}
-        {!savedToProofs && issue.status === "resolved" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="mt-5"
-          >
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={saveProofToCollection}
-              disabled={saving}
-              className="w-full flex items-center justify-center gap-2 py-3 sm:py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium hover:shadow-xl transition-all duration-200"
-            >
-              {saving ? (
-                <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-              ) : (
-                <>
-                  <BookmarkPlus size={18} />
-                  Save to My Proofs Collection
-                </>
-              )}
-            </motion.button>
-          </motion.div>
+        {reviewSubmitted && (
+          <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+            ✅ You have already reviewed this resolution. Thank you!
+          </div>
         )}
       </div>
 
-      {/* Image Zoom Modal */}
+      {/* FULLSCREEN IMAGE MODAL */}
       <AnimatePresence>
         {selectedImage && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
-            onClick={() => {
-              setSelectedImage(null);
-              setIsImageFullscreen(false);
-            }}
+            className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4"
+            onClick={() => setSelectedImage(null)}
           >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative max-w-full max-h-full"
+            <div
+              className="relative max-w-5xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <img
                 src={selectedImage}
-                alt="Full size"
-                className={`max-w-full ${isImageFullscreen ? "max-h-screen" : "max-h-[80vh]"} rounded-xl shadow-2xl object-contain cursor-pointer`}
-                onClick={() => setIsImageFullscreen(!isImageFullscreen)}
+                alt="Fullscreen evidence"
+                className="max-h-[88vh] w-auto mx-auto rounded-2xl shadow-2xl"
               />
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                <button
-                  className="bg-black/50 backdrop-blur-sm rounded-full p-2 text-white hover:bg-black/70 transition"
-                  onClick={() => setIsImageFullscreen(!isImageFullscreen)}
-                >
-                  {isImageFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-                </button>
-                <button
-                  className="bg-black/50 backdrop-blur-sm rounded-full p-2 text-white hover:bg-black/70 transition"
-                  onClick={() => window.open(selectedImage, "_blank")}
-                >
-                  <ExternalLink size={20} />
-                </button>
-              </div>
               <button
-                className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-full p-2.5 text-white hover:bg-black/70 transition"
-                onClick={() => {
-                  setSelectedImage(null);
-                  setIsImageFullscreen(false);
-                }}
+                onClick={() => setSelectedImage(null)}
+                className="absolute -top-3 -right-3 bg-red-600 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-lg hover:bg-red-700 transition"
               >
                 ✕
               </button>
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

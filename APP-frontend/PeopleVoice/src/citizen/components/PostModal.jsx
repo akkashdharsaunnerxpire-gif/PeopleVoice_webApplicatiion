@@ -46,7 +46,9 @@ const PostModal = ({
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
-  const allImages = localIssue?.images || [];
+  const allImages = (localIssue?.images || []).map(img =>
+  typeof img === "string" ? img : img.url
+);
   const totalImages = allImages.length;
   const comments = localIssue?.comments || [];
 

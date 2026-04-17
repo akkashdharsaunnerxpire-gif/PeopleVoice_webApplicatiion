@@ -10,11 +10,7 @@ import {
   Clock,
   MapPin,
   ChevronRight,
-  Volume2,
-  VolumeX,
   Trash2,
-  RefreshCw,
-  FileText,
 } from "lucide-react";
 import { useTheme } from "../../Context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -64,19 +60,26 @@ const Notifications = () => {
   }, []);
 
   /* ================= GET NOTIFICATION IMAGE ================= */
-  const getNotificationImage = useCallback((notification) => {
+  const getNotificationImage = (notification) => {
+    const getUrl = (img) => (typeof img === "string" ? img : img?.url);
+
+    // ✅ AFTER image first (resolved proof)
     if (notification.issueId?.after_images?.[0]) {
-      return notification.issueId.after_images[0];
+      return getUrl(notification.issueId.after_images[0]);
     }
-    if (notification.issueId?.images_data?.[0]) {
-      return notification.issueId.images_data[0];
+
+    // ✅ BEFORE image
+    if (notification.issueId?.images?.[0]) {
+      return getUrl(notification.issueId.images[0]);
     }
+
+    // ✅ fallback
     if (notification.image) {
       return notification.image;
     }
-    return null;
-  }, []);
 
+    return null;
+  };
   /* ================= LOAD NOTIFICATIONS ================= */
   const loadNotifications = useCallback(async () => {
     if (!citizenId) return;
@@ -120,16 +123,17 @@ const Notifications = () => {
   ]);
 
   useEffect(() => {
-  const handleMessage = (event) => {
-    if (event.data?.type === "CLOSE_PROOF_POPUP") {
-      setSelectedProofId(null);
-    }
-  };
+    const handleMessage = (event) => {
+      if (event.data?.type === "CLOSE_PROOF_POPUP") {
+        setSelectedProofId(null);
+      }
+    };
 
-  window.addEventListener("message", handleMessage);
+    window.addEventListener("message", handleMessage);
 
-  return () => window.removeEventListener("message", handleMessage);
-}, []);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
   /* ================= INITIAL LOAD + POLLING ================= */
   useEffect(() => {
     loadNotifications();
@@ -290,7 +294,7 @@ const Notifications = () => {
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="fixed bottom-8 right-4 z-50"
+            className="fixed bottom-6 right-4 z-50"
           >
             <button
               onClick={() => {
@@ -317,16 +321,16 @@ const Notifications = () => {
       >
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 lg:gap-3">
+            <div className="flex items-center gap-2">
               <div
-                className={`relative p-1.5 lg:p-2 rounded-full ${isDark ? "bg-emerald-950" : "bg-emerald-100"}`}
+                className={`relative p-1.5 rounded-full ${isDark ? "bg-emerald-950" : "bg-emerald-100"}`}
               >
-                <Bell size={18} className="lg:w-5 lg:h-5 text-emerald-500" />
+                <Bell size={18} className="text-emerald-500" />
                 {unreadCount > 0 && (
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-1 w-3.5 h-3.5 lg:w-4 lg:h-4 bg-red-500 text-white text-[8px] lg:text-[10px] font-bold rounded-full flex items-center justify-center"
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
                   >
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </motion.span>
@@ -334,28 +338,36 @@ const Notifications = () => {
               </div>
               <div>
                 <h1
-                  className={`text-base lg:text-lg font-bold ${isDark ? "text-white" : "text-gray-900"}`}
+                  className={`text-base font-bold ${isDark ? "text-white" : "text-gray-900"}`}
                 >
                   Notifications
                 </h1>
                 <p
-                  className={`text-[10px] lg:text-xs ${isDark ? "text-gray-400" : "text-gray-500"} hidden sm:block`}
+                  className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"} hidden sm:block`}
                 >
                   Stay updated with your issue status
                 </p>
               </div>
             </div>
+            {notifications.length > 0 && unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                className="text-xs text-emerald-500 font-medium px-2 py-1 rounded-lg hover:bg-emerald-500/10 transition"
+              >
+                Mark all read
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-3 lg:px-4 py-3 lg:py-4">
+      <div className="max-w-4xl mx-auto px-4 py-4">
         {loading && notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 lg:py-20">
-            <div className="animate-spin h-6 w-6 lg:h-8 lg:w-8 border-2 lg:border-3 border-emerald-500 border-t-transparent rounded-full" />
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin h-8 w-8 border-2 border-emerald-500 border-t-transparent rounded-full" />
             <p
-              className={`text-xs lg:text-sm mt-3 lg:mt-4 ${isDark ? "text-gray-400" : "text-gray-500"}`}
+              className={`text-sm mt-4 ${isDark ? "text-gray-400" : "text-gray-500"}`}
             >
               Loading notifications...
             </p>
@@ -364,28 +376,28 @@ const Notifications = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`text-center py-12 lg:py-20 rounded-xl lg:rounded-2xl ${
+            className={`text-center py-16 rounded-2xl ${
               isDark ? "bg-gray-900/50" : "bg-white"
             }`}
           >
             <div
-              className={`inline-flex p-3 lg:p-4 rounded-full mb-3 lg:mb-4 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
+              className={`inline-flex p-4 rounded-full mb-4 ${isDark ? "bg-gray-800" : "bg-gray-100"}`}
             >
-              <Bell size={36} className="lg:w-12 lg:h-12 text-gray-400" />
+              <Bell size={40} className="text-gray-400" />
             </div>
             <h3
-              className={`text-base lg:text-lg font-semibold mb-1 lg:mb-2 ${isDark ? "text-white" : "text-gray-900"}`}
+              className={`text-lg font-semibold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}
             >
               No notifications yet
             </h3>
             <p
-              className={`text-xs lg:text-sm ${isDark ? "text-gray-400" : "text-gray-500"} px-4`}
+              className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"} px-4`}
             >
               We'll notify you when there are updates on your issues
             </p>
           </motion.div>
         ) : (
-          <div className="space-y-2 lg:space-y-3">
+          <div className="space-y-3">
             <AnimatePresence mode="popLayout">
               {notifications.map((n, index) => {
                 const unread = !n.read;
@@ -400,29 +412,29 @@ const Notifications = () => {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ delay: index * 0.03 }}
-                    whileTap={{ scale: 0.99 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => handleNotificationClick(n._id, n)}
                     className={`
-                      cursor-pointer rounded-lg lg:rounded-xl border transition-all duration-200
+                      cursor-pointer rounded-xl border transition-all duration-200
                       ${
                         unread
                           ? isDark
-                            ? "bg-gradient-to-r from-gray-900 to-gray-900/95 border-l-3 lg:border-l-4 border-l-emerald-500 border-gray-800 shadow-lg shadow-emerald-500/10"
-                            : "bg-white border-l-3 lg:border-l-4 border-l-emerald-500 border-gray-200 shadow-md"
+                            ? "bg-gradient-to-r from-gray-900 to-gray-900/95 border-l-4 border-l-emerald-500 border-gray-800 shadow-lg shadow-emerald-500/10"
+                            : "bg-white border-l-4 border-l-emerald-500 border-gray-200 shadow-md"
                           : isDark
-                            ? "bg-gray-800/40 border-gray-700 opacity-60"
-                            : "bg-gray-100 border-gray-200 opacity-60"
+                            ? "bg-gray-800/40 border-gray-700 opacity-70"
+                            : "bg-gray-50 border-gray-200 opacity-70"
                       }
                       hover:shadow-md active:scale-[0.98]
                     `}
                   >
-                    <div className="flex gap-2 lg:gap-3 p-3 lg:p-4">
+                    <div className="flex gap-3 p-3">
                       {/* Status Icon / Image Section */}
                       <div className="flex-shrink-0">
                         {notificationImage ? (
                           <div
                             className={`
-                              w-10 h-10 lg:w-12 lg:h-12 rounded-lg overflow-hidden
+                              w-12 h-12 rounded-xl overflow-hidden
                               border ${isDark ? "border-gray-700" : "border-gray-200"}
                               cursor-zoom-in
                               ${!unread ? "opacity-60 grayscale-[0.3]" : ""}
@@ -440,46 +452,46 @@ const Notifications = () => {
                           </div>
                         ) : (
                           <div
-                            className={`p-1.5 lg:p-2 rounded-full ${statusStyle.bg} ${statusStyle.color}`}
+                            className={`p-2 rounded-full ${statusStyle.bg} ${statusStyle.color}`}
                           >
-                            <StatusIcon size={14} className="lg:w-4 lg:h-4" />
+                            <StatusIcon size={16} />
                           </div>
                         )}
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 lg:gap-2 flex-wrap mb-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
                           {unread && (
-                            <span className="text-[8px] lg:text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500 text-white rounded-full animate-pulse">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-500 text-white rounded-full animate-pulse">
                               NEW
                             </span>
                           )}
                           <span
-                            className={`text-[8px] lg:text-[9px] font-medium px-1.5 lg:px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.color}`}
+                            className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.color}`}
                           >
                             {statusStyle.label}
                           </span>
 
                           {/* Read Badge - shows when notification is read */}
                           {!unread && (
-                            <span className="text-[8px] font-medium px-1.5 py-0.5 bg-gray-500/20 text-gray-500 rounded-full">
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 bg-gray-500/20 text-gray-500 rounded-full">
                               Read
                             </span>
                           )}
                         </div>
 
                         <p
-                          className={`text-[12px] lg:text-[13px] leading-relaxed font-medium
-    ${
-      unread
-        ? isDark
-          ? "text-white font-semibold"
-          : "text-gray-900 font-semibold"
-        : isDark
-          ? "text-gray-400"
-          : "text-gray-500"
-    }`}
+                          className={`text-sm leading-relaxed font-medium
+                          ${
+                            unread
+                              ? isDark
+                                ? "text-white font-semibold"
+                                : "text-gray-900 font-semibold"
+                              : isDark
+                                ? "text-gray-400"
+                                : "text-gray-500"
+                          }`}
                         >
                           {getMessagePreview(n.message)}
 
@@ -501,62 +513,70 @@ const Notifications = () => {
 
                                   setSelectedProofId(issueId);
                                 }}
-                                className={`ml-2 cursor-pointer font-semibold underline-offset-2 hover:underline transition
-        ${
-          !clickedProofs[
-            typeof n.issueId === "string" ? n.issueId : n.issueId?._id
-          ]
-            ? "text-red-500 animate-pulse"
-            : "text-emerald-500"
-        }
-      `}
+                                className={`ml-2 cursor-pointer font-semibold underline-offset-2 hover:underline transition inline-flex items-center gap-1 text-xs
+                                ${
+                                  !clickedProofs[
+                                    typeof n.issueId === "string"
+                                      ? n.issueId
+                                      : n.issueId?._id
+                                  ]
+                                    ? "text-red-500 animate-pulse"
+                                    : "text-emerald-500"
+                                }
+                              `}
                               >
-                                <Eye size={12} className="inline mr-1" />
+                                <Eye size={12} />
                                 View Proof
                               </span>
                             )}
                         </p>
 
                         {n.location && (
-                          <div className="flex items-start gap-1 mt-1.5 lg:mt-2">
+                          <div className="flex items-start gap-1 mt-1.5">
                             <MapPin
-                              size={10}
-                              className={`lg:w-3 lg:h-3 mt-0.5 ${unread ? "text-gray-400" : "text-gray-500"}`}
+                              size={12}
+                              className={`mt-0.5 ${unread ? "text-gray-400" : "text-gray-500"}`}
                             />
                             <p
-                              className={`text-[9px] lg:text-[10px] ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"} break-words`}
+                              className={`text-xs ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"} break-words`}
                             >
-                              {getMessagePreview(n.location, 80)}
+                              {getMessagePreview(n.location, 60)}
                             </p>
                           </div>
                         )}
 
-                        <div className="flex items-center gap-2 mt-1.5 lg:mt-2">
-                          <Clock
-                            size={9}
-                            className={`lg:w-2.5 lg:h-2.5 ${unread ? "text-gray-400" : "text-gray-500"}`}
-                          />
-                          <span
-                            className={`text-[9px] lg:text-[10px] ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"}`}
-                          >
-                            {formatDate(n.createdAt)}
-                          </span>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
+                          <div className="flex items-center gap-1">
+                            <Clock
+                              size={10}
+                              className={
+                                unread ? "text-gray-400" : "text-gray-500"
+                              }
+                            />
+                            <span
+                              className={`text-xs ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"}`}
+                            >
+                              {formatDate(n.createdAt)}
+                            </span>
+                          </div>
 
                           {n.issueId && (
                             <>
                               <span
-                                className={`text-[8px] ${unread ? "text-gray-500" : "text-gray-600"}`}
+                                className={`text-[10px] ${unread ? "text-gray-500" : "text-gray-600"}`}
                               >
                                 •
                               </span>
-                              <span
-                                className={`text-[9px] lg:text-[10px] ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"}`}
-                              >
-                                Issue #
-                                {typeof n.issueId === "string"
-                                  ? n.issueId.slice(-6)
-                                  : n.issueId?._id?.slice(-6)}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span
+                                  className={`text-xs ${unread ? (isDark ? "text-gray-400" : "text-gray-500") : isDark ? "text-gray-600" : "text-gray-400"}`}
+                                >
+                                  ID: #
+                                  {typeof n.issueId === "string"
+                                    ? n.issueId.slice(-6)
+                                    : n.issueId?._id?.slice(-6)}
+                                </span>
+                              </div>
                             </>
                           )}
                         </div>
@@ -566,10 +586,9 @@ const Notifications = () => {
                       <button
                         onClick={(e) => deleteNotification(n._id, e)}
                         className={`
-                          opacity-0 group-hover:opacity-100 transition-opacity
-                          p-1 rounded-lg
+                          p-1.5 rounded-lg flex-shrink-0 self-start
                           ${isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-400"}
-                          hover:text-red-500
+                          hover:text-red-500 transition
                         `}
                       >
                         <Trash2 size={14} />
@@ -603,7 +622,7 @@ const Notifications = () => {
               onClick={(e) => e.stopPropagation()}
             />
             <button
-              className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition"
+              className="absolute top-4 right-4 text-white bg-black/50 rounded-full w-8 h-8 flex items-center justify-center text-lg hover:bg-black/70 transition"
               onClick={() => setSelectedImage(null)}
             >
               ✕
@@ -611,26 +630,28 @@ const Notifications = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Proof Popup Modal */}
       <AnimatePresence>
         {selectedProofId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={() => setSelectedProofId(null)}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-             className="w-[90%] sm:w-[75%] md:w-[60%] lg:w-[50%] h-[85%] bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-2xl"
+              className="w-full max-w-3xl h-[85vh] bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* CLOSE BUTTON */}
               <button
                 onClick={() => setSelectedProofId(null)}
-                className="absolute top-4 right-4 z-50 bg-black/70 hover:bg-black text-white rounded-full w-10 h-10 flex items-center justify-center text-lg"
+                className="absolute top-4 right-4 z-50 bg-black/70 hover:bg-black text-white rounded-full w-10 h-10 flex items-center justify-center text-lg transition"
               >
                 ✕
               </button>
@@ -639,6 +660,7 @@ const Notifications = () => {
               <iframe
                 src={`/peopleVoice/proofpop/${selectedProofId}`}
                 className="w-full h-full"
+                title="Proof Details"
               />
             </motion.div>
           </motion.div>

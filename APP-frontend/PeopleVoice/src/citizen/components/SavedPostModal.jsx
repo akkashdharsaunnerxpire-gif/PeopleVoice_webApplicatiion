@@ -21,7 +21,9 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
   const [error, setError] = useState(null);
 
   const issue = post.issueData || {};
-  const images = issue.images || [];
+  const images = (issue.images || []).map(img =>
+  typeof img === "string" ? img : img.url
+);
 
   /* UNSAVE */
   const handleUnsave = async () => {

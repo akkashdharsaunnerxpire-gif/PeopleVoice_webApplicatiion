@@ -78,17 +78,57 @@ const REASONS = [
 
 // Comprehensive hashtags collection
 const ALL_TAGS = [
-  "#RoadIssue", "#RoadDamage", "#Pothole", "#RoadSafety", "#RoadAccident",
-  "#Garbage", "#WasteManagement", "#GarbageDumping", "#CleanCity", "#SwachhBharat",
-  "#WaterProblem", "#WaterLeakage", "#PipelineIssue", "#Drainage", "#SewageOverflow",
-  "#Electricity", "#PowerCut", "#TransformerIssue", "#WireSnapping", "#PoleDamage",
-  "#DrainageBlockage", "#SewageProblem", "#Flooding", "#StagnantWater",
-  "#PublicIssue", "#PeopleVoice", "#CitizenReport", "#CivicIssue",
-  "#Urgent", "#Emergency", "#HighPriority", "#Dangerous", "#SafetyHazard",
-  "#Chennai", "#Nagercoil", "#Coimbatore", "#Madurai", "#Tirunelveli", "#Salem",
-  "#HealthHazard", "#EnvironmentalIssue", "#TrafficIssue", "#PublicSafety",
-  "#IllegalDumping", "#NoisePollution", "#AirPollution", "#StreetLightOutage",
-  "#FootpathIssue", "#PedestrianSafety", "#WaterLogging", "#MosquitoBreeding",
+  "#RoadIssue",
+  "#RoadDamage",
+  "#Pothole",
+  "#RoadSafety",
+  "#RoadAccident",
+  "#Garbage",
+  "#WasteManagement",
+  "#GarbageDumping",
+  "#CleanCity",
+  "#SwachhBharat",
+  "#WaterProblem",
+  "#WaterLeakage",
+  "#PipelineIssue",
+  "#Drainage",
+  "#SewageOverflow",
+  "#Electricity",
+  "#PowerCut",
+  "#TransformerIssue",
+  "#WireSnapping",
+  "#PoleDamage",
+  "#DrainageBlockage",
+  "#SewageProblem",
+  "#Flooding",
+  "#StagnantWater",
+  "#PublicIssue",
+  "#PeopleVoice",
+  "#CitizenReport",
+  "#CivicIssue",
+  "#Urgent",
+  "#Emergency",
+  "#HighPriority",
+  "#Dangerous",
+  "#SafetyHazard",
+  "#Chennai",
+  "#Nagercoil",
+  "#Coimbatore",
+  "#Madurai",
+  "#Tirunelveli",
+  "#Salem",
+  "#HealthHazard",
+  "#EnvironmentalIssue",
+  "#TrafficIssue",
+  "#PublicSafety",
+  "#IllegalDumping",
+  "#NoisePollution",
+  "#AirPollution",
+  "#StreetLightOutage",
+  "#FootpathIssue",
+  "#PedestrianSafety",
+  "#WaterLogging",
+  "#MosquitoBreeding",
 ];
 
 /* ================= LANGUAGE CONSTANTS ================= */
@@ -111,12 +151,14 @@ const TEXTS = {
     descriptionTamil: "Description (Tamil)",
     hashtags: "Hashtags",
     addHashtags: "Add hashtags (#Urgent #Chennai ...)",
-    agreement: "I confirm this complaint is genuine and based on facts. False information may lead to legal action.",
+    agreement:
+      "I confirm this complaint is genuine and based on facts. False information may lead to legal action.",
     proceed: "Proceed to Final Verification",
     finalConfirmation: "Final Confirmation – Mandatory",
     falseComplaints: "False complaints are punishable offences",
     importantLegalNotice: "Important Legal Notice",
-    legalText: "Submitting false, misleading or irrelevant information / photographs is a serious offence. Government authorities may impose fines and take legal action under Section 177 IPC and other applicable laws.",
+    legalText:
+      "Submitting false, misleading or irrelevant information / photographs is a serious offence. Government authorities may impose fines and take legal action under Section 177 IPC and other applicable laws.",
     complaintSummary: "Complaint Summary",
     departmentLabel: "Department",
     locationLabel: "Location",
@@ -128,7 +170,8 @@ const TEXTS = {
     confirmLocation: "The location is correct & accurate.",
     confirmLocationDesc: "Issue location:",
     acceptTerms: "THIS COMPLAINT IS TRUE AND GENUINE",
-    acceptTermsDesc: "I understand that providing false information may result in government fines and legal action.",
+    acceptTermsDesc:
+      "I understand that providing false information may result in government fines and legal action.",
     goBackEdit: "Go Back & Edit",
     iConfirmSubmit: "I Confirm → Submit Complaint",
     submitting: "Submitting...",
@@ -138,7 +181,8 @@ const TEXTS = {
     fillAllFields: "Please fill all required fields",
     minPhotosRequired: "Minimum {minImages} photo(s) required for {department}",
     confirmAllPoints: "Please confirm all required points",
-    complaintRegistered: "Complaint registered successfully! Authorities will review it soon.",
+    complaintRegistered:
+      "Complaint registered successfully! Authorities will review it soon.",
     networkError: "Network error. Please try again.",
     yesThisIsIssue: "✓ Yes, this is a {department} issue",
     save: "Save",
@@ -149,7 +193,8 @@ const TEXTS = {
     enterValidLocation: "Please enter valid location",
     pleaseLogin: "Please login first",
     searchHashtags: "Search hashtags...",
-    otherDetailLabel: "What specific problem? (e.g., Road, Streetlight, Water, Footpath, etc.)",
+    otherDetailLabel:
+      "What specific problem? (e.g., Road, Streetlight, Water, Footpath, etc.)",
     otherDetailRequired: "Please specify the problem type",
   },
   ta: {
@@ -170,24 +215,29 @@ const TEXTS = {
     descriptionTamil: "விளக்கம் (தமிழ்)",
     hashtags: "ஹேஷ்டேக்கள்",
     addHashtags: "ஹேஷ்டேக்களை சேர்க்கவும் (#அவசர #சென்னை ...)",
-    agreement: "இந்தப் புகார் உண்மை மற்றும் உண்மையானது என உறுதிப்படுத்துகிறேன். பொய்த் தகவல்கள் சட்ட நடவடிக்கைக்கு வழிவகுக்கும்.",
+    agreement:
+      "இந்தப் புகார் உண்மை மற்றும் உண்மையானது என உறுதிப்படுத்துகிறேன். பொய்த் தகவல்கள் சட்ட நடவடிக்கைக்கு வழிவகுக்கும்.",
     proceed: "இறுதி சரிபார்ப்புக்குச் செல்லவும்",
     finalConfirmation: "இறுதி உறுதிப்படுத்தல் – கட்டாயம்",
     falseComplaints: "பொய் புகார்கள் தண்டனைக்குரிய குற்றங்கள்",
     importantLegalNotice: "முக்கிய சட்ட அறிவிப்பு",
-    legalText: "பொய், தவறான அல்லது தொடர்பில்லாத தகவல்/புகைப்படங்களை சமர்ப்பிப்பது கடுமையான குற்றமாகும். அரசு அதிகாரிகள் பிரிவு 177 IPC மற்றும் பிற சட்டங்களின் கீழ் அபராதம் விதிக்கலாம் மற்றும் சட்ட நடவடிக்கை எடுக்கலாம்.",
+    legalText:
+      "பொய், தவறான அல்லது தொடர்பில்லாத தகவல்/புகைப்படங்களை சமர்ப்பிப்பது கடுமையான குற்றமாகும். அரசு அதிகாரிகள் பிரிவு 177 IPC மற்றும் பிற சட்டங்களின் கீழ் அபராதம் விதிக்கலாம் மற்றும் சட்ட நடவடிக்கை எடுக்கலாம்.",
     complaintSummary: "புகார் சுருக்கம்",
     departmentLabel: "துறை",
     locationLabel: "இடம்",
     photosLabel: "புகைப்படங்கள்",
     attached: "இணைக்கப்பட்டது",
     iHerebyDeclare: "நான் இதன்மூலம் உறுதியளிக்கிறேன்:",
-    confirmImages: "அனைத்து புகைப்படங்களும் புகாரளிக்கப்பட்ட பிரச்சினையை உண்மையாகக் காட்டுகின்றன.",
-    confirmImagesDesc: "பழைய, தொடர்பில்லாத அல்லது தொடர்பில்லாத படங்கள் பயன்படுத்தப்படவில்லை.",
+    confirmImages:
+      "அனைத்து புகைப்படங்களும் புகாரளிக்கப்பட்ட பிரச்சினையை உண்மையாகக் காட்டுகின்றன.",
+    confirmImagesDesc:
+      "பழைய, தொடர்பில்லாத அல்லது தொடர்பில்லாத படங்கள் பயன்படுத்தப்படவில்லை.",
     confirmLocation: "இடம் சரியானது & துல்லியமானது.",
     confirmLocationDesc: "பிரச்சினை இடம்:",
     acceptTerms: "இந்த புகார் உண்மை மற்றும் உண்மையானது",
-    acceptTermsDesc: "பொய்த் தகவலை வழங்குவது அரசு அபராதம் மற்றும் சட்ட நடவடிக்கைக்கு வழிவகுக்கும் என்பதை நான் புரிந்துகொள்கிறேன்.",
+    acceptTermsDesc:
+      "பொய்த் தகவலை வழங்குவது அரசு அபராதம் மற்றும் சட்ட நடவடிக்கைக்கு வழிவகுக்கும் என்பதை நான் புரிந்துகொள்கிறேன்.",
     goBackEdit: "திரும்பிச் சென்று திருத்தவும்",
     iConfirmSubmit: "நான் உறுதிப்படுத்துகிறேன் → புகாரைச் சமர்ப்பிக்கவும்",
     submitting: "சமர்ப்பிக்கிறது...",
@@ -195,9 +245,11 @@ const TEXTS = {
     cameraDenied: "கேமரா அணுகல் மறுக்கப்பட்டது அல்லது இல்லை",
     duplicatePhoto: "நகல் புகைப்படம் கண்டறியப்பட்டது",
     fillAllFields: "தேவையான அனைத்து புலங்களையும் பூர்த்தி செய்யவும்",
-    minPhotosRequired: "{department} க்கு குறைந்தபட்ச {minImages} புகைப்பட(ங்கள்) தேவை",
+    minPhotosRequired:
+      "{department} க்கு குறைந்தபட்ச {minImages} புகைப்பட(ங்கள்) தேவை",
     confirmAllPoints: "அனைத்து தேவையான புள்ளிகளையும் உறுதிப்படுத்தவும்",
-    complaintRegistered: "புகார் வெற்றிகரமாக பதிவு செய்யப்பட்டது! அதிகாரிகள் விரைவில் மதிப்பாய்வு செய்வார்கள்.",
+    complaintRegistered:
+      "புகார் வெற்றிகரமாக பதிவு செய்யப்பட்டது! அதிகாரிகள் விரைவில் மதிப்பாய்வு செய்வார்கள்.",
     networkError: "பிணையப் பிழை. மீண்டும் முயற்சிக்கவும்.",
     yesThisIsIssue: "✓ ஆம், இது ஒரு {department} பிரச்சினை",
     save: "சேமிக்கவும்",
@@ -208,7 +260,8 @@ const TEXTS = {
     enterValidLocation: "சரியான இடத்தை உள்ளிடவும்",
     pleaseLogin: "முதலில் உள்நுழையவும்",
     searchHashtags: "ஹேஷ்டேக்களைத் தேடுங்கள்...",
-    otherDetailLabel: "குறிப்பிட்ட பிரச்சனை என்ன? (எ.கா. சாலை, தெருவிளக்கு, நீர், நடைபாதை, முதலியன)",
+    otherDetailLabel:
+      "குறிப்பிட்ட பிரச்சனை என்ன? (எ.கா. சாலை, தெருவிளக்கு, நீர், நடைபாதை, முதலியன)",
     otherDetailRequired: "தயவுசெய்து பிரச்சனை வகையைக் குறிப்பிடவும்",
   },
 };
@@ -256,7 +309,8 @@ const PostIssue = () => {
     confirmDescription: false,
     acceptTerms: false,
   });
-  const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
+  const [isSubmittingVerification, setIsSubmittingVerification] =
+    useState(false);
 
   // Language state
   const [language, setLanguage] = useState("en");
@@ -289,7 +343,7 @@ const PostIssue = () => {
     if (department) {
       setCameraAllowed(false);
       setValidationMessage(
-        t("readyToCapture", { department: getDepartmentName(department) })
+        t("readyToCapture", { department: getDepartmentName(department) }),
       );
       if (department !== "Other") setOtherDetail("");
     }
@@ -311,7 +365,8 @@ const PostIssue = () => {
 
   useEffect(() => {
     return () => {
-      if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
+      if (translateTimeoutRef.current)
+        clearTimeout(translateTimeoutRef.current);
     };
   }, []);
 
@@ -329,7 +384,7 @@ const PostIssue = () => {
           try {
             const res = await fetch(
               `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-              { headers: { "User-Agent": "CivicIssueApp/1.0" } }
+              { headers: { "User-Agent": "CivicIssueApp/1.0" } },
             );
             const data = await res.json();
             const address =
@@ -359,7 +414,7 @@ const PostIssue = () => {
               : "Could not get location";
           reject(new Error(msg));
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
     });
 
@@ -396,7 +451,7 @@ const PostIssue = () => {
     if (!cameraAllowed) return setError(t("selectDeptFirst"));
     if (images.length >= getDepartmentDetails(department).maxImages) {
       return setError(
-        `Max ${getDepartmentDetails(department).maxImages} photos allowed`
+        `Max ${getDepartmentDetails(department).maxImages} photos allowed`,
       );
     }
 
@@ -480,7 +535,7 @@ const PostIssue = () => {
         setArea(location.address);
         if (!district) {
           const found = DISTRICTS.find((d) =>
-            location.address.toLowerCase().includes(d.toLowerCase())
+            location.address.toLowerCase().includes(d.toLowerCase()),
           );
           if (found) setDistrict(found);
         }
@@ -526,7 +581,7 @@ const PostIssue = () => {
     }
     setCameraAllowed(true);
     setValidationMessage(
-      t("readyToCapture", { department: getDepartmentName(department) })
+      t("readyToCapture", { department: getDepartmentName(department) }),
     );
   };
 
@@ -540,14 +595,14 @@ const PostIssue = () => {
     if (lastWord?.startsWith("#") && lastWord.length > 1) {
       const searchTerm = lastWord.toLowerCase();
       const filtered = ALL_TAGS.filter(
-        (tag) => tag.toLowerCase().includes(searchTerm) && !value.includes(tag)
+        (tag) => tag.toLowerCase().includes(searchTerm) && !value.includes(tag),
       ).slice(0, 10);
       setSuggestions(filtered);
     } else {
       if (!lastWord?.startsWith("#") && words.length > 0) {
         const usedTags = words.filter((w) => w.startsWith("#"));
         const popularTags = ALL_TAGS.filter(
-          (tag) => !usedTags.includes(tag)
+          (tag) => !usedTags.includes(tag),
         ).slice(0, 8);
         setSuggestions(popularTags);
       } else {
@@ -577,8 +632,8 @@ const PostIssue = () => {
       try {
         const res = await fetch(
           `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
-            englishText
-          )}&langpair=en|ta`
+            englishText,
+          )}&langpair=en|ta`,
         );
         const data = await res.json();
         let translated = data?.responseData?.translatedText || englishText;
@@ -619,7 +674,7 @@ const PostIssue = () => {
         t("minPhotosRequired", {
           minImages: dept.minImages,
           department: dept.name,
-        })
+        }),
       );
     }
 
@@ -633,116 +688,123 @@ const PostIssue = () => {
     setShowVerification(true);
   };
 
- const uploadImage = async (base64) => {
-  const res = await fetch(`${APIURL}/upload`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: base64 }),
-  });
-
-  const data = await res.json();
-  if (!data.url) throw new Error("Image upload failed");
-  return data.url;
-};
-
-const handleVerificationSubmit = async () => {
-  const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
-  const allRequiredChecked = requiredChecks.every(
-    (check) => verificationChecks[check]
-  );
-
-  if (!allRequiredChecked) {
-    return setError(t("confirmAllPoints"));
-  }
-
-  setIsSubmittingVerification(true);
-
-  try {
-    // 🔥 Upload all images safely
-    const imageUrls = [];
-
-    for (let img of images) {
-      try {
-        const url = await uploadImage(img.data);
-        imageUrls.push(url);
-      } catch (err) {
-        console.error("Image upload failed:", err);
-        setError("Image upload failed. Try again.");
-        setIsSubmittingVerification(false);
-        return;
-      }
-    }
-
-    const payload = {
-      citizenId,
-      district,
-      area: area.trim(),
-      department,
-      other_detail: department === "Other" ? otherDetail.trim() : "",
-      reason,
-      description_en: descEn.trim(),
-      description_ta: descTa.trim(),
-      hashtags: hashtags.split(" ").filter((h) => h.startsWith("#")),
-      images: imageUrls, // ✅ FIXED
-      device_fingerprint,
-      photo_locations: images.map((i) => i.location),
-      verification_metadata: {
-        verified_by_user: true,
-        verification_timestamp: new Date().toISOString(),
-        verification_checks: verificationChecks,
-      },
-    };
-
-    const res = await fetch(`${APIURL}/post-issue-data`, {
+  const uploadImage = async (base64) => {
+    const res = await fetch(`${APIURL}/upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ image: base64 }),
     });
 
-    const result = await res.json();
+    const data = await res.json();
+    if (!data.url) throw new Error("Image upload failed");
+    return {
+      url: data.url,
+      publicId: data.publicId,
+    };
+  };
 
-    if (res.ok && result.success) {
-      localStorage.setItem("lastCheck", Date.now());
-      addNewIssue(result.issue);
+  const handleVerificationSubmit = async () => {
+    const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
+    const allRequiredChecked = requiredChecks.every(
+      (check) => verificationChecks[check],
+    );
 
-      // 🔥 reset
-      setDistrict("");
-      setArea("");
-      setDepartment("");
-      setOtherDetail("");
-      setReason("");
-      setDescEn("");
-      setDescTa("");
-      setHashtags("#peoplevoice ");
-      setImages([]);
-      setAgree(false);
-      setCameraAllowed(false);
-      setShowVerification(false);
-      setVerificationChecks({
-        confirmImages: false,
-        confirmLocation: false,
-        confirmDepartment: false,
-        confirmDescription: false,
-        acceptTerms: false,
+    if (!allRequiredChecked) {
+      return setError(t("confirmAllPoints"));
+    }
+
+    setIsSubmittingVerification(true);
+
+    try {
+      // 🔥 Upload all images safely
+      const uploadedImages = [];
+
+      for (let img of images) {
+        try {
+          const result = await uploadImage(img.data);
+
+          uploadedImages.push({
+            url: result.url,
+            publicId: result.publicId, // 🔥 correct
+          });
+        } catch (err) {
+          console.error("Image upload failed:", err);
+          setError("Image upload failed. Try again.");
+          setIsSubmittingVerification(false);
+          return;
+        }
+      }
+
+      const payload = {
+        citizenId,
+        district,
+        area: area.trim(),
+        department,
+        other_detail: department === "Other" ? otherDetail.trim() : "",
+        reason,
+        description_en: descEn.trim(),
+        description_ta: descTa.trim(),
+        hashtags: hashtags.split(" ").filter((h) => h.startsWith("#")),
+        images: uploadedImages, // ✅ FIXED
+        device_fingerprint,
+        photo_locations: images.map((i) => i.location),
+        verification_metadata: {
+          verified_by_user: true,
+          verification_timestamp: new Date().toISOString(),
+          verification_checks: verificationChecks,
+        },
+      };
+
+      const res = await fetch(`${APIURL}/post-issue-data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      setIsSubmittingVerification(false);
-      setShowThankYou(true);
+      const result = await res.json();
 
-      setTimeout(() => {
-        setShowThankYou(false);
-        navigate("/feed");
-      }, 2000);
-    } else {
-      setError(result.message || "Submission failed");
+      if (res.ok && result.success) {
+        localStorage.setItem("lastCheck", Date.now());
+        addNewIssue(result.issue);
+
+        // 🔥 reset
+        setDistrict("");
+        setArea("");
+        setDepartment("");
+        setOtherDetail("");
+        setReason("");
+        setDescEn("");
+        setDescTa("");
+        setHashtags("#peoplevoice ");
+        setImages([]);
+        setAgree(false);
+        setCameraAllowed(false);
+        setShowVerification(false);
+        setVerificationChecks({
+          confirmImages: false,
+          confirmLocation: false,
+          confirmDepartment: false,
+          confirmDescription: false,
+          acceptTerms: false,
+        });
+
+        setIsSubmittingVerification(false);
+        setShowThankYou(true);
+
+        setTimeout(() => {
+          setShowThankYou(false);
+          navigate("/feed");
+        }, 2000);
+      } else {
+        setError(result.message || "Submission failed");
+        setIsSubmittingVerification(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(t("networkError"));
       setIsSubmittingVerification(false);
     }
-  } catch (err) {
-    console.error(err);
-    setError(t("networkError"));
-    setIsSubmittingVerification(false);
-  }
-};
+  };
 
   const toggleLanguage = () => {
     setLanguage(language === "en" ? "ta" : "en");
@@ -877,7 +939,9 @@ const handleVerificationSubmit = async () => {
                   </h3>
                   <div className="space-y-1.5 sm:space-y-2">
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>
+                      <span
+                        className={isDark ? "text-gray-400" : "text-gray-600"}
+                      >
                         {t("departmentLabel")}
                       </span>
                       <span
@@ -894,7 +958,9 @@ const handleVerificationSubmit = async () => {
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>
+                      <span
+                        className={isDark ? "text-gray-400" : "text-gray-600"}
+                      >
                         {t("locationLabel")}
                       </span>
                       <span
@@ -906,7 +972,9 @@ const handleVerificationSubmit = async () => {
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>
+                      <span
+                        className={isDark ? "text-gray-400" : "text-gray-600"}
+                      >
                         {t("photosLabel")}
                       </span>
                       <span
@@ -1209,7 +1277,8 @@ const handleVerificationSubmit = async () => {
                     isDark ? "text-gray-300" : "text-gray-700"
                   }`}
                 >
-                  {t("otherDetailLabel")} <span className="text-red-600">*</span>
+                  {t("otherDetailLabel")}{" "}
+                  <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -1262,8 +1331,8 @@ const handleVerificationSubmit = async () => {
                       ? "text-green-400"
                       : "text-green-600"
                     : isDark
-                    ? "text-amber-400"
-                    : "text-amber-600"
+                      ? "text-amber-400"
+                      : "text-amber-600"
                 }`}
               >
                 {validationMessage}
@@ -1306,8 +1375,8 @@ const handleVerificationSubmit = async () => {
                         ? "border-green-700 hover:bg-green-900/20"
                         : "border-green-400 hover:bg-green-50"
                       : isDark
-                      ? "border-gray-700 bg-gray-800 opacity-60"
-                      : "border-gray-300 bg-gray-50 opacity-60"
+                        ? "border-gray-700 bg-gray-800 opacity-60"
+                        : "border-gray-300 bg-gray-50 opacity-60"
                   }`}
               >
                 <Camera
@@ -1317,8 +1386,8 @@ const handleVerificationSubmit = async () => {
                         ? "text-green-400"
                         : "text-green-600"
                       : isDark
-                      ? "text-gray-500"
-                      : "text-gray-400"
+                        ? "text-gray-500"
+                        : "text-gray-400"
                   }
                   size={24}
                 />
@@ -1510,8 +1579,8 @@ const handleVerificationSubmit = async () => {
                           ? "bg-gray-600 text-white shadow"
                           : "bg-white shadow font-medium"
                         : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                          ? "text-gray-400 hover:bg-gray-600"
+                          : "text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {t("english")}
@@ -1525,8 +1594,8 @@ const handleVerificationSubmit = async () => {
                           ? "bg-gray-600 text-white shadow"
                           : "bg-white shadow font-medium"
                         : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                          ? "text-gray-400 hover:bg-gray-600"
+                          : "text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {t("tamil")}
@@ -1540,8 +1609,8 @@ const handleVerificationSubmit = async () => {
                           ? "bg-gray-600 text-white shadow"
                           : "bg-white shadow font-medium"
                         : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                          ? "text-gray-400 hover:bg-gray-600"
+                          : "text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {t("both")}
@@ -1552,7 +1621,9 @@ const handleVerificationSubmit = async () => {
 
             <div
               className={`grid gap-4 sm:gap-6 ${
-                descView === "both" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+                descView === "both"
+                  ? "grid-cols-1 md:grid-cols-2"
+                  : "grid-cols-1"
               }`}
             >
               {(descView === "english" || descView === "both") && (

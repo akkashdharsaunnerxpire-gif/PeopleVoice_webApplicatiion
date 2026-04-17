@@ -15,6 +15,7 @@ import Settings from "../pages/Settings";
 import Helpcare from "../pages/Helpcare";
 import Proofpop from "../pages/Proofpop";
 import Proofpage from "../pages/Proofspage";
+import ResolutionReviewPage from "../pages/ResolutionReview";
 // src/citizen/routes/AppRoutes.jsx
 
 const AppRoutes = () => {
@@ -38,6 +39,7 @@ const AppRoutes = () => {
       <Route path="register" element={<Register />} />
       <Route path="forgotpassword" element={<ForgotPassword />} />
       <Route path="proofpop/:id" element={<Proofpop />} />
+      <Route path="/resolution-review/:id" element={<ResolutionReviewPage />} />
 
       {/* PROTECTED */}
       <Route element={<AppLayout />}>

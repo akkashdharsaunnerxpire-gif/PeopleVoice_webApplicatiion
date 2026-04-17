@@ -204,7 +204,9 @@ const CommentModal = ({
 
   if (!open) return null;
 
-  const allImages = images?.length > 0 ? images : [];
+  const allImages = (images || []).map((img) =>
+    typeof img === "string" ? img : img.url,
+  );
 
   const updateParentAfterComment = useCallback(
     (newComment, isDelete = false, deletedCommentId = null) => {

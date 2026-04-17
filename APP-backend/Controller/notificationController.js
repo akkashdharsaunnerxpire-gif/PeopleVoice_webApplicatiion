@@ -23,11 +23,14 @@ const saveNotification = async (issue, status, customMessage = null) => {
       status: status,
       type: type,
       location: issue.area || issue.district || "",
-      image: issue.images_data?.[0] || null,
+      image:
+        typeof issue.images?.[0] === "string"
+          ? issue.images[0]
+          : issue.images?.[0]?.url || null,
       read: false,
       createdAt: new Date(),
     });
-    
+
     return notification;
   } catch (err) {
     console.error("Save Notification Error:", err);
@@ -69,7 +72,7 @@ const markAsRead = async (req, res) => {
     const notification = await Notification.findByIdAndUpdate(
       id,
       { read: true },
-      { new: true }
+      { new: true },
     );
 
     if (!notification) {
@@ -91,40 +94,6 @@ const deleteNotification = async (req, res) => {
   } catch (error) {
     console.error("Delete failed:", error);
     res.status(500).json({ message: "Delete failed" });
-  }
-};
-// verify issue
-exports.verifyIssue = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { response, citizenId } = req.body;
-
-    const issue = await Issue.findById(id);
-    if (!issue) return res.status(404).json({ message: "Not found" });
-
-    if (!issue.verifications) issue.verifications = [];
-
-    issue.verifications.push({
-      citizenId,
-      response,
-      time: new Date(),
-    });
-
-    // Logic
-    if (response === "yes") {
-      issue.status = "Closed";
-    }
-
-    if (response === "no") {
-      issue.status = "In Progress";
-    }
-
-    await issue.save();
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error verifying" });
   }
 };
 

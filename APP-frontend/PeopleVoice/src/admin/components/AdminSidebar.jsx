@@ -18,8 +18,8 @@ const API_URL = `${import.meta.env.VITE_BACKEND_URL}/api/admin/issues`;
 const links = [
   { name: "Dashboard", to: "/admin/dashboard", icon: LayoutDashboard },
   { name: "All Issues", to: "/admin/dashboard/issues", icon: ClipboardList },
-  { name: "Analytics", to: "/admin/dashboard/analytics", icon: BarChart3 },
   { name: "Departments", to: "/admin/dashboard/departments", icon: Users },
+  { name: "People Reviews", to: "/admin/dashboard/review", icon: BarChart3 },
   { name: "Settings", to: "/admin/dashboard/settings", icon: Settings },
 ];
 

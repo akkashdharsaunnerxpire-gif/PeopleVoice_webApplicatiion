@@ -6,7 +6,7 @@ import AdminLogin from "../pages/AdminLogin";
 import Dashboard from "../pages/Dashboard";
 import Issues from "../pages/Issues";
 import IssueDetails from "../pages/IssueDetails";
-import Analytics from "../pages/Analytics";
+import ReviewPage from "../pages/ReviewPage";
 import Departments from "../pages/Departments";
 import Settings from "../pages/Settings";
 import AdminRegister from "../pages/AdminRegister.jsx";
@@ -24,7 +24,7 @@ const AdminRoutes = () => (
       <Route path="dashboard" element={<Dashboard />} />
       <Route path="dashboard/issues" element={<Issues />} />
       <Route path="dashboard/issues/:id" element={<IssueDetails />} />
-      <Route path="dashboard/analytics" element={<Analytics />} />
+      <Route path="dashboard/review" element={<ReviewPage />} />
       <Route path="dashboard/departments" element={<Departments />} />
       <Route path="dashboard/settings" element={<Settings />} />
     </Route>

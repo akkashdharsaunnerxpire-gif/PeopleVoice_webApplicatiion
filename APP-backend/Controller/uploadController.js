@@ -18,6 +18,7 @@ exports.uploadImage = async (req, res) => {
     res.json({
       success: true,
       url: result.secure_url,
+      publicId: result.public_id, // 🔥 ADD THIS LINE
     });
   } catch (err) {
     console.error("Upload error:", err);
@@ -39,6 +40,7 @@ exports.uploadAdminProofImage = async (req, res) => {
     res.json({
       success: true,
       url: result.secure_url,
+      publicId: result.public_id, // 🔥 ADD HERE ALSO
     });
   } catch (err) {
     console.error("Upload error:", err);
