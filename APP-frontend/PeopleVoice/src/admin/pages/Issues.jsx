@@ -437,9 +437,10 @@ const Issues = () => {
                             <div className="relative w-12 h-12 rounded-lg overflow-hidden shadow-md group-hover:scale-105 transition-transform">
                               <img
                                 src={
-                                  typeof issue?.images?.[0] === "string"
+                                  (typeof issue?.images?.[0] === "string"
                                     ? issue.images[0]
-                                    : issue?.images?.[0]?.url
+                                    : issue?.images?.[0]?.url) ||
+                                  "https://via.placeholder.com/150"
                                 }
                                 className="w-full h-full object-cover"
                                 alt="issue"

@@ -166,7 +166,11 @@ exports.getIssueById = async (req, res) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
-    res.status(200).json(issue);
+    res.status(200).json({
+      ...issue._doc,
+      images: issue.images || [],
+      after_images: issue.after_images || [],
+    });
   } catch (error) {
     console.error("Get Issue By ID Error:", error);
     res.status(500).json({ message: "Server error" });
