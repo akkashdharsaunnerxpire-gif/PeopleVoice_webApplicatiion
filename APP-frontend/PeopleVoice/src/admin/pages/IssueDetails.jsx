@@ -196,12 +196,13 @@ export default function IssueDetails() {
   const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [detailsError, setDetailsError] = useState("");
+  const getImageUrl = (img) => (typeof img === "string" ? img : img?.url);
 
   // Cleanup object URLs on unmount or when images change
   useEffect(() => {
     return () => {
       afterImages.forEach((file) => {
-        if (file.preview) URL.revokeObjectURL(file.preview);
+        if (file?.preview) URL.revokeObjectURL(file.preview);
       });
     };
   }, [afterImages]);
@@ -241,18 +242,6 @@ export default function IssueDetails() {
     }
   };
 
-  const filesToBase64 = async (files) => {
-    const promises = files.map((file) => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-      });
-    });
-    return Promise.all(promises);
-  };
-
   const fetchIssue = useCallback(async () => {
     setLoading(true);
     try {
@@ -279,8 +268,11 @@ export default function IssueDetails() {
 
   const normalized = useMemo(() => {
     if (!issue) return null;
-    let displayStatus = issue.status;
-    if (issue.status === "solved") displayStatus = "Closed";
+    const statusMap = {
+      solved: "Closed",
+    };
+
+    let displayStatus = statusMap[issue.status] || issue.status;
     return {
       ...issue,
       beforeImages: (
@@ -476,10 +468,9 @@ export default function IssueDetails() {
     }
 
     const trimmedDetails = resolutionDetails.trim();
+
     if (trimmedDetails.length < 10) {
-      setDetailsError(
-        "Please provide at least 10 characters describing the resolution",
-      );
+      setDetailsError("Minimum 10 characters required");
       modalDescriptionRef.current?.focus();
       return;
     }
@@ -487,42 +478,48 @@ export default function IssueDetails() {
     setActionLoading(true);
 
     try {
-      const uploadedImages = [];
-
-      for (let file of afterImages) {
-        const base64 = await new Promise((resolve, reject) => {
+      // 🚀 parallel upload (FAST)
+      const uploadPromises = afterImages.map((file) => {
+        return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result);
+
+          reader.onload = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/api/upload/admin`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: reader.result }),
+              });
+
+              const data = await res.json();
+
+              if (data.success) {
+                resolve({
+                  url: data.url,
+                  publicId: data.publicId,
+                });
+              } else {
+                reject("Upload failed");
+              }
+            } catch (err) {
+              reject(err);
+            }
+          };
+
           reader.onerror = reject;
         });
+      });
 
-        const res = await fetch(`${API_BASE}/api/upload/admin`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ image: base64 }),
-        });
+      const uploadedImages = await Promise.all(uploadPromises);
 
-        const data = await res.json();
-
-        if (data.success) {
-          uploadedImages.push({
-            url: data.url,
-            publicId: data.publicId, // 🔥 ADD THIS
-          });
-        }
-      }
-
-      // ✅ save only URLs
       await updateStatus("Resolved", {
-        afterImages: uploadedImages, // 🔥 FIXED
+        afterImages: uploadedImages,
         resolutionDetails: trimmedDetails,
       });
     } catch (err) {
       console.error(err);
-      showToast("error", "Failed to submit resolution");
+      showToast("error", "Image upload failed");
     } finally {
       setActionLoading(false);
     }

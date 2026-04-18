@@ -50,6 +50,7 @@ const Issues = () => {
   const [openedIssues, setOpenedIssues] = useState(() => {
     return JSON.parse(localStorage.getItem("openedIssues") || "{}");
   });
+  const getImageUrl = (img) => (typeof img === "string" ? img : img?.url);
 
   // Fetch Issues
   const fetchIssues = useCallback(
@@ -437,10 +438,8 @@ const Issues = () => {
                             <div className="relative w-12 h-12 rounded-lg overflow-hidden shadow-md group-hover:scale-105 transition-transform">
                               <img
                                 src={
-                                  (typeof issue?.images?.[0] === "string"
-                                    ? issue.images[0]
-                                    : issue?.images?.[0]?.url) ||
-                                  "https://via.placeholder.com/150"
+                                  getImageUrl(issue.images?.[0]) ||
+                                  "https://via.placeholder.com/400"
                                 }
                                 className="w-full h-full object-cover"
                                 alt="issue"
