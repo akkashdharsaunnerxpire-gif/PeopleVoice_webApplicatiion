@@ -14,6 +14,7 @@ import {
   Check,
   MapPin,
   Clock,
+  Loader2, // ✅ added for loading spinner
 } from "lucide-react";
 import { useTheme } from "../../Context/ThemeContext";
 import { themeColors } from "./constants";
@@ -42,14 +43,15 @@ const PostModal = ({
   const { setCommentModalData } = useOutletContext();
   const [openMenuId, setOpenMenuId] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false); // ✅ loading state for delete
 
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
   const allImages = (localIssue?.images || []).map(img =>
-  typeof img === "string" ? img : img.url
-);
-  const totalImages = allImages.length;
+    typeof img === "string" ? img : img.url
+  );
+  const totalImages = allImages.length; 
   const comments = localIssue?.comments || [];
 
   const nextImage = useCallback(
@@ -68,9 +70,10 @@ const PostModal = ({
     },
     [currentImageIndex],
   );
+
   const handleDeleteClick = (issueId, e) => {
     e.stopPropagation();
-    setDeleteModal(issueId); // open popup
+    setDeleteModal(issueId);
   };
 
   useEffect(() => {
@@ -79,6 +82,8 @@ const PostModal = ({
 
   const confirmDelete = async () => {
     if (!deleteModal) return;
+
+    setIsDeleting(true); // ✅ start loading
 
     try {
       await axios.delete(`${APIURL}/issues/${deleteModal}`, {
@@ -93,6 +98,7 @@ const PostModal = ({
     } catch (err) {
       console.error("Delete failed:", err);
     } finally {
+      setIsDeleting(false); // ✅ stop loading
       setDeleteModal(null);
       setOpenMenuId(null);
     }
@@ -156,7 +162,6 @@ const PostModal = ({
         await navigator.clipboard.writeText(
           `${shareData.text}\n\nView this issue at: ${shareData.url}`,
         );
-        // Optional: Show toast notification
       } catch (err) {
         console.error("Copy failed", err);
       }
@@ -369,7 +374,6 @@ const PostModal = ({
                     </>
                   )}
 
-                  {/* Image counter */}
                   {totalImages > 1 && (
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm">
                       {currentImageIndex + 1} / {totalImages}
@@ -380,7 +384,6 @@ const PostModal = ({
                 <div className="text-gray-500 text-sm">No media available</div>
               )}
 
-              {/* Navigation arrows for posts */}
               <div className="absolute top-4 left-4 flex gap-2">
                 {hasPrev && (
                   <button
@@ -478,7 +481,6 @@ const PostModal = ({
                     </p>
                   )}
 
-                  {/* Location */}
                   {localIssue.area && (
                     <div className="flex items-center gap-1 mt-3">
                       <MapPin size={12} className={theme.textMuted} />
@@ -488,7 +490,6 @@ const PostModal = ({
                     </div>
                   )}
 
-                  {/* Department Tag */}
                   <div
                     className={`mt-3 inline-block text-[10px] font-medium px-2 py-1 rounded ${
                       isDark
@@ -518,14 +519,12 @@ const PostModal = ({
                   </div>
 
                   <div className="relative flex justify-between px-2">
-                    {/* Background line */}
                     <div
                       className={`absolute top-3.5 left-0 w-full h-0.5 ${
                         isDark ? "bg-gray-800" : "bg-gray-100"
                       } z-0`}
                     />
 
-                    {/* Progress line */}
                     <motion.div
                       initial={false}
                       animate={{
@@ -536,7 +535,6 @@ const PostModal = ({
                       }`}
                     />
 
-                    {/* 4 Stages */}
                     {["send", "in progress", "resolved", "closed"].map(
                       (stage, idx) => {
                         const statusOrder = {
@@ -587,9 +585,7 @@ const PostModal = ({
               {/* Actions Footer */}
               <div className={`p-4 border-t ${theme.border}`}>
                 <div className="flex items-center justify-between">
-                  {/* LEFT SIDE */}
                   <div className="flex items-center gap-5">
-                    {/* ❤️ LIKE */}
                     <div className="flex items-center gap-1">
                       <button
                         onClick={toggleLike}
@@ -610,7 +606,6 @@ const PostModal = ({
                       </span>
                     </div>
 
-                    {/* 💬 COMMENT */}
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() =>
@@ -622,7 +617,7 @@ const PostModal = ({
                               ? localIssue.images
                               : localIssue.images_data || [],
                             citizenId: citizenId,
-                            postOwnerId: localIssue.citizenId, // ✅ IMPORTANT
+                            postOwnerId: localIssue.citizenId,
                             district: localIssue.district,
                             setDisplayedIssues: setDisplayedIssues,
                             hideImage: true,
@@ -639,9 +634,7 @@ const PostModal = ({
                     </div>
                   </div>
 
-                  {/* RIGHT SIDE */}
                   <div className="flex items-center gap-2 relative">
-                    {/* 🔗 SHARE */}
                     <button
                       onClick={handleShare}
                       className={`p-2 rounded-full transition ${
@@ -651,7 +644,6 @@ const PostModal = ({
                       <Share2 size={20} className={theme.textMuted} />
                     </button>
 
-                    {/* ⋮ MENU */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -666,7 +658,6 @@ const PostModal = ({
                       <MoreVertical size={20} className={theme.textMuted} />
                     </button>
 
-                    {/* 🗑 DELETE POPUP */}
                     <AnimatePresence>
                       {openMenuId === issue._id && (
                         <motion.div
@@ -695,6 +686,8 @@ const PostModal = ({
           </motion.div>
         </motion.div>
       </AnimatePresence>
+
+      {/* Delete Confirmation Modal with Loading Spinner */}
       <AnimatePresence>
         {deleteModal && (
           <motion.div
@@ -720,16 +713,25 @@ const PostModal = ({
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setDeleteModal(null)}
-                  className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700"
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 disabled:opacity-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   onClick={confirmDelete}
-                  className="px-4 py-2 rounded-lg bg-red-500 text-white"
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-lg bg-red-500 text-white disabled:opacity-70 flex items-center gap-2"
                 >
-                  Delete
+                  {isDeleting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete"
+                  )}
                 </button>
               </div>
             </motion.div>
