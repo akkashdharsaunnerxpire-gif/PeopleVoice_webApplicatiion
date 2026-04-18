@@ -26,6 +26,8 @@ const MyIssues = () => {
 
   const [openMenuId, setOpenMenuId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const getImageUrl = (img) =>
+  typeof img === "string" ? img : img?.url;
 
   const navigate = useNavigate();
   const citizenId = localStorage.getItem("citizenId");
@@ -267,9 +269,7 @@ const MyIssues = () => {
                 >
                   <div className="aspect-square relative overflow-hidden">
                     <img
-                      src={
-                        issue.images?.[0].url || "https://via.placeholder.com/400"
-                      }
+                      src={getImageUrl(issue.images?.[0]) || "https://via.placeholder.com/400"}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       alt=""
                     />
