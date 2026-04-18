@@ -696,7 +696,10 @@ const PostIssue = () => {
     });
 
     const data = await res.json();
-    if (!data.url) throw new Error("Image upload failed");
+    if (!data || !data.url) {
+      console.error("Upload failed response:", data);
+      throw new Error("Image upload failed");
+    }
     return {
       url: data.url,
       publicId: data.publicId,

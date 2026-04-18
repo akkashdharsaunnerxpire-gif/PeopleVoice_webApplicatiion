@@ -132,7 +132,7 @@ exports.getAllIssues = async (req, res) => {
       area: issue.area, // 🔥 IMPORTANT
       status: issue.status,
       createdAt: issue.createdAt,
-      images: issue.images,
+      images: (issue.images || []).filter(img => img?.url),
       citizenId: issue.citizenId,
       likes: issue.likes?.length || 0,
       comments: issue.comments?.length || 0,
