@@ -1,10 +1,15 @@
 const express = require("express");
-const { createReview, checkReviewSubmitted ,getAllReviews} = require("../Controller/reviewController");
-
 const router = express.Router();
+const {
+  createReview,
+  checkReviewSubmitted,
+  getAllReviews,
+  getPreviousReview
+} = require("../Controller/reviewController");
 
 router.post("/", createReview);
 router.get("/check/:issueId", checkReviewSubmitted);
 router.get("/", getAllReviews);
+router.get("/previous/:issueId", getPreviousReview);
 
 module.exports = router;

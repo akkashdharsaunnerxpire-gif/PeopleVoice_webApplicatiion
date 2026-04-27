@@ -32,8 +32,6 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const APIURL = `${BACKEND_URL}/api`;
 const BASE = "/peopleVoice";
 
-
-
 // =============================
 // Helper Components
 // =============================
@@ -215,7 +213,7 @@ const Feed = () => {
     if (!citizenId) return;
     try {
       const res = await axios.get(
-        `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`,
+        `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`
       );
       const unread = (res.data || []).filter((n) => n.read === false).length;
       setUnreadCount(unread);
@@ -224,30 +222,34 @@ const Feed = () => {
     }
   }, [citizenId]);
 
-  // Initial fetch + polling for notifications
+  useEffect(() => {
+    if (location.pathname !== "/peopleVoice/feed") return;
+
+    let timeout;
+    const handleScroll = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        sessionStorage.setItem("feed_scroll_position", window.scrollY);
+      }, 100);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [location.pathname]);
+
   useEffect(() => {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 
-  // Listen for notification updates
   useEffect(() => {
     const handleUpdate = () => fetchUnreadCount();
     window.addEventListener("notification_update", handleUpdate);
-    return () =>
-      window.removeEventListener("notification_update", handleUpdate);
+    return () => window.removeEventListener("notification_update", handleUpdate);
   }, [fetchUnreadCount]);
-
-  // =============================
-  // Cache Helpers (with TTL)
-  // =============================
-
-  // Expose clearCache globally for post/update/delete event
-
-  // =============================
-  // Scroll Restoration Helpers
-  // =============================
 
   // =============================
   // Normalisation & Data Fetching
@@ -258,123 +260,110 @@ const Feed = () => {
   });
 
   const fetchIssues = useCallback(
-  async (pageNum, append = false) => {
-    if (append && isFetchingRef.current) return;
+    async (pageNum, append = false) => {
+      if (append && isFetchingRef.current) return;
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    isFetchingRef.current = true;
-
-    try {
-      if (!append) {
-        setLoading(true);
-        setError(null);
-      } else {
-        setLoadingMore(true);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
 
-      const params = new URLSearchParams({
-        page: pageNum,
-        limit: ITEMS_PER_PAGE,
-      });
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      isFetchingRef.current = true;
 
-      if (district !== DISTRICTS[0]) params.append("district", district);
-      if (department !== DEPARTMENTS[0])
-        params.append("department", department);
-      if (status !== STATUSES[0]) params.append("status", status);
-      if (sortBy !== SORT_OPTIONS[0])
-        params.append("sortBy", sortBy.toLowerCase().replace(" ", ""));
-      if (onlyWithImages) params.append("onlyWithImages", true);
-      if (onlyMyIssues) params.append("citizenId", citizenId);
+      try {
+        if (!append) {
+          setLoading(true);
+          setError(null);
+        } else {
+          setLoadingMore(true);
+        }
 
-      const res = await fetch(`${APIURL}/issues?${params.toString()}`, {
-        signal: controller.signal,
-      });
-
-      const data = await res.json();
-
-      console.log("🔥 API RESPONSE:", data);
-
-      if (!data.success) throw new Error(data.message);
-
-      const rawIssues = data.issues || [];
-      const newIssues = rawIssues.map(normalizeIssue);
-
-      console.log("🔥 NEW ISSUES:", newIssues);
-
-      // ✅ REMOVE EARLY RETURN
-      if (newIssues.length === 0) {
-        setHasMore(false);
-      }
-
-      if (append) {
-        setDisplayedIssues((prev) => {
-          const existingIds = new Set(prev.map((i) => i._id));
-          const uniqueNew = newIssues.filter((i) => !existingIds.has(i._id));
-          return [...prev, ...uniqueNew];
+        const params = new URLSearchParams({
+          page: pageNum,
+          limit: ITEMS_PER_PAGE,
         });
 
-        setHasMore(data.hasMore);
-        pageRef.current = pageNum;
-        setPage(pageNum);
-      } else {
-        // 🔥 IMPORTANT: ALWAYS SET DATA
-        setDisplayedIssues(newIssues);
+        if (district !== DISTRICTS[0]) params.append("district", district);
+        if (department !== DEPARTMENTS[0]) params.append("department", department);
+        if (status !== STATUSES[0]) params.append("status", status);
+        if (sortBy !== SORT_OPTIONS[0]) params.append("sortBy", sortBy.toLowerCase().replace(" ", ""));
+        if (onlyWithImages) params.append("onlyWithImages", true);
+        if (onlyMyIssues) params.append("citizenId", citizenId);
 
-        setHasMore(data.hasMore);
-        pageRef.current = 1;
-        setPage(1);
-      }
-    } catch (err) {
-      if (err.name !== "AbortError") {
-        console.error("❌ Fetch error:", err);
-        setError(err.message);
+        const res = await fetch(`${APIURL}/issues?${params.toString()}`, {
+          signal: controller.signal,
+        });
 
-        if (!append) {
-          setDisplayedIssues([]);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        const rawIssues = data.issues || [];
+        const newIssues = rawIssues.map(normalizeIssue);
+
+        if (newIssues.length === 0) {
           setHasMore(false);
         }
+
+        if (append) {
+          setDisplayedIssues((prev) => {
+            const existingIds = new Set(prev.map((i) => i._id));
+            const uniqueNew = newIssues.filter((i) => !existingIds.has(i._id));
+            return [...prev, ...uniqueNew];
+          });
+          setHasMore(data.hasMore);
+          pageRef.current = pageNum;
+          setPage(pageNum);
+        } else {
+          setDisplayedIssues(newIssues);
+          setHasMore(data.hasMore);
+          pageRef.current = 1;
+          setPage(1);
+        }
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("❌ Fetch error:", err);
+          setError(err.message);
+          if (!append) {
+            setDisplayedIssues([]);
+            setHasMore(false);
+          }
+        }
+      } finally {
+        if (!append) setLoading(false);
+        else setLoadingMore(false);
+        isFetchingRef.current = false;
+        abortControllerRef.current = null;
+        setShowAdvancedLoader(false);
       }
-    } finally {
-      if (!append) setLoading(false);
-      else setLoadingMore(false);
+    },
+    [district, department, status, sortBy, onlyWithImages, onlyMyIssues, citizenId, setDisplayedIssues]
+  );
 
-      isFetchingRef.current = false;
-      abortControllerRef.current = null;
-      setShowAdvancedLoader(false);
-    }
-  },
-  [
-    district,
-    department,
-    status,
-    sortBy,
-    onlyWithImages,
-    onlyMyIssues,
-    citizenId,
-    setDisplayedIssues,
-  ],
-);
-
+  // Initial load
   useEffect(() => {
-  if (!initialDataLoaded.current) {
-    fetchIssues(1, false);   // 🔥 FIRST API CALL
-    initialDataLoaded.current = true;
-    console.log(displayedIssues);
-  }
-}, [fetchIssues]);
+    if (!initialDataLoaded.current) {
+      if (displayedIssues.length === 0) {
+        fetchIssues(1, false);
+      }
+      initialDataLoaded.current = true;
+    }
+  }, [fetchIssues, displayedIssues]);
 
-  // =============================
-  // Initial load & restoration (with TTL)
-  // =============================
+  // Scroll restoration after first load
+  useEffect(() => {
+    if (displayedIssues.length > 0 && !scrollRestoredRef.current) {
+      const savedScroll = sessionStorage.getItem("feed_scroll_position");
+      if (savedScroll) {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, parseInt(savedScroll));
+        });
+      }
+      scrollRestoredRef.current = true;
+    }
+  }, [displayedIssues]);
 
-  // =============================
-  // Real-time Updates: New Issue Created
-  // =============================
+  // Real-time update: new issue created
   useEffect(() => {
     const handleNewIssue = () => {
       const currentScroll = window.scrollY;
@@ -382,14 +371,11 @@ const Feed = () => {
         window.scrollTo(0, currentScroll);
       });
     };
-
     window.addEventListener("newIssueCreated", handleNewIssue);
     return () => window.removeEventListener("newIssueCreated", handleNewIssue);
   }, [fetchIssues]);
 
-  // =============================
-  // Filter Changes
-  // =============================
+  // Filter change debounce
   useEffect(() => {
     if (!initialDataLoaded.current) return;
 
@@ -435,20 +421,9 @@ const Feed = () => {
     return () => {
       if (filterTimeout.current) clearTimeout(filterTimeout.current);
     };
-  }, [
-    district,
-    department,
-    status,
-    sortBy,
-    onlyWithImages,
-    onlyMyIssues,
-    fetchIssues,
-    setDisplayedIssues,
-  ]);
+  }, [district, department, status, sortBy, onlyWithImages, onlyMyIssues, fetchIssues, setDisplayedIssues]);
 
-  // =============================
-  // Scroll Restoration after Initial Load
-  // =============================
+  // Load more on scroll
   const loadMoreIssues = useCallback(async () => {
     if (isFetchingRef.current || loading || loadingMore || !hasMore) return;
     const nextPage = pageRef.current + 1;
@@ -461,7 +436,7 @@ const Feed = () => {
       (entries) => {
         if (entries[0].isIntersecting) loadMoreIssues();
       },
-      { rootMargin: "400px" },
+      { rootMargin: "400px" }
     );
     if (current) observer.observe(current);
     return () => {
@@ -469,9 +444,6 @@ const Feed = () => {
     };
   }, [loadMoreIssues]);
 
-  // =============================
-  // Helper Functions
-  // =============================
   const clearFilters = () => {
     setDistrict(DISTRICTS[0]);
     setDepartment(DEPARTMENTS[0]);
@@ -486,7 +458,6 @@ const Feed = () => {
       if (!citizenId) return;
 
       let previousState;
-
       setDisplayedIssues((prev) => {
         previousState = prev;
         return prev.map((issue) => {
@@ -512,22 +483,15 @@ const Feed = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ citizenId }),
         });
-
         const data = await res.json();
-
         if (data.success) {
-          setDisplayedIssues((prev) => {
-            const updated = prev.map((issue) =>
+          setDisplayedIssues((prev) =>
+            prev.map((issue) =>
               issue._id === issueId
-                ? {
-                    ...issue,
-                    likes: data.likes,
-                    likeCount: data.likeCount ?? data.likes.length,
-                  }
-                : issue,
-            );
-            return updated;
-          });
+                ? { ...issue, likes: data.likes, likeCount: data.likeCount ?? data.likes.length }
+                : issue
+            )
+          );
         } else {
           setDisplayedIssues(previousState);
         }
@@ -535,17 +499,12 @@ const Feed = () => {
         setDisplayedIssues(previousState);
       }
     },
-    [citizenId, setDisplayedIssues],
+    [citizenId, setDisplayedIssues]
   );
 
-  // =============================
-  // Render
-  // =============================
   return (
-    <div
-      className={`min-h-screen transition-colors duration-700 ${theme.bg} pb-20`}
-    >
-      {/* Mobile Header with Filter Button and Notification Bell */}
+    <div className={`min-h-screen transition-colors duration-700 ${theme.bg} pb-20`}>
+      {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30">
         <div
           className={`backdrop-blur-xl border-b ${
@@ -556,9 +515,6 @@ const Feed = () => {
         >
           <div className="px-4 py-3 flex items-center justify-between">
             <div>
-              {/* <h1 className={`text-lg font-black tracking-tight ${theme.text}`}>
-                PEOPLE VOICE
-              </h1> */}
               <p
                 className={`text-[10px] uppercase tracking-wider ${
                   isDark ? "text-violet-400" : "text-green-600"
@@ -568,9 +524,6 @@ const Feed = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* Notification Bell - Mobile only */}
-
-              {/* Filter Button */}
               <motion.button
                 whileTap={{ scale: 0.92 }}
                 onClick={() => setIsMobileFilterOpen(true)}
@@ -588,10 +541,7 @@ const Feed = () => {
                 onClick={() => navigate(`${BASE}/notifications`)}
                 className="relative p-2 rounded-xl"
               >
-                <Bell
-                  size={22}
-                  className={isDark ? "text-violet-300" : "text-gray-700"}
-                />
+                <Bell size={22} className={isDark ? "text-violet-300" : "text-gray-700"} />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                     {unreadCount > 9 ? "9+" : unreadCount}
@@ -604,7 +554,7 @@ const Feed = () => {
       </div>
 
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row-reverse items-start justify-center gap-8 px-0 lg:px-4 pt-20 lg:pt-8">
-        {/* Desktop Filter Sidebar */}
+        {/* Desktop Sidebar */}
         <aside className="hidden lg:block w-[340px] shrink-0 sticky top-8 z-20">
           <div
             className={`backdrop-blur-2xl border rounded-[2.5rem] p-6 shadow-xl transition-all duration-500 ${
@@ -635,7 +585,6 @@ const Feed = () => {
         {/* Main Feed */}
         <main className="flex-1 max-w-2xl w-full relative">
           <div className="space-y-0 md:space-y-6 pb-16">
-            {/* Show Advanced Loader for 4 seconds on ANY filter change */}
             {showAdvancedLoader ? (
               <AdvancedLoader isDark={isDark} />
             ) : loading && displayedIssues.length === 0 ? (
@@ -653,11 +602,7 @@ const Feed = () => {
                 }`}
               >
                 <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
-                <p
-                  className={`font-bold mb-4 ${
-                    isDark ? "text-violet-200" : "text-red-800"
-                  }`}
-                >
+                <p className={`font-bold mb-4 ${isDark ? "text-violet-200" : "text-red-800"}`}>
                   {error}
                 </p>
                 <button
@@ -722,17 +667,9 @@ const Feed = () => {
               </AnimatePresence>
             )}
 
-            {/* Infinite Scroll Trigger */}
-            <div
-              ref={bottomObserverRef}
-              className="py-12 flex flex-col items-center justify-center gap-3"
-            >
+            <div ref={bottomObserverRef} className="py-12 flex flex-col items-center justify-center gap-3">
               {loadingMore && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex flex-col items-center gap-3"
-                >
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-3">
                   <SmallSpinner size="md" isDark={isDark} />
                   <span
                     className={`text-[10px] font-black uppercase tracking-[0.2em] ${
@@ -744,16 +681,8 @@ const Feed = () => {
                 </motion.div>
               )}
               {!loadingMore && !hasMore && displayedIssues.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.3 }}
-                  className="flex items-center gap-4"
-                >
-                  <div
-                    className={`h-[1px] w-16 ${
-                      isDark ? "bg-violet-500" : "bg-slate-400"
-                    }`}
-                  />
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.3 }} className="flex items-center gap-4">
+                  <div className={`h-[1px] w-16 ${isDark ? "bg-violet-500" : "bg-slate-400"}`} />
                   <span
                     className={`text-[11px] font-bold uppercase tracking-[0.3em] ${
                       isDark ? "text-violet-200" : "text-slate-500"
@@ -761,11 +690,7 @@ const Feed = () => {
                   >
                     End of Road
                   </span>
-                  <div
-                    className={`h-[1px] w-16 ${
-                      isDark ? "bg-violet-500" : "bg-slate-400"
-                    }`}
-                  />
+                  <div className={`h-[1px] w-16 ${isDark ? "bg-violet-500" : "bg-slate-400"}`} />
                 </motion.div>
               )}
             </div>
@@ -773,7 +698,7 @@ const Feed = () => {
         </main>
       </div>
 
-      {/* Mobile Filter Drawer */}
+      {/* Mobile Filter Drawer – FIXED: Apply button just closes drawer */}
       <AnimatePresence>
         {isMobileFilterOpen && (
           <>
@@ -799,23 +724,14 @@ const Feed = () => {
                   isDark ? "border-violet-500/20" : "border-green-100"
                 }`}
               >
-                <h2
-                  className={`text-xl font-black uppercase tracking-tighter ${theme.text}`}
-                >
-                  Filters
-                </h2>
+                <h2 className={`text-xl font-black uppercase tracking-tighter ${theme.text}`}>Filters</h2>
                 <motion.button
                   whileTap={{ scale: 0.9 }}
                   whileHover={{ rotate: 90 }}
                   onClick={() => setIsMobileFilterOpen(false)}
-                  className={`p-3 rounded-xl ${
-                    isDark ? "hover:bg-violet-900/50" : "hover:bg-green-50"
-                  }`}
+                  className={`p-3 rounded-xl ${isDark ? "hover:bg-violet-900/50" : "hover:bg-green-50"}`}
                 >
-                  <X
-                    size={22}
-                    className={isDark ? "text-violet-300" : "text-green-600"}
-                  />
+                  <X size={22} className={isDark ? "text-violet-300" : "text-green-600"} />
                 </motion.button>
               </div>
               <div className="flex-1 overflow-y-auto p-5">
@@ -843,17 +759,14 @@ const Feed = () => {
                 }`}
               >
                 <button
-                  onClick={() => {
-                    clearFilters();
-                    setIsMobileFilterOpen(false);
-                  }}
+                  onClick={() => setIsMobileFilterOpen(false)} // ✅ Just close – filters already applied live
                   className={`w-full py-3 rounded-xl font-bold ${
                     isDark
                       ? "bg-violet-700 hover:bg-violet-600 text-white"
                       : "bg-green-600 hover:bg-green-700 text-white"
                   } transition-colors`}
                 >
-                  Apply Filters
+                  Done
                 </button>
               </div>
             </motion.div>

@@ -28,6 +28,7 @@ import {
   ChevronRight,
   ImageUp,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 
 // Material UI Components
@@ -96,6 +97,7 @@ const StatusChip = styled(Chip)(({ status, theme }) => {
     Resolved: { bg: "#e3f7ec", color: "#0b6e4f", border: "#a8e6c0" },
     Closed: { bg: "#e8eaff", color: "#3949ab", border: "#c5cae9" },
     solved: { bg: "#e8eaff", color: "#3949ab", border: "#c5cae9" },
+    Reopened: { bg: "#fee2e2", color: "#b91c1c", border: "#fecaca" }, // ✅ added
   };
   const color = colors[status] || colors[displayStatus] || colors.Sent;
   return {
@@ -179,6 +181,85 @@ const formatShortDate = (dateString) => {
   }
 };
 
+// Image Gallery Component with dynamic sizing
+const ImageGallery = ({ images, onImageClick }) => {
+  if (!images || images.length === 0) {
+    return (
+      <Paper
+        sx={{ p: 3, textAlign: "center", bgcolor: "#f9fafc", borderRadius: 2 }}
+      >
+        <ImageIcon size={32} color="#9ca3af" />
+        <Typography color="text.secondary">No images available</Typography>
+      </Paper>
+    );
+  }
+
+  const isSingleImage = images.length === 1;
+
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: isSingleImage
+          ? "1fr" // Single image takes full width
+          : "repeat(auto-fill, minmax(200px, 1fr))", // Multiple images: responsive grid
+        gap: 2,
+      }}
+    >
+      {images.map((src, i) => (
+        <Box
+          key={i}
+          onClick={() => onImageClick(src)}
+          sx={{
+            borderRadius: 2,
+            overflow: "hidden",
+            cursor: "pointer",
+            border: isSingleImage ? "2px solid #10b981" : "1px solid #e5e7eb",
+            transition: "all 0.2s",
+            "&:hover": {
+              opacity: 0.9,
+              transform: "scale(1.02)",
+            },
+            // Single image specific styles
+            ...(isSingleImage && {
+              maxWidth: "100%",
+              "& img": {
+                width: "100%",
+                height: "auto",
+                maxHeight: 400,
+                objectFit: "contain",
+                backgroundColor: "#f5f5f5",
+              },
+            }),
+          }}
+        >
+          <img
+            src={src}
+            alt={`Image ${i + 1}`}
+            style={{
+              width: "100%",
+              height: isSingleImage ? "auto" : 160,
+              maxHeight: isSingleImage ? 400 : 160,
+              objectFit: isSingleImage ? "contain" : "cover",
+              backgroundColor: isSingleImage ? "#fafafa" : "transparent",
+            }}
+          />
+          {!isSingleImage && (
+            <Box sx={{ p: 1, bgcolor: "rgba(0,0,0,0.7)" }}>
+              <Typography
+                variant="caption"
+                sx={{ color: "white", display: "block", textAlign: "center" }}
+              >
+                {i + 1}/{images.length}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 export default function IssueDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -196,6 +277,8 @@ export default function IssueDetails() {
   const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [detailsError, setDetailsError] = useState("");
+  const [negativeFeedback, setNegativeFeedback] = useState(""); // ✅ state for reopened feedback
+
   const getImageUrl = (img) => (typeof img === "string" ? img : img?.url);
 
   // Cleanup object URLs on unmount or when images change
@@ -250,7 +333,14 @@ export default function IssueDetails() {
       const res = await axios.get(`${API_BASE}/api/admin/issues/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setIssue(res.data.issue || res.data);
+      const fetchedIssue = res.data.issue || res.data;
+      setIssue(fetchedIssue);
+      // ✅ Extract negative feedback for reopened issues
+      if (fetchedIssue.status === "Reopened" && fetchedIssue.negativeReview?.feedback) {
+        setNegativeFeedback(fetchedIssue.negativeReview.feedback);
+      } else {
+        setNegativeFeedback("");
+      }
     } catch (err) {
       console.error("Fetch error:", err);
       setToast({
@@ -369,6 +459,7 @@ export default function IssueDetails() {
       return 100;
     if (normalized.status === "Resolved") return 80;
     if (normalized.status === "In Progress") return 50;
+    if (normalized.status === "Reopened") return 50; // ✅ treat like In Progress
     return 25;
   }, [normalized?.status]);
 
@@ -378,6 +469,7 @@ export default function IssueDetails() {
       return "success";
     if (normalized.status === "Resolved") return "success";
     if (normalized.status === "In Progress") return "warning";
+    if (normalized.status === "Reopened") return "warning"; // ✅ orange warning
     return "info";
   };
 
@@ -414,7 +506,14 @@ export default function IssueDetails() {
     const currentRawStatus = normalized?.status || "Sent";
     let currentIdx;
     if (currentRawStatus === "solved") currentIdx = 3;
-    else {
+    else if (currentRawStatus === "Reopened") {
+      // ✅ Reopened: treat as active on "In Progress" step (so previous steps completed)
+      const order = ["Sent", "In Progress", "Resolved", "Closed"];
+      currentIdx = order.indexOf("In Progress");
+      if (stepStatus === "In Progress") return "active";
+      if (stepStatus === "Sent") return "completed";
+      return "pending";
+    } else {
       const order = ["Sent", "In Progress", "Resolved", "Closed"];
       currentIdx = order.indexOf(currentRawStatus);
     }
@@ -446,10 +545,17 @@ export default function IssueDetails() {
         };
       case "Resolved":
         return {
-          label: "Close Issue",
+          label: "Waiting for User Confirmation",
           colorType: "warning",
-          onClick: () => updateStatus("Closed"),
-          loading: "Closing...",
+          onClick: () => {}, // no action
+          disabled: true,
+        };
+      case "Reopened": // ✅ allow admin to resolve again
+        return {
+          label: "Resolve Issue",
+          colorType: "success",
+          onClick: () => setShowResolveModal(true),
+          loading: "Processing...",
         };
       default:
         return null;
@@ -458,72 +564,68 @@ export default function IssueDetails() {
 
   const action = getActionConfig();
 
-  const handleResolveSubmit = async () => {
-    setDetailsError("");
-    setUploadError("");
+// Update the handleResolveSubmit function
+const handleResolveSubmit = async () => {
+  setDetailsError("");
+  setUploadError("");
 
-    if (afterImages.length === 0) {
-      setUploadError("Please upload at least one after-resolution image");
-      return;
-    }
+  if (afterImages.length === 0) {
+    setUploadError("Please upload at least one after-resolution image");
+    return;
+  }
 
-    const trimmedDetails = resolutionDetails.trim();
+  const trimmedDetails = resolutionDetails.trim();
+  if (trimmedDetails.length < 10) {
+    setDetailsError("Minimum 10 characters required");
+    modalDescriptionRef.current?.focus();
+    return;
+  }
 
-    if (trimmedDetails.length < 10) {
-      setDetailsError("Minimum 10 characters required");
-      modalDescriptionRef.current?.focus();
-      return;
-    }
+  setActionLoading(true);
 
-    setActionLoading(true);
-
-    try {
-      // 🚀 parallel upload (FAST)
-      const uploadPromises = afterImages.map((file) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-
-          reader.onload = async () => {
-            try {
-              const res = await fetch(`${API_BASE}/api/upload/admin`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image: reader.result }),
-              });
-
-              const data = await res.json();
-
-              if (data.success) {
-                resolve({
-                  url: data.url,
-                  publicId: data.publicId,
-                });
-              } else {
-                reject("Upload failed");
-              }
-            } catch (err) {
-              reject(err);
+  try {
+    const uploadPromises = afterImages.map((file) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+          try {
+            const res = await fetch(`${API_BASE}/api/upload/admin`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ image: reader.result }),
+            });
+            const data = await res.json();
+            if (data.success) {
+              resolve({ url: data.url, publicId: data.publicId });
+            } else {
+              reject("Upload failed");
             }
-          };
-
-          reader.onerror = reject;
-        });
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = reject;
       });
+    });
 
-      const uploadedImages = await Promise.all(uploadPromises);
+    const uploadedImages = await Promise.all(uploadPromises);
+    
+    // Note: The backend will detect that this was a reopened issue
+    // and send the appropriate "properly resolved" message
+    await updateStatus("Resolved", {
+      afterImages: uploadedImages,
+      resolutionDetails: trimmedDetails,
+    });
 
-      await updateStatus("Resolved", {
-        afterImages: uploadedImages,
-        resolutionDetails: trimmedDetails,
-      });
-    } catch (err) {
-      console.error(err);
-      showToast("error", "Image upload failed");
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    showToast("success", "Resolution confirmation sent to the complaint user");
+  } catch (err) {
+    console.error(err);
+    showToast("error", "Image upload failed");
+  } finally {
+    setActionLoading(false);
+  }
+};
 
   if (loading) {
     return (
@@ -638,7 +740,11 @@ export default function IssueDetails() {
                   Issue #{id?.slice(-8)}
                 </Typography>
                 <StatusChip
-                  label={normalized.displayStatus || normalized.status}
+                  label={
+                    normalized.status === "Reopened"
+                      ? "Improperly Resolved"
+                      : (normalized.displayStatus || normalized.status)
+                  }
                   status={normalized.status}
                   size="small"
                 />
@@ -659,6 +765,22 @@ export default function IssueDetails() {
             </IconButton>
           </Tooltip>
         </Box>
+
+        {/* ✅ Warning banner for Reopened issues with negative feedback */}
+        {normalized.status === "Reopened" && negativeFeedback && (
+          <Alert
+            severity="error"
+            icon={<MessageSquare size={20} />}
+            sx={{ mb: 3, borderRadius: 2 }}
+          >
+            <Typography variant="subtitle2" fontWeight="bold">
+              Citizen reported this issue as NOT properly resolved
+            </Typography>
+            <Typography variant="body2">
+              <strong>Feedback:</strong> {negativeFeedback}
+            </Typography>
+          </Alert>
+        )}
 
         <StyledCard>
           <CardContent sx={{ p: 4 }}>
@@ -842,55 +964,13 @@ export default function IssueDetails() {
                   gutterBottom
                   sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}
                 >
-                  <ImageIcon size={18} /> Images
+                  <ImageIcon size={18} /> Before Images
                 </Typography>
                 {normalized.beforeImages.length > 0 && (
-                  <Box>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      fontWeight={600}
-                      sx={{ display: "block", mb: 2 }}
-                    >
-                      BEFORE IMAGES
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fill, minmax(180px, 1fr))",
-                        gap: 2,
-                      }}
-                    >
-                      {normalized.beforeImages.map((src, i) => (
-                        <Box
-                          key={i}
-                          onClick={() => openImagePreview(src)}
-                          sx={{
-                            borderRadius: 2,
-                            overflow: "hidden",
-                            cursor: "pointer",
-                            border: "1px solid #e5e7eb",
-                            transition: "all 0.2s",
-                            "&:hover": {
-                              opacity: 0.9,
-                              transform: "scale(1.02)",
-                            },
-                          }}
-                        >
-                          <img
-                            src={src}
-                            alt={`Before ${i + 1}`}
-                            style={{
-                              width: "100%",
-                              height: 160,
-                              objectFit: "cover",
-                            }}
-                          />
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
+                  <ImageGallery
+                    images={normalized.beforeImages}
+                    onImageClick={openImagePreview}
+                  />
                 )}
               </Box>
             </Box>
@@ -931,42 +1011,10 @@ export default function IssueDetails() {
                   </Box>
                   <Box sx={{ mb: 4 }}>
                     {normalized.afterImages.length > 0 ? (
-                      <Box
-                        sx={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fill, minmax(200px, 1fr))",
-                          gap: 2,
-                        }}
-                      >
-                        {normalized.afterImages.map((src, i) => (
-                          <Box
-                            key={i}
-                            onClick={() => openImagePreview(src)}
-                            sx={{
-                              borderRadius: 2,
-                              overflow: "hidden",
-                              cursor: "pointer",
-                              border: "2px solid #10b981",
-                              transition: "all 0.2s",
-                              "&:hover": {
-                                opacity: 0.9,
-                                transform: "scale(1.02)",
-                              },
-                            }}
-                          >
-                            <img
-                              src={src}
-                              alt={`After ${i + 1}`}
-                              style={{
-                                width: "100%",
-                                height: 160,
-                                objectFit: "cover",
-                              }}
-                            />
-                          </Box>
-                        ))}
-                      </Box>
+                      <ImageGallery
+                        images={normalized.afterImages}
+                        onImageClick={openImagePreview}
+                      />
                     ) : (
                       <Paper
                         sx={{
@@ -1050,7 +1098,7 @@ export default function IssueDetails() {
               <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
                 <GradientButton
                   colorType={action.colorType}
-                  disabled={actionLoading}
+                  disabled={actionLoading || action?.disabled}
                   onClick={action.onClick}
                   startIcon={
                     actionLoading ? (
@@ -1104,7 +1152,7 @@ export default function IssueDetails() {
         </StyledCard>
       </Container>
 
-      {/* ==================== RESOLVE MODAL (FIXED) ==================== */}
+      {/* ==================== RESOLVE MODAL ==================== */}
       {showResolveModal && (
         <Box
           sx={{

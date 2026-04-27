@@ -60,13 +60,17 @@ const PostIssueSchema = new mongoose.Schema(
         publicId: String, // 🔥 MUST
       },
     ],
+    lastOpenedNotified: {
+      type: Boolean,
+      default: false,
+    },
 
     resolution_details: String,
 
     /* ⏱ STATUS (Citizen-visible only) */
     status: {
       type: String,
-      enum: ["Sent", "In Progress", "Resolved", "Closed", "solved"],
+      enum: ["Sent", "In Progress", "Resolved", "Closed", "Reopened"],
       default: "Sent",
     },
     notificationRead: {

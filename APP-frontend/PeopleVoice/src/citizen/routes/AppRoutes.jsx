@@ -8,22 +8,21 @@ import Feed from "../pages/Feed";
 import PostIssue from "../pages/PostIssue";
 import Profile from "../pages/Profile";
 import Notifications from "../pages/Notifications";
-import SavedIssues from "../pages/SavedIssues"; // ✅ FIX
+import SavedIssues from "../pages/SavedIssues";
 import ForgotPassword from "../pages/Forgetpassword";
 import MyIssues from "../pages/myissues";
 import Settings from "../pages/Settings";
 import Helpcare from "../pages/Helpcare";
 import Proofpop from "../pages/Proofpop";
 import Proofpage from "../pages/Proofspage";
-import ResolutionReviewPage from "../pages/ResolutionReview";
-// src/citizen/routes/AppRoutes.jsx
+import ResolutionReview from "../pages/ResolutionReview";
 
 const AppRoutes = () => {
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
   return (
     <Routes>
-      {/* ROOT: Using absolute path to /peopleVoice/feed */}
+      {/* ROOT */}
       <Route
         index
         element={
@@ -34,20 +33,17 @@ const AppRoutes = () => {
         }
       />
 
-      {/* PUBLIC */}
+      {/* PUBLIC ROUTES */}
       <Route path="login" element={<Login />} />
       <Route path="register" element={<Register />} />
       <Route path="forgotpassword" element={<ForgotPassword />} />
       <Route path="proofpop/:id" element={<Proofpop />} />
-      <Route path="/resolution-review/:id" element={<ResolutionReviewPage />} />
+      <Route path="resolution-review/:id" element={<ResolutionReview />} />
 
-      {/* PROTECTED */}
+      {/* PROTECTED ROUTES (with AppLayout) */}
       <Route element={<AppLayout />}>
         <Route path="feed" element={<Feed />} />
-
-        {/* FIX: Changed "myissues" to "my-issues" to match your Navigation.jsx */}
         <Route path="my-issues" element={<MyIssues />} />
-
         <Route path="post-issue" element={<PostIssue />} />
         <Route path="profile" element={<Profile />} />
         <Route path="proofspage" element={<Proofpage />} />
@@ -57,6 +53,7 @@ const AppRoutes = () => {
         <Route path="help" element={<Helpcare />} />
       </Route>
 
+      {/* CATCH ALL */}
       <Route path="*" element={<Navigate to="/peopleVoice/login" replace />} />
     </Routes>
   );

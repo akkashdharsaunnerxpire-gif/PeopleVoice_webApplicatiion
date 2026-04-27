@@ -9,10 +9,10 @@ const AppLayout = () => {
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
   const [isDark, setIsDark] = useState(
-    localStorage.getItem("theme") === "dark",
+    localStorage.getItem("theme") === "dark"
   );
 
-  // Disable zooming by setting viewport meta tag
+  // Disable zooming (optional, keeps pinch zoom off)
   useEffect(() => {
     let metaViewport = document.querySelector('meta[name="viewport"]');
     if (!metaViewport) {
@@ -22,21 +22,19 @@ const AppLayout = () => {
     }
     metaViewport.setAttribute(
       "content",
-      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
+      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     );
-
-    // Cleanup on unmount (optional: restore original content if needed)
     return () => {
-      // Restore default zoom behavior when component unmounts
       if (metaViewport) {
         metaViewport.setAttribute(
           "content",
-          "width=device-width, initial-scale=1.0",
+          "width=device-width, initial-scale=1.0"
         );
       }
     };
   }, []);
 
+  // Sync theme with localStorage & document class
   useEffect(() => {
     const handleThemeUpdate = () => {
       const currentTheme = localStorage.getItem("theme") === "dark";
@@ -59,43 +57,62 @@ const AppLayout = () => {
     return <Navigate to="/peopleVoice/login" replace />;
   }
 
+  // Global scroll style – clean & invisible scrollbar
+  const scrollbarStyle = `
+    * {
+      scroll-behavior: smooth;
+      scrollbar-width: thin;
+    }
+    *::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    *::-webkit-scrollbar-thumb {
+      background-color: ${isDark ? "#4b5563" : "#cbd5e1"};
+      border-radius: 20px;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background-color: ${isDark ? "#6b7280" : "#94a3b8"};
+    }
+  `;
+
   return (
     <div
       className={`min-h-screen w-full transition-all duration-500 ${
         isDark ? "bg-[#1a0033] text-violet-50" : "bg-white text-gray-900"
       }`}
     >
+      <style>{scrollbarStyle}</style>
+
       <div className="relative flex">
-        {/* Sidebar – visible from md breakpoint (≥768px) */}
         {isLoggedIn && <Navigation />}
 
-        {/* Main content – margin only when sidebar is visible */}
-        <main
-          className={`flex-1 w-full min-h-screen ${
-            isLoggedIn ? "md:ml-72" : ""
-          }`}
-        >
+        <main className={`flex-1 w-full min-h-screen ${isLoggedIn ? "md:ml-72" : ""}`}>
+          {/* Single Outlet – context passed directly */}
           <Outlet context={{ setCommentModalData, isDark }} />
         </main>
 
         <AnimatePresence>
           {commentModalData && (
             <CommentModal
-  open={true}
-  onClose={() => setCommentModalData(null)}
-  issueId={commentModalData.issueId} // ✅ FIXED
-  comments={commentModalData.comments}
-  images={
-    commentModalData.hideImage
-      ? []
-      : commentModalData.images || commentModalData.images_data
-  }
-  citizenId={localStorage.getItem("citizenId")}
-  postOwnerId={commentModalData.postOwnerId} // ✅ FIXED
-  district={commentModalData.district}
-  setDisplayedIssues={commentModalData.setDisplayedIssues}
-  isDark={isDark}
-/>
+              open={true}
+              onClose={() => setCommentModalData(null)}
+              issueId={commentModalData.issueId}
+              comments={commentModalData.comments}
+              images={
+                commentModalData.hideImage
+                  ? []
+                  : commentModalData.images || commentModalData.images_data
+              }
+              citizenId={localStorage.getItem("citizenId")}
+              postOwnerId={commentModalData.postOwnerId}
+              district={commentModalData.district}
+              setDisplayedIssues={commentModalData.setDisplayedIssues}
+              isDark={isDark}
+            />
           )}
         </AnimatePresence>
       </div>

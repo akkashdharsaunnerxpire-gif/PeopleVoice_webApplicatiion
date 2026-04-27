@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { flushSync } from "react-dom";
 import {
   Bell,
   CheckCircle2,
@@ -28,8 +29,8 @@ const Notifications = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [newNotificationCount, setNewNotificationCount] = useState(0);
   const [selectedImage, setSelectedImage] = useState(null);
-
-  const pollingInterval = useRef(null);
+  const isFetching = useRef(false);
+  const intervalRef = useRef(null);
   const lastNotificationIds = useRef(new Set());
 
   const citizenId = localStorage.getItem("citizenId");
@@ -81,8 +82,13 @@ const Notifications = () => {
     return null;
   };
   /* ================= LOAD NOTIFICATIONS ================= */
-  const loadNotifications = useCallback(async () => {
-    if (!citizenId) return;
+
+  const isFirstLoad = useRef(true);
+
+  const loadNotifications = async () => {
+    if (!citizenId || isFetching.current) return;
+
+    isFetching.current = true;
 
     try {
       const res = await axios.get(
@@ -92,60 +98,91 @@ const Notifications = () => {
       const newData = res.data || [];
 
       const currentIds = lastNotificationIds.current;
-      const freshNew = newData.filter((n) => !currentIds.has(n._id));
 
-      if (freshNew.length > 0 && currentIds.size > 0) {
-        setNewNotificationCount((prev) => prev + freshNew.length);
-        playNotificationSound();
+      // 🔥 detect only AFTER first load
+      if (!isFirstLoad.current) {
+        const freshNew = newData.filter((n) => !currentIds.has(n._id));
 
-        freshNew.forEach((n) => {
-          const notificationImage = getNotificationImage(n);
-          showBrowserNotification(
-            "PeopleVoice Update",
-            n.message,
-            notificationImage,
-          );
-        });
+        if (freshNew.length > 0) {
+          setNewNotificationCount((prev) => prev + freshNew.length);
+          playNotificationSound();
+
+          // 🔥 ADD THIS LINE
+          window.dispatchEvent(new Event("notification_update"));
+
+          freshNew.forEach((n) => {
+            const notificationImage = getNotificationImage(n);
+            showBrowserNotification(
+              "PeopleVoice Update",
+              n.message,
+              notificationImage,
+            );
+          });
+        }
       }
 
+      // ✅ update ids
       lastNotificationIds.current = new Set(newData.map((n) => n._id));
       setNotifications(newData);
+
+      // 🔥 mark first load done
+      isFirstLoad.current = false;
     } catch (err) {
       console.error("Fetch notifications error:", err);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
-  }, [
-    citizenId,
-    playNotificationSound,
-    showBrowserNotification,
-    getNotificationImage,
-  ]);
+  };
+
+  // In Notifications.jsx, update the handleMessage function:
 
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.data?.type === "CLOSE_PROOF_POPUP") {
         setSelectedProofId(null);
       }
+
+      if (event.data?.type === "CLOSE_PROOF_POPUP_AND_NAVIGATE") {
+        if (event.data?.path) {
+          requestAnimationFrame(() => {
+            navigate(event.data.path, { replace: true });
+          });
+        }
+      }
     };
 
     window.addEventListener("message", handleMessage);
 
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [navigate]);
 
   /* ================= INITIAL LOAD + POLLING ================= */
+
   useEffect(() => {
+    if (!citizenId || selectedProofId) return;
+
     loadNotifications();
 
-    pollingInterval.current = setInterval(() => {
-      loadNotifications();
-    }, 15000);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+
+    intervalRef.current = setInterval(loadNotifications, 15000);
 
     return () => {
-      clearInterval(pollingInterval.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null; // 👈 add this
+      }
     };
-  }, [loadNotifications]);
+  }, [citizenId, selectedProofId]);
+
+  useEffect(() => {
+    return () => {
+      setSelectedProofId(null); // cleanup
+    };
+  }, []);
 
   /* ================= REQUEST PERMISSION ================= */
   useEffect(() => {
@@ -264,7 +301,7 @@ const Notifications = () => {
       if (notification.issueId) {
         const status = notification.status?.toLowerCase();
         if (status === "resolved" && notification.issueId) {
-          navigate(`/peopleVoice/proofpop/${notification.issueId}`);
+          setSelectedProofId(notification.issueId);
         } else {
           navigate(`/peopleVoice/my-issues`);
         }
@@ -638,20 +675,20 @@ const Notifications = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-2"
             onClick={() => setSelectedProofId(null)}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              className="w-full max-w-3xl h-[85vh] bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-2xl"
+              className="w-full max-w-3xl h-[95vh] bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* CLOSE BUTTON */}
               <button
                 onClick={() => setSelectedProofId(null)}
-                className="absolute top-4 right-4 z-50 bg-black/70 hover:bg-black text-white rounded-full w-10 h-10 flex items-center justify-center text-lg transition"
+                className="absolute top-8 right-4 z-50 bg-black/70 hover:bg-black text-white rounded-full w-10 h-10 flex items-center justify-center text-lg transition"
               >
                 ✕
               </button>

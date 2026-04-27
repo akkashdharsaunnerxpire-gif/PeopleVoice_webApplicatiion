@@ -35,6 +35,19 @@ const Navigation = () => {
 
   const lastScrollY = useRef(0);
   const { isDark, toggleDarkMode } = useTheme();
+  const [hasNewProof, setHasNewProof] = useState(false);
+
+  useEffect(() => {
+    const checkNew = () => {
+      const isNew = localStorage.getItem("hasNewProof") === "true";
+      setHasNewProof(isNew);
+    };
+
+    checkNew();
+
+    window.addEventListener("proof_update", checkNew);
+    return () => window.removeEventListener("proof_update", checkNew);
+  }, []);
 
   // fetch unread count
   const fetchUnreadCount = async () => {
@@ -66,11 +79,6 @@ const Navigation = () => {
     return () =>
       window.removeEventListener("notification_update", handleUpdate);
   }, []);
-
-  // route change refetch
-  useEffect(() => {
-    fetchUnreadCount();
-  }, [location.pathname]);
 
   // scroll hide/show nav (only for bottom nav)
   useEffect(() => {
@@ -122,7 +130,11 @@ const Navigation = () => {
       return (
         <motion.button
           whileTap={{ scale: 0.9 }}
-          onClick={() => navigate(`${BASE}${to}`)}
+          onClick={() => {
+            if (location.pathname !== `${BASE}${to}`) {
+              navigate(`${BASE}${to}`, { replace: true });
+            }
+          }}
           className={`relative inline-flex items-center justify-center p-1 rounded-full transition-colors ${
             isActive
               ? isDark
@@ -208,12 +220,24 @@ const Navigation = () => {
             to="/my-issues"
             nav="myissues"
           />
-          <NavItem
-            icon={FileText}
-            label="complaintproofs"
-            to="/proofspage"
-            nav="complaintproofs"
-          />
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            onClick={() => navigate(`${BASE}/proofspage`)}
+            className={`relative flex items-center gap-4 w-full px-4 py-3 rounded-xl ${
+              activeNav === "complaintproofs"
+                ? "bg-green-500/10 text-green-600 font-bold"
+                : "text-gray-600"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-sm font-medium">Complaint Proofs</span>
+
+            {hasNewProof && (
+              <span className="absolute right-4 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                NEW
+              </span>
+            )}
+          </motion.button>
           <NavItem
             icon={PlusCircle}
             label="Post Issue"
@@ -311,23 +335,44 @@ const Navigation = () => {
         </div>
       </motion.aside>
 
-      {/* BOTTOM NAVIGATION – visible only on mobile (below md: 768px) */}
+      {/* ========== IMPROVED MOBILE BOTTOM NAVIGATION ========== */}
       <nav
         className={`fixed bottom-0 left-0 right-0 z-50 md:hidden
-          border-t shadow-md backdrop-blur-md transition-transform duration-300
-          ${
-            isDark
-              ? "bg-gray-900/95 border-gray-800 text-white"
-              : "bg-white/95 border-gray-200 text-gray-900"
-          }`}
+          border-t shadow-lg backdrop-blur-xl transition-transform duration-300
+          ${isDark ? "bg-gray-900/95 border-gray-800" : "bg-white/95 border-gray-200"}
+          pb-safe`}
         style={{
           transform: showBottomNav ? "translateY(0)" : "translateY(100%)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
-        <div className="flex items-end justify-around px-2 py-1">
+        <div className="flex items-center justify-around px-2 py-1">
           {/* Home */}
-          <div className="flex-1 flex flex-col items-center">
-            <NavItem icon={LayoutGrid} to="/feed" nav="home" isMobile />
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => navigate(`${BASE}/feed`, { replace: true })}
+            className="relative flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all"
+          >
+            <div className="relative">
+              <LayoutGrid
+                className={`w-6 h-6 transition-colors ${
+                  activeNav === "home"
+                    ? isDark
+                      ? "text-green-400"
+                      : "text-green-600"
+                    : isDark
+                      ? "text-gray-400"
+                      : "text-gray-500"
+                }`}
+              />
+              {activeNav === "home" && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full"
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              )}
+            </div>
             <span
               className={`text-[10px] mt-1 font-medium ${
                 activeNav === "home"
@@ -341,11 +386,34 @@ const Navigation = () => {
             >
               Home
             </span>
-          </div>
+          </motion.button>
 
           {/* My Issues */}
-          <div className="flex-1 flex flex-col items-center">
-            <NavItem icon={FileText} to="/my-issues" nav="myissues" isMobile />
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => navigate(`${BASE}/my-issues`)}
+            className="relative flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all"
+          >
+            <div className="relative">
+              <FileText
+                className={`w-6 h-6 transition-colors ${
+                  activeNav === "myissues"
+                    ? isDark
+                      ? "text-green-400"
+                      : "text-green-600"
+                    : isDark
+                      ? "text-gray-400"
+                      : "text-gray-500"
+                }`}
+              />
+              {activeNav === "myissues" && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full"
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              )}
+            </div>
             <span
               className={`text-[10px] mt-1 font-medium ${
                 activeNav === "myissues"
@@ -359,16 +427,16 @@ const Navigation = () => {
             >
               My Issues
             </span>
-          </div>
+          </motion.button>
 
-          {/* Post (raised button) */}
-          <div className="flex-1 flex flex-col items-center">
+          {/* Post (Floating Action Button style) */}
+          <div className="relative flex flex-col items-center justify-center flex-1 -mt-6">
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => navigate(`${BASE}/post-issue`)}
-              className="bg-green-600 hover:bg-green-700 text-white rounded-full p-3 shadow-lg border-4 transition-colors duration-300 border-white dark:border-gray-900 -mt-6"
+              className="bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-full p-3.5 shadow-xl border-4 border-white dark:border-gray-900 transition-all duration-200 hover:shadow-2xl"
             >
-              <PlusCircle size={22} />
+              <PlusCircle size={24} />
             </motion.button>
             <span
               className={`text-[10px] mt-1 font-medium ${
@@ -385,14 +453,37 @@ const Navigation = () => {
             </span>
           </div>
 
-          {/* Proofs */}
-          <div className="flex-1 flex flex-col items-center">
-            <NavItem
-              icon={FileCheck}
-              to="/proofspage"
-              nav="complaintproofs"
-              isMobile
-            />
+          {/* Proofs (with NEW badge) */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => navigate(`${BASE}/proofspage`)}
+            className="relative flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all"
+          >
+            <div className="relative">
+              <FileCheck
+                className={`w-6 h-6 transition-colors ${
+                  activeNav === "complaintproofs"
+                    ? isDark
+                      ? "text-green-400"
+                      : "text-green-600"
+                    : isDark
+                      ? "text-gray-400"
+                      : "text-gray-500"
+                }`}
+              />
+              {hasNewProof && (
+                <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-md animate-pulse">
+                  NEW
+                </span>
+              )}
+              {activeNav === "complaintproofs" && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full"
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              )}
+            </div>
             <span
               className={`text-[10px] mt-1 font-medium ${
                 activeNav === "complaintproofs"
@@ -406,11 +497,34 @@ const Navigation = () => {
             >
               Proofs
             </span>
-          </div>
+          </motion.button>
 
           {/* Profile */}
-          <div className="flex-1 flex flex-col items-center">
-            <NavItem icon={UserCircle} to="/profile" nav="profile" isMobile />
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => navigate(`${BASE}/profile`)}
+            className="relative flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all"
+          >
+            <div className="relative">
+              <UserCircle
+                className={`w-6 h-6 transition-colors ${
+                  activeNav === "profile"
+                    ? isDark
+                      ? "text-green-400"
+                      : "text-green-600"
+                    : isDark
+                      ? "text-gray-400"
+                      : "text-gray-500"
+                }`}
+              />
+              {activeNav === "profile" && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full"
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              )}
+            </div>
             <span
               className={`text-[10px] mt-1 font-medium ${
                 activeNav === "profile"
@@ -424,11 +538,11 @@ const Navigation = () => {
             >
               Profile
             </span>
-          </div>
+          </motion.button>
         </div>
       </nav>
     </>
   );
 };
 
-export default Navigation;
+export default React.memo(Navigation);

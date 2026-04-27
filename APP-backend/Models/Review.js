@@ -16,15 +16,12 @@ const reviewSchema = new mongoose.Schema(
       type: Boolean,
       required: true,
     },
+    feedback: { type: String, default: "" },
     rating: {
       type: Number,
       min: 1,
       max: 5,
       default: null,
-    },
-    feedback: {
-      type: String,
-      required: true,
     },
   },
   {

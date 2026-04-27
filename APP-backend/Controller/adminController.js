@@ -1,10 +1,13 @@
 const DistrictPerformance = require("../Models/district_performance");
 const Admin = require("../Models/AdminModel");
-const Issue = require("../Models/PostIssueModel"); // ✅ EXACT CASE
+const Issue = require("../Models/PostIssueModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const Review = require("../Models/Review");
 const mongoose = require("mongoose");
 const { saveNotification } = require("../Controller/notificationController");
+const Notification = require("../Models/Notification");
+
 /* ================= ADMIN REGISTER ================= */
 exports.registerAdmin = async (req, res) => {
   try {
@@ -124,19 +127,38 @@ exports.getAllIssues = async (req, res) => {
       Issue.countDocuments(query),
     ]);
 
-    const issues = rawIssues.map((issue) => ({
-      _id: issue._id,
-      title: issue.reason,
-      department: issue.department,
-      district: issue.district,
-      area: issue.area, // 🔥 IMPORTANT
-      status: issue.status,
-      createdAt: issue.createdAt,
-      images: issue.images,
-      citizenId: issue.citizenId,
-      likes: issue.likes?.length || 0,
-      comments: issue.comments?.length || 0,
-    }));
+    const issues = await Promise.all(
+      rawIssues.map(async (issue) => {
+        const issueObj = {
+          _id: issue._id,
+          title: issue.reason,
+          department: issue.department,
+          district: issue.district,
+          area: issue.area,
+          status: issue.status,
+          createdAt: issue.createdAt,
+          images: issue.images,
+          citizenId: issue.citizenId,
+          likes: issue.likes?.length || 0,
+          comments: issue.comments?.length || 0,
+        };
+
+        if (issue.status === "Reopened" || issue.isImproper === true) {
+          const negativeReview = await Review.findOne({
+            issueId: issue._id,
+            isResolved: false,
+          })
+            .sort({ createdAt: -1 })
+            .lean();
+          if (negativeReview && negativeReview.feedback) {
+            issueObj.negativeReview = { feedback: negativeReview.feedback };
+          } else {
+            issueObj.negativeReview = { feedback: "" };
+          }
+        }
+        return issueObj;
+      }),
+    );
 
     res.json({
       total,
@@ -155,7 +177,6 @@ exports.getIssueById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // ✅ SAFETY CHECK (THIS FIXES CRASH)
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid issue ID" });
     }
@@ -166,10 +187,23 @@ exports.getIssueById = async (req, res) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
+    let negativeReview = null;
+    if (issue.status === "Reopened" || issue.isImproper === true) {
+      negativeReview = await Review.findOne({
+        issueId: issue._id,
+        isResolved: false,
+      })
+        .sort({ createdAt: -1 })
+        .lean();
+    }
+
     res.status(200).json({
       ...issue._doc,
       images: issue.images || [],
       after_images: issue.after_images || [],
+      negativeReview: negativeReview
+        ? { feedback: negativeReview.feedback }
+        : null,
     });
   } catch (error) {
     console.error("Get Issue By ID Error:", error);
@@ -177,6 +211,7 @@ exports.getIssueById = async (req, res) => {
   }
 };
 
+/* ================= UPDATE ISSUE STATUS ================= */
 exports.updateIssueStatus = async (req, res) => {
   try {
     const { status, afterImages, resolutionDetails } = req.body;
@@ -189,41 +224,37 @@ exports.updateIssueStatus = async (req, res) => {
       resolutionDetails,
     });
 
-    const validStatuses = [
-      "Sent",
-      "In Progress",
-      "Resolved",
-      "Closed",
-      "solved",
-    ];
+    const validStatuses = ["Sent", "In Progress", "Resolved", "Closed"];
+
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status value" });
     }
 
-    // Build update object
+    const oldIssue = await Issue.findById(id);
+    if (!oldIssue) {
+      return res.status(404).json({ message: "Issue not found" });
+    }
+
     const updateFields = {
-      status: status,
+      status,
       updatedAt: new Date(),
       notificationRead: false,
     };
 
-    // Handle after-images (expecting array of base64 strings or URLs)
-    if (afterImages && Array.isArray(afterImages) && afterImages.length > 0) {
+    if (Array.isArray(afterImages) && afterImages.length > 0) {
       updateFields.after_images = afterImages;
     }
 
-    // Handle resolution details
     if (resolutionDetails && resolutionDetails.trim()) {
       updateFields.resolution_details = resolutionDetails.trim();
     }
 
-    // Set resolved date when status becomes Resolved
-    if (status === "Resolved" && !updateFields.resolved_date) {
+    if (status === "Resolved") {
       updateFields.resolved_date = new Date();
+      updateFields.lastOpenedNotified = false;
     }
 
-    // Set closed date when status becomes Closed or solved
-    if (status === "Closed" || status === "solved") {
+    if (status === "Closed") {
       updateFields.closedDate = new Date();
     }
 
@@ -238,20 +269,45 @@ exports.updateIssueStatus = async (req, res) => {
 
     console.log("✅ Issue updated:", issue._id, "Status:", status);
 
-    // Save notification for status changes (except "Sent")
+    // Send notification - Check Review collection for negative review
     if (status !== "Sent") {
-      let msg;
+      const hasNegativeReview = await Review.findOne({
+        issueId: id,
+        isResolved: false
+      });
+      
+      const wasImproper = hasNegativeReview !== null;
+      
+      let message = "";
+      let type = "info";
+
       if (status === "Resolved") {
-        msg = `✅ Your issue "${issue.reason || "Report"}" has been resolved.`;
-      } else if (status === "Closed" || status === "solved") {
-        msg = `🎉 Your issue "${issue.reason || "Report"}" has been closed.`;
-      } else if (status === "In Progress") {
-        msg = `🔄 Your issue "${issue.reason || "Report"}" is in progress.`;
-      } else {
-        msg = customMessage || `Your issue update: ${status}`;
+        if (wasImproper) {
+          message = `⚠️ Municipality has made a new resolution attempt for your improperly reported issue "${issue.reason || "Report"}". Please review and confirm.`;
+          type = "warning";
+        } else {
+          message = `✅ Your issue "${issue.reason || "Report"}" has been resolved. Please confirm.`;
+          type = "success";
+        }
+      } 
+      else if (status === "Closed") {
+        message = `🎉 Your issue "${issue.reason || "Report"}" has been closed. Thank you for using PeopleVoice!`;
+        type = "success";
+      } 
+      else if (status === "In Progress") {
+        if (wasImproper) {
+          message = `🔄 Your improperly reported issue "${issue.reason || "Report"}" is now being processed properly.`;
+          type = "warning";
+        } else {
+          message = `🔄 Your issue "${issue.reason || "Report"}" is now in progress.`;
+          type = "warning";
+        }
+      } 
+      else {
+        message = `Your issue "${issue.reason || "Report"}" status: ${status}`;
       }
 
-      await saveNotification(issue, status, msg);
+      await saveNotification(issue, status, message, wasImproper);
     }
 
     res.json({
@@ -261,18 +317,20 @@ exports.updateIssueStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Update Status Error:", error);
-    res.status(500).json({ message: "Status update failed: " + error.message });
+    res.status(500).json({
+      message: "Status update failed: " + error.message,
+    });
   }
 };
 
-/* ================= GET ALL DISTRICTS + CLOSED ISSUE POINTS ================= */
+/* ================= GET DISTRICT POINTS ================= */
 exports.getDistrictPoints = async (req, res) => {
   try {
     const districts = await DistrictPerformance.find().lean();
 
     const resolvedCounts = await Issue.aggregate([
       {
-        $match: { status: { $in: ["Resolved", "Closed", "solved"] } },
+        $match: { status: { $in: ["Resolved", "Closed"] } },
       },
       {
         $group: {
@@ -301,5 +359,61 @@ exports.getDistrictPoints = async (req, res) => {
   } catch (error) {
     console.error("District Points Error:", error);
     res.status(500).json({ message: "Failed to fetch district points" });
+  }
+};
+
+// Add this to adminController.js
+exports.notifyImproperIssueOpened = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const issue = await Issue.findById(id);
+    if (!issue) {
+      return res.status(404).json({ message: "Issue not found" });
+    }
+
+    // Check if already notified
+    if (issue.lastOpenedNotified) {
+      return res.json({ success: true, message: "Already notified" });
+    }
+
+    // Check if this is an improper issue
+    const hasNegativeReview = await Review.findOne({
+      issueId: id,
+      isResolved: false
+    });
+
+    let message = "";
+    let type = "info";
+    
+    if (hasNegativeReview) {
+      message = `⚠️ Officer is reviewing your improperly reported issue "${issue.reason || "Report"}".`;
+      type = "warning";
+    } else if (issue.status === "Sent") {
+      message = `👀 Officer has viewed your issue "${issue.reason || "Report"}" and will address it soon.`;
+      type = "info";
+    }
+
+    if (message) {
+      await Notification.create({
+        citizenId: String(issue.citizenId),
+        issueId: issue._id,
+        message,
+        status: "Opened",
+        type,
+        location: issue.area || issue.district || "",
+        image: typeof issue.images?.[0] === "string" ? issue.images[0] : issue.images?.[0]?.url || null,
+        read: false,
+        createdAt: new Date(),
+      });
+
+      issue.lastOpenedNotified = true;
+      await issue.save();
+    }
+
+    res.json({ success: true, message: "Notification sent" });
+  } catch (error) {
+    console.error("Notify improper issue opened error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

@@ -17,6 +17,7 @@ import {
   Filter,
   XCircle,
   BookOpen,
+  MessageSquare,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
@@ -34,22 +35,25 @@ const Issues = () => {
     resolved: 0,
     closed: 0,
     total: 0,
+    reopened: 0,
   });
 
   // Filter states
   const [search, setSearch] = useState("");
   const [problemType, setProblemType] = useState("All");
   const [showClosedIssues, setShowClosedIssues] = useState(false);
+  const [statusFilter, setStatusFilter] = useState(null); // NEW: filter by status
 
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 8;
 
-  // Opened issues tracking (stores opened status)
+  // Opened issues tracking
   const [openedIssues, setOpenedIssues] = useState(() => {
     return JSON.parse(localStorage.getItem("openedIssues") || "{}");
   });
+
   const getImageUrl = (img) => (typeof img === "string" ? img : img?.url);
 
   // Fetch Issues
@@ -63,8 +67,22 @@ const Issues = () => {
           },
           params: { district: adminDistrict, search, page, limit },
         });
-        setIssues(res.data.issues || []);
+
+        const fetchedIssues = res.data.issues || [];
+        setIssues(fetchedIssues);
         setTotalPages(res.data.totalPages || 1);
+
+        // Clean openedIssues when status changes
+        setOpenedIssues((prev) => {
+          const updated = { ...prev };
+          fetchedIssues.forEach((issue) => {
+            if (issue.status !== "Sent") {
+              delete updated[issue._id];
+            }
+          });
+          localStorage.setItem("openedIssues", JSON.stringify(updated));
+          return updated;
+        });
       } catch (err) {
         console.error("Fetch issues error:", err);
       } finally {
@@ -85,7 +103,7 @@ const Issues = () => {
       });
       setGlobalStats(res.data);
     } catch (err) {
-      // fallback
+      // fallback calculation if stats endpoint fails
       try {
         const fallbackRes = await axios.get(`${API_URL}/api/admin/issues`, {
           headers: {
@@ -98,9 +116,8 @@ const Issues = () => {
           new: allIssues.filter((i) => i.status === "Sent").length,
           ongoing: allIssues.filter((i) => i.status === "In Progress").length,
           resolved: allIssues.filter((i) => i.status === "Resolved").length,
-          closed: allIssues.filter(
-            (i) => i.status === "solved" || i.status === "Closed",
-          ).length,
+          closed: allIssues.filter((i) => i.status === "Closed").length,
+          reopened: allIssues.filter((i) => i.status === "Reopened").length,
           total: allIssues.length,
         });
       } catch (e) {}
@@ -120,18 +137,26 @@ const Issues = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, statusFilter]); // reset page when filter changes
 
-  // Client-side filtering
+  // Client-side filtering (respects statusFilter, showClosedIssues, problemType)
   const filteredIssues = useMemo(() => {
-    let base = showClosedIssues
-      ? issues.filter((i) => i.status === "solved" || i.status === "Closed")
-      : issues.filter((i) => i.status !== "solved" && i.status !== "Closed");
+    let base = [...issues];
+
+    // Apply status filter (takes precedence over showClosedIssues)
+    if (statusFilter) {
+      base = base.filter((i) => i.status === statusFilter);
+    } else if (!showClosedIssues) {
+      base = base.filter((i) => i.status !== "Closed");
+    } else {
+      base = base.filter((i) => i.status === "Closed");
+    }
+
     if (problemType !== "All") {
       base = base.filter((i) => i.department === problemType);
     }
     return base;
-  }, [issues, problemType, showClosedIssues]);
+  }, [issues, problemType, showClosedIssues, statusFilter]);
 
   const getStatusDisplay = (status) => {
     switch (status) {
@@ -147,12 +172,17 @@ const Issues = () => {
           color: "bg-emerald-100 text-emerald-800 border-emerald-200",
           icon: <CheckCircle size={14} className="mr-1" />,
         };
-      case "solved":
       case "Closed":
         return {
           text: "Closed",
           color: "bg-gray-100 text-gray-700 border-gray-200",
           icon: <Archive size={14} className="mr-1" />,
+        };
+      case "Reopened":
+        return {
+          text: "Improper",
+          color: "bg-red-100 text-red-800 border-red-200",
+          icon: <AlertCircle size={14} className="mr-1" />,
         };
       default:
         return {
@@ -163,10 +193,21 @@ const Issues = () => {
     }
   };
 
-  // Action button with blinking effect for "Opened"
+  // Action button with blinking effect for "Opened" and "Reopened"
   const getActionButton = (issue) => {
     const isOpened = openedIssues[issue._id];
-    if (isOpened) {
+
+    // Blink for improperly resolved (Reopened)
+    if (issue.status === "Reopened") {
+      return {
+        text: "Improperly Resolved",
+        color: "from-red-500 to-red-700",
+        icon: <AlertCircle size={16} />,
+        blink: true,
+      };
+    }
+
+    if (isOpened && issue.status === "Sent") {
       return {
         text: "Opened",
         color:
@@ -183,9 +224,14 @@ const Issues = () => {
           icon: <Clock size={16} />,
           blink: false,
         };
-      case "Resolved":
-      case "solved":
       case "Closed":
+        return {
+          text: "Closed",
+          color: "from-gray-500 to-gray-700",
+          icon: <Archive size={16} />,
+          blink: false,
+        };
+      case "Resolved":
         return {
           text: "View Details",
           color: "from-blue-500 to-blue-700",
@@ -202,32 +248,58 @@ const Issues = () => {
     }
   };
 
-  const handleTakeAction = async (issueId) => {
-    if (!openedIssues[issueId]) {
-      try {
-        await axios.post(
-          `${API_URL}/api/admin/issues/${issueId}/notify-view`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
-            },
-          },
-        );
-        const updated = { ...openedIssues, [issueId]: true };
-        setOpenedIssues(updated);
-        localStorage.setItem("openedIssues", JSON.stringify(updated));
-      } catch (err) {
-        console.error("Notification error:", err);
-      }
+ const handleTakeAction = async (issueId) => {
+  if (!openedIssues[issueId]) {
+    try {
+      // Check if this is an improper issue (has negative review)
+      const checkRes = await axios.get(
+        `${API_URL}/api/reviews/check/${issueId}?citizenId=${localStorage.getItem("citizenId")}`
+      );
+      
+      // Use different endpoint for improper issues
+      const endpoint = checkRes.data.allowResubmit 
+        ? `${API_URL}/api/admin/issues/${issueId}/notify-improper-view`
+        : `${API_URL}/api/admin/issues/${issueId}/notify-view`;
+      
+      await axios.post(endpoint, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+      });
+      
+      const updated = { ...openedIssues, [issueId]: true };
+      setOpenedIssues(updated);
+      localStorage.setItem("openedIssues", JSON.stringify(updated));
+    } catch (err) {
+      console.error("Notification error:", err);
     }
-    navigate(`/admin/dashboard/issues/${issueId}`);
-  };
+  }
+  navigate(`/admin/dashboard/issues/${issueId}`);
+};
 
   const goToPrevPage = () => setPage((p) => Math.max(1, p - 1));
   const goToNextPage = () => setPage((p) => Math.min(totalPages, p + 1));
 
-  // Add animation style
+  // Handle stats card click to filter by status
+  const handleStatusCardClick = (status) => {
+    if (statusFilter === status) {
+      // If same status is clicked again, clear the filter
+      setStatusFilter(null);
+    } else {
+      setStatusFilter(status);
+      setShowClosedIssues(false); // reset closed toggle when status filtering
+    }
+    setPage(1);
+  };
+
+  // Clear all filters (status, search, problemType, closed toggle)
+  const clearAllFilters = () => {
+    setStatusFilter(null);
+    setShowClosedIssues(false);
+    setProblemType("All");
+    setSearch("");
+    setPage(1);
+  };
+
+  // Animation keyframes
   const blinkKeyframes = `
     @keyframes blink-pulse {
       0% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
@@ -259,6 +331,17 @@ const Issues = () => {
               <span className="text-emerald-600 text-sm font-medium">
                 Live Updates (8s)
               </span>
+              {statusFilter && (
+                <span className="ml-3 inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                  Filter: {statusFilter === "Sent" ? "New" : statusFilter}
+                  <button
+                    onClick={() => setStatusFilter(null)}
+                    className="ml-1 hover:text-blue-600"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -276,8 +359,8 @@ const Issues = () => {
           </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+        {/* Stats Cards - Clickable */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-10">
           {[
             {
               label: "New Reports",
@@ -285,6 +368,7 @@ const Issues = () => {
               icon: AlertCircle,
               gradient: "from-blue-500 to-blue-600",
               bg: "from-blue-50 to-blue-100/50",
+              status: "Sent",
             },
             {
               label: "In Progress",
@@ -292,6 +376,7 @@ const Issues = () => {
               icon: Clock,
               gradient: "from-amber-500 to-amber-600",
               bg: "from-amber-50 to-amber-100/50",
+              status: "In Progress",
             },
             {
               label: "Resolved",
@@ -299,6 +384,7 @@ const Issues = () => {
               icon: CheckCircle,
               gradient: "from-emerald-500 to-emerald-600",
               bg: "from-emerald-50 to-emerald-100/50",
+              status: "Resolved",
             },
             {
               label: "Closed",
@@ -306,11 +392,25 @@ const Issues = () => {
               icon: Archive,
               gradient: "from-gray-500 to-gray-600",
               bg: "from-gray-50 to-gray-100/50",
+              status: "Closed",
+            },
+            {
+              label: "Improperly Resolved",
+              val: globalStats.reopened,
+              icon: AlertCircle,
+              gradient: "from-red-500 to-red-600",
+              bg: "from-red-50 to-red-100/50",
+              status: "Reopened",
             },
           ].map((s, i) => (
             <div
               key={i}
-              className={`bg-gradient-to-br ${s.bg} backdrop-blur-sm p-5 rounded-2xl shadow-lg border border-white/50 transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer group`}
+              onClick={() => handleStatusCardClick(s.status)}
+              className={`bg-gradient-to-br ${s.bg} backdrop-blur-sm p-5 rounded-2xl shadow-lg border border-white/50 transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer group ${
+                statusFilter === s.status
+                  ? "ring-2 ring-blue-500 ring-offset-2"
+                  : ""
+              }`}
             >
               <div className="flex justify-between items-start">
                 <div>
@@ -362,7 +462,10 @@ const Issues = () => {
             </select>
           </div>
           <button
-            onClick={() => setShowClosedIssues(!showClosedIssues)}
+            onClick={() => {
+              if (statusFilter) setStatusFilter(null);
+              setShowClosedIssues(!showClosedIssues);
+            }}
             className={`px-5 py-3 rounded-xl font-bold transition-all duration-200 flex items-center gap-2 shadow-sm ${
               showClosedIssues
                 ? "bg-gradient-to-r from-slate-800 to-slate-900 text-white hover:shadow-md"
@@ -371,6 +474,12 @@ const Issues = () => {
           >
             {showClosedIssues ? <Eye size={16} /> : <Archive size={16} />}
             {showClosedIssues ? "View Active Issues" : "View Closed Issues"}
+          </button>
+          <button
+            onClick={clearAllFilters}
+            className="px-5 py-3 rounded-xl font-bold bg-gray-200 text-gray-700 hover:bg-gray-300 transition flex items-center gap-2"
+          >
+            <XCircle size={16} /> Clear Filters
           </button>
         </div>
 
@@ -420,12 +529,19 @@ const Issues = () => {
                       <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
                         Action
                       </th>
+                      {/* Optional column for negative review feedback */}
+                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Citizen Feedback
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredIssues.map((issue, idx) => {
                       const statusDisplay = getStatusDisplay(issue.status);
                       const action = getActionButton(issue);
+                      // Check if issue has negative review feedback (attached by backend)
+                      const negativeFeedback =
+                        issue.negativeReview?.feedback || "";
                       return (
                         <tr
                           key={issue._id}
@@ -467,10 +583,33 @@ const Issues = () => {
                           <td className="px-6 py-4 text-center">
                             <button
                               onClick={() => handleTakeAction(issue._id)}
-                              className={`bg-gradient-to-r ${action.color} text-white px-4 py-1.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center gap-1 mx-auto ${action.blink ? "blink-opened" : ""}`}
+                              className={`bg-gradient-to-r ${action.color} text-white px-4 py-1.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center gap-1 mx-auto ${
+                                action.blink ? "blink-opened" : ""
+                              }`}
                             >
                               {action.icon} {action.text}
                             </button>
+                          </td>
+                          <td className="px-6 py-4">
+                            {issue.status === "Reopened" && negativeFeedback ? (
+                              <div className="group relative cursor-help">
+                                <MessageSquare
+                                  size={18}
+                                  className="text-red-500"
+                                />
+                                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 w-48 z-10">
+                                  {negativeFeedback.length > 100
+                                    ? negativeFeedback.slice(0, 100) + "..."
+                                    : negativeFeedback}
+                                </div>
+                              </div>
+                            ) : issue.status === "Reopened" ? (
+                              <span className="text-xs text-red-500 italic">
+                                No feedback yet
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -490,14 +629,22 @@ const Issues = () => {
                   <button
                     onClick={goToPrevPage}
                     disabled={page === 1}
-                    className={`p-2 rounded-lg transition-all ${page === 1 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"}`}
+                    className={`p-2 rounded-lg transition-all ${
+                      page === 1
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"
+                    }`}
                   >
                     <ChevronLeft size={18} />
                   </button>
                   <button
                     onClick={goToNextPage}
                     disabled={page === totalPages}
-                    className={`p-2 rounded-lg transition-all ${page === totalPages ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"}`}
+                    className={`p-2 rounded-lg transition-all ${
+                      page === totalPages
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"
+                    }`}
                   >
                     <ChevronRight size={18} />
                   </button>

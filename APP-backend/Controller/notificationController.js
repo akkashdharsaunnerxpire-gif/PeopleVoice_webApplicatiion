@@ -1,37 +1,48 @@
 const Notification = require("../Models/Notification");
-const Issue = require("../Models/PostIssueModel");
 
-/* ================= SAVE NOTIFICATION ================= */
-const saveNotification = async (issue, status, customMessage = null) => {
+const saveNotification = async (issue, status, customMessage = null, isImproper = false) => {
   try {
-    if (!issue || !issue.citizenId) {
-      return;
-    }
+    if (!issue || !issue.citizenId) return;
 
     let type = "info";
-    if (["Resolved", "solved", "Closed"].includes(status)) type = "success";
-    if (status === "In Progress") type = "warning";
+    let message = "";
 
-    const msg =
-      customMessage ||
-      `Your issue "${issue.reason || "Report"}" is now ${status}`;
+    if (status === "Reopened") return;
 
-    const notification = await Notification.create({
+    if (status === "Resolved") {
+      type = isImproper ? "warning" : "success";
+      const title = issue.reason || "Report";
+      message = isImproper
+        ? `⚠️ Municipality has made a new resolution attempt for your improperly reported issue "${title}". Please review and confirm.`
+        : `✅ Your issue "${title}" has been resolved. Please confirm.`;
+    } 
+    else if (status === "Closed") {
+      type = "success";
+      message = customMessage || `🎉 Your issue "${issue.reason || "Report"}" has been closed. Thank you!`;
+    }
+    else if (status === "In Progress") {
+      type = "warning";
+      message = customMessage || `🔄 Your issue "${issue.reason || "Report"}" is now in progress.`;
+    }
+    else if (status === "Opened") {
+      type = "info";
+      message = customMessage || `👀 Your issue "${issue.reason || "Report"}" has been viewed.`;
+    }
+    else {
+      message = customMessage || `Your issue "${issue.reason || "Report"}" status: ${status}`;
+    }
+
+    await Notification.create({
       citizenId: String(issue.citizenId),
       issueId: issue._id,
-      message: msg,
-      status: status,
-      type: type,
+      message,
+      status,
+      type,
       location: issue.area || issue.district || "",
-      image:
-        typeof issue.images?.[0] === "string"
-          ? issue.images[0]
-          : issue.images?.[0]?.url || null,
+      image: typeof issue.images?.[0] === "string" ? issue.images[0] : issue.images?.[0]?.url || null,
       read: false,
       createdAt: new Date(),
     });
-
-    return notification;
   } catch (err) {
     console.error("Save Notification Error:", err);
   }
@@ -50,8 +61,7 @@ const getNotifications = async (req, res) => {
       citizenId: String(citizenId),
     })
       .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
+      .limit(50);
 
     res.json(notifications);
   } catch (error) {
@@ -63,25 +73,13 @@ const getNotifications = async (req, res) => {
 /* ================= MARK AS READ ================= */
 const markAsRead = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({ message: "Notification id required" });
-    }
-
     const notification = await Notification.findByIdAndUpdate(
-      id,
+      req.params.id,
       { read: true },
-      { new: true },
+      { new: true }
     );
-
-    if (!notification) {
-      return res.status(404).json({ message: "Notification not found" });
-    }
-
     res.json({ success: true, notification });
   } catch (error) {
-    console.error("Mark read error:", error);
     res.status(500).json({ message: "Error updating notification" });
   }
 };
@@ -92,7 +90,6 @@ const deleteNotification = async (req, res) => {
     await Notification.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (error) {
-    console.error("Delete failed:", error);
     res.status(500).json({ message: "Delete failed" });
   }
 };

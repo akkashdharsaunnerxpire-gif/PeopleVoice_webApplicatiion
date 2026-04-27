@@ -1,5 +1,6 @@
 const { saveNotification } = require("../Controller/notificationController");
-const Issue = require("../Models/PostIssueModel"); // needed for fetching issue details
+const Issue = require("../Models/PostIssueModel");
+const Notification = require("../Models/Notification"); // Add this import
 const express = require("express");
 const router = express.Router();
 
@@ -10,9 +11,9 @@ const {
   getIssueById,
   updateIssueStatus,
   getDistrictPoints,
+  notifyIssueOpened,
+  notifyImproperIssueOpened // ✅ Import the new function
 } = require("../Controller/adminController");
-
-// Import notification controller
 
 /* AUTH */
 router.post("/register", registerAdmin);
@@ -25,8 +26,10 @@ router.put("/issues/:id/status", updateIssueStatus);
 
 /* DISTRICT LEADERBOARD */
 router.get("/district-points", getDistrictPoints);
+// Add this route
+router.post("/issues/:id/notify-improper-view",notifyImproperIssueOpened);
 
-/* NOTIFICATION: Officer viewed an issue */
+/* NOTIFICATION: Officer viewed an issue - UPDATED VERSION */
 router.post("/issues/:issueId/notify-view", async (req, res) => {
   try {
     const { issueId } = req.params;
@@ -36,15 +39,52 @@ router.post("/issues/:issueId/notify-view", async (req, res) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
-    // ✅ Always same message → helps duplicate check
-    const customMessage = `Officer has viewed your issue`;
+    // ✅ Check if already notified
+    if (issue.lastOpenedNotified) {
+      return res.status(200).json({ success: true, message: "Already notified" });
+    }
 
-    await saveNotification(issue, "Viewed", customMessage);
+    let message = "";
+    let type = "info";
 
-    res.status(200).json({ success: true });
+    // 🔥 CRITICAL: Different message for improperly resolved issues
+    if (issue.status === "Reopened") {
+      message = `⚠️ Your improperly resolved issue "${issue.reason || "Report"}" is being reviewed by the municipality.`;
+      type = "warning";
+    } else if (issue.status === "Sent") {
+      message = `👀 Your issue "${issue.reason || "Report"}" has been viewed by the municipality and will be addressed soon.`;
+      type = "info";
+    } else {
+      // For other statuses, use generic message
+      message = `📋 Your issue "${issue.reason || "Report"}" has been reviewed by an officer.`;
+    }
+
+    // ✅ Save notification
+    await Notification.create({
+      citizenId: String(issue.citizenId),
+      issueId: issue._id,
+      message,
+      status: "Opened",
+      type,
+      location: issue.area || issue.district || "",
+      image: typeof issue.images?.[0] === "string" ? issue.images[0] : issue.images?.[0]?.url || null,
+      read: false,
+      createdAt: new Date(),
+    });
+
+    // ✅ Mark as notified
+    issue.lastOpenedNotified = true;
+    await issue.save();
+
+    console.log(`✅ Notification sent for issue ${issueId}: ${message}`);
+    res.status(200).json({ success: true, message: "Notification sent" });
   } catch (error) {
     console.error("Error sending view notification:", error);
-    res.status(500).json({ message: "Failed" });
+    res.status(500).json({ message: "Failed to send notification" });
   }
 });
+
+// Alternative: Use the controller function if you prefer
+// router.post("/issues/:issueId/notify-view", notifyIssueOpened);
+
 module.exports = router;
