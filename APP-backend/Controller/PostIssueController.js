@@ -4,6 +4,7 @@ const SavedIssue = require("../Models/SavedIssue");
 const redisClient = require("../config/redis");
 const Issue = require("../Models/PostIssueModel");
 const cloudinary = require("../config/cloudinary");
+const Admin = require("../Models/AdminModel");
 
 /* ---------------- HELPER: Get current cache version (or create) ---------------- */
 const getCacheVersion = async () => {
@@ -279,7 +280,6 @@ exports.toggleCommentLike = async (req, res) => {
 };
 
 /* ---------------- GET SINGLE ISSUE ---------------- */
-const Admin = require("../Models/adminModel");
 exports.getIssue = async (req, res) => {
   try {
     const { id } = req.params;
