@@ -51,23 +51,6 @@ const AdminRegister = () => {
     "Vellore", "Viluppuram", "Virudhunagar"
   ];
 
-  /* ================= INJECT KEYFRAMES FOR PROGRESS BAR ================= */
-  useEffect(() => {
-    if (!document.getElementById("linear-progress-keyframes")) {
-      const style = document.createElement("style");
-      style.id = "linear-progress-keyframes";
-      style.textContent = `
-        @keyframes progressSlide {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(300%); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -162,15 +145,6 @@ const AdminRegister = () => {
 
   return (
     <>
-      {loading && (
-        <div className="fixed top-0 left-0 w-full h-1 bg-blue-100 z-50 overflow-hidden shadow-sm">
-          <div
-            className="h-full bg-gradient-to-r from-blue-600 to-purple-600 w-1/3"
-            style={{ animation: "progressSlide 1.2s ease-in-out infinite" }}
-          />
-        </div>
-      )}
-
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-4">
         {/* Animated Background Elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">

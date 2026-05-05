@@ -87,3 +87,8 @@ select {
 .custom-scrollbar {
   -ms-overflow-style: none;
 }
+
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}

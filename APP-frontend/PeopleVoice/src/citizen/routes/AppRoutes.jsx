@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "../components/AppLayout";
+import { useLocation } from "react-router-dom";
+import { useEffect } from "react";
 
 // Pages
 import Login from "../pages/Login";
@@ -16,8 +18,20 @@ import Helpcare from "../pages/Helpcare";
 import Proofpop from "../pages/Proofpop";
 import Proofpage from "../pages/Proofspage";
 import ResolutionReview from "../pages/ResolutionReview";
+import NProgress from "../../utils/nprogress";
+
 
 const AppRoutes = () => {
+  const location = useLocation();
+  useEffect(() => {
+    NProgress.start();
+
+    const timer = setTimeout(() => {
+      NProgress.done();
+    }, 800); // 🔥 800ms slow feel
+
+    return () => clearTimeout(timer);
+  }, [location]);
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
   return (

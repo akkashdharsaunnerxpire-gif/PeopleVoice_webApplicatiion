@@ -20,7 +20,6 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [mobileError, setMobileError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [progress, setProgress] = useState(0);
 
   // Load saved mobile number if "remember me" was checked
   useEffect(() => {
@@ -30,29 +29,6 @@ const Login = () => {
       setRememberMe(true);
     }
   }, []);
-
-  // Linear progress bar animation
-  useEffect(() => {
-    let timer;
-    if (loading) {
-      setProgress(0);
-      const interval = setInterval(() => {
-        setProgress((prevProgress) => {
-          if (prevProgress >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return prevProgress + 1; // Linear increment
-        });
-      }, 30); // 50ms * 100 = 5000ms (5 seconds)
-
-      return () => {
-        clearInterval(interval);
-      };
-    } else {
-      setProgress(0);
-    }
-  }, [loading]);
 
   const validateForm = () => {
     let isValid = true;
@@ -135,37 +111,6 @@ const Login = () => {
 
   return (
     <>
-      {/* Global Progress Bar at Top of DOM */}
-      <AnimatePresence>
-        {loading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: "3px",
-              backgroundColor: "#e5e7eb",
-              zIndex: 9999,
-            }}
-          >
-            <motion.div
-              style={{
-                height: "100%",
-                background: "linear-gradient(to right, #10b981, #059669)",
-                width: `${progress}%`,
-              }}
-              initial={{ width: "0%" }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.1, ease: "linear" }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 px-4">
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,transparent,black)] pointer-events-none" />
