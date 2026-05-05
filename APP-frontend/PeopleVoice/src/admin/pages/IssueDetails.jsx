@@ -52,6 +52,10 @@ import {
   Container,
   Stack,
   Alert,
+  Checkbox,
+  FormControlLabel,
+  MenuItem,
+  Grid,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
@@ -97,7 +101,7 @@ const StatusChip = styled(Chip)(({ status, theme }) => {
     Resolved: { bg: "#e3f7ec", color: "#0b6e4f", border: "#a8e6c0" },
     Closed: { bg: "#e8eaff", color: "#3949ab", border: "#c5cae9" },
     solved: { bg: "#e8eaff", color: "#3949ab", border: "#c5cae9" },
-    Reopened: { bg: "#fee2e2", color: "#b91c1c", border: "#fecaca" }, // ✅ added
+    Reopened: { bg: "#fee2e2", color: "#b91c1c", border: "#fecaca" },
   };
   const color = colors[status] || colors[displayStatus] || colors.Sent;
   return {
@@ -201,8 +205,8 @@ const ImageGallery = ({ images, onImageClick }) => {
       sx={{
         display: "grid",
         gridTemplateColumns: isSingleImage
-          ? "1fr" // Single image takes full width
-          : "repeat(auto-fill, minmax(200px, 1fr))", // Multiple images: responsive grid
+          ? "1fr"
+          : "repeat(auto-fill, minmax(200px, 1fr))",
         gap: 2,
       }}
     >
@@ -220,7 +224,6 @@ const ImageGallery = ({ images, onImageClick }) => {
               opacity: 0.9,
               transform: "scale(1.02)",
             },
-            // Single image specific styles
             ...(isSingleImage && {
               maxWidth: "100%",
               "& img": {
@@ -277,11 +280,34 @@ export default function IssueDetails() {
   const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [detailsError, setDetailsError] = useState("");
-  const [negativeFeedback, setNegativeFeedback] = useState(""); // ✅ state for reopened feedback
+  const [negativeFeedback, setNegativeFeedback] = useState("");
 
-  const getImageUrl = (img) => (typeof img === "string" ? img : img?.url);
+  // NEW fields for resolution
+  const [resolutionMunicipality, setResolutionMunicipality] = useState("");
+  const [resolutionDepartment, setResolutionDepartment] = useState("");
+  const [resolutionOfficerName, setResolutionOfficerName] = useState("");
+  const [confirmationChecked, setConfirmationChecked] = useState(false);
 
-  // Cleanup object URLs on unmount or when images change
+  // Admin profile (only name and district from localStorage)
+  const [adminProfile, setAdminProfile] = useState({
+    district: "",
+    name: "",
+  });
+
+  // Load admin data from localStorage on mount
+  useEffect(() => {
+    const name = localStorage.getItem("adminName");
+    const district = localStorage.getItem("adminDistrict");
+
+    setAdminProfile({
+      name: name || "",
+      district: district || "",
+    });
+
+    setResolutionOfficerName(name || "");
+  }, []);
+
+  // Revoke object URLs when afterImages change (cleanup)
   useEffect(() => {
     return () => {
       afterImages.forEach((file) => {
@@ -290,12 +316,20 @@ export default function IssueDetails() {
     };
   }, [afterImages]);
 
+  // Reset modal fields when opened
   useEffect(() => {
-    if (showResolveModal && modalDescriptionRef.current) {
-      setTimeout(() => modalDescriptionRef.current.focus(), 100);
+    if (showResolveModal) {
+      setConfirmationChecked(false);
+      setResolutionMunicipality("");
+      setResolutionDepartment("");
+      setResolutionOfficerName(adminProfile.name || "");
+      if (modalDescriptionRef.current) {
+        setTimeout(() => modalDescriptionRef.current.focus(), 100);
+      }
     }
-  }, [showResolveModal]);
+  }, [showResolveModal, adminProfile.name]);
 
+  // Update status (only status and extraData, no forced admin name/district storage)
   const updateStatus = async (status, extraData = {}) => {
     try {
       setActionLoading(true);
@@ -307,7 +341,6 @@ export default function IssueDetails() {
       showToast("success", `Status updated to ${status}`);
       fetchIssue();
       setShowResolveModal(false);
-      // Cleanup preview URLs
       afterImages.forEach((file) => {
         if (file.preview) URL.revokeObjectURL(file.preview);
       });
@@ -315,6 +348,7 @@ export default function IssueDetails() {
       setResolutionDetails("");
       setUploadError("");
       setDetailsError("");
+      setConfirmationChecked(false);
     } catch (err) {
       showToast(
         "error",
@@ -335,8 +369,10 @@ export default function IssueDetails() {
       });
       const fetchedIssue = res.data.issue || res.data;
       setIssue(fetchedIssue);
-      // ✅ Extract negative feedback for reopened issues
-      if (fetchedIssue.status === "Reopened" && fetchedIssue.negativeReview?.feedback) {
+      if (
+        fetchedIssue.status === "Reopened" &&
+        fetchedIssue.negativeReview?.feedback
+      ) {
         setNegativeFeedback(fetchedIssue.negativeReview.feedback);
       } else {
         setNegativeFeedback("");
@@ -361,7 +397,6 @@ export default function IssueDetails() {
     const statusMap = {
       solved: "Closed",
     };
-
     let displayStatus = statusMap[issue.status] || issue.status;
     return {
       ...issue,
@@ -382,6 +417,13 @@ export default function IssueDetails() {
       municipalityInformedDate: issue.municipalityInformedDate,
       resolvedDate: issue.resolved_date || issue.resolvedAt,
       closedDate: issue.closedDate,
+      // Fields possibly stored from resolution (optional)
+      resolvedByAdminName: issue.resolvedByAdminName,
+      resolvedByAdminDistrict: issue.resolvedByAdminDistrict,
+      resolvedByAdminMunicipality: issue.resolvedByAdminMunicipality,
+      resolutionDepartment: issue.resolutionDepartment,
+      resolutionOfficerName: issue.resolutionOfficerName,
+      resolutionConfirmationStatement: issue.resolutionConfirmationStatement,
     };
   }, [issue]);
 
@@ -409,7 +451,6 @@ export default function IssueDetails() {
         errors.push(`${file.name} exceeds 5MB limit`);
         continue;
       }
-      // Create preview URL and store it on the file object
       const fileWithPreview = Object.assign(file, {
         preview: URL.createObjectURL(file),
       });
@@ -459,7 +500,7 @@ export default function IssueDetails() {
       return 100;
     if (normalized.status === "Resolved") return 80;
     if (normalized.status === "In Progress") return 50;
-    if (normalized.status === "Reopened") return 50; // ✅ treat like In Progress
+    if (normalized.status === "Reopened") return 50;
     return 25;
   }, [normalized?.status]);
 
@@ -469,7 +510,7 @@ export default function IssueDetails() {
       return "success";
     if (normalized.status === "Resolved") return "success";
     if (normalized.status === "In Progress") return "warning";
-    if (normalized.status === "Reopened") return "warning"; // ✅ orange warning
+    if (normalized.status === "Reopened") return "warning";
     return "info";
   };
 
@@ -507,7 +548,6 @@ export default function IssueDetails() {
     let currentIdx;
     if (currentRawStatus === "solved") currentIdx = 3;
     else if (currentRawStatus === "Reopened") {
-      // ✅ Reopened: treat as active on "In Progress" step (so previous steps completed)
       const order = ["Sent", "In Progress", "Resolved", "Closed"];
       currentIdx = order.indexOf("In Progress");
       if (stepStatus === "In Progress") return "active";
@@ -547,10 +587,10 @@ export default function IssueDetails() {
         return {
           label: "Waiting for User Confirmation",
           colorType: "warning",
-          onClick: () => {}, // no action
+          onClick: () => {},
           disabled: true,
         };
-      case "Reopened": // ✅ allow admin to resolve again
+      case "Reopened":
         return {
           label: "Resolve Issue",
           colorType: "success",
@@ -564,68 +604,93 @@ export default function IssueDetails() {
 
   const action = getActionConfig();
 
-// Update the handleResolveSubmit function
-const handleResolveSubmit = async () => {
-  setDetailsError("");
-  setUploadError("");
+  const handleResolveSubmit = async () => {
+    setDetailsError("");
+    setUploadError("");
 
-  if (afterImages.length === 0) {
-    setUploadError("Please upload at least one after-resolution image");
-    return;
-  }
+    if (afterImages.length === 0) {
+      setUploadError("Please upload at least one after-resolution image");
+      return;
+    }
 
-  const trimmedDetails = resolutionDetails.trim();
-  if (trimmedDetails.length < 10) {
-    setDetailsError("Minimum 10 characters required");
-    modalDescriptionRef.current?.focus();
-    return;
-  }
+    const trimmedDetails = resolutionDetails.trim();
+    if (trimmedDetails.length < 10) {
+      setDetailsError("Minimum 10 characters required");
+      modalDescriptionRef.current?.focus();
+      return;
+    }
 
-  setActionLoading(true);
+    if (!confirmationChecked) {
+      setDetailsError("Please confirm that you have reviewed the proof");
+      return;
+    }
 
-  try {
-    const uploadPromises = afterImages.map((file) => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = async () => {
-          try {
-            const res = await fetch(`${API_BASE}/api/upload/admin`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ image: reader.result }),
-            });
-            const data = await res.json();
-            if (data.success) {
-              resolve({ url: data.url, publicId: data.publicId });
-            } else {
-              reject("Upload failed");
+    if (!resolutionMunicipality.trim()) {
+      setDetailsError("Please enter the municipality name");
+      return;
+    }
+    if (!resolutionDepartment.trim()) {
+      setDetailsError("Please enter the department name");
+      return;
+    }
+    if (!resolutionOfficerName.trim()) {
+      setDetailsError("Please enter the officer name");
+      return;
+    }
+
+    setActionLoading(true);
+
+    try {
+      const uploadPromises = afterImages.map((file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = async () => {
+            try {
+              const res = await fetch(`${API_BASE}/api/uploadadminimage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: reader.result }),
+              });
+              const data = await res.json();
+              if (data.success) {
+                resolve({ url: data.url, publicId: data.publicId });
+              } else {
+                reject("Upload failed");
+              }
+            } catch (err) {
+              reject(err);
             }
-          } catch (err) {
-            reject(err);
-          }
-        };
-        reader.onerror = reject;
+          };
+          reader.onerror = reject;
+        });
       });
-    });
 
-    const uploadedImages = await Promise.all(uploadPromises);
-    
-    // Note: The backend will detect that this was a reopened issue
-    // and send the appropriate "properly resolved" message
-    await updateStatus("Resolved", {
-      afterImages: uploadedImages,
-      resolutionDetails: trimmedDetails,
-    });
+      const uploadedImages = await Promise.all(uploadPromises);
 
-    showToast("success", "Resolution confirmation sent to the complaint user");
-  } catch (err) {
-    console.error(err);
-    showToast("error", "Image upload failed");
-  } finally {
-    setActionLoading(false);
-  }
-};
+      const confirmationStatement = `I, ${adminProfile.name} (${adminProfile.district} Administratior), hereby confirm that the above resolution details and after-resolution images are true and correct to the best of my knowledge.`;
+
+      // Send only the fields expected by backend (no resolvedByAdminName/District)
+      await updateStatus("Resolved", {
+        afterImages: uploadedImages,
+        resolutionDetails: trimmedDetails,
+        resolvedByAdminMunicipality: resolutionMunicipality,
+        resolutionDepartment: resolutionDepartment,
+        resolutionOfficerName: resolutionOfficerName,
+        resolutionConfirmationStatement: confirmationStatement,
+      });
+
+      showToast(
+        "success",
+        "Resolution confirmation sent to the complaint user",
+      );
+    } catch (err) {
+      console.error(err);
+      showToast("error", "Image upload failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -743,7 +808,7 @@ const handleResolveSubmit = async () => {
                   label={
                     normalized.status === "Reopened"
                       ? "Improperly Resolved"
-                      : (normalized.displayStatus || normalized.status)
+                      : normalized.displayStatus || normalized.status
                   }
                   status={normalized.status}
                   size="small"
@@ -766,7 +831,6 @@ const handleResolveSubmit = async () => {
           </Tooltip>
         </Box>
 
-        {/* ✅ Warning banner for Reopened issues with negative feedback */}
         {normalized.status === "Reopened" && negativeFeedback && (
           <Alert
             severity="error"
@@ -975,6 +1039,7 @@ const handleResolveSubmit = async () => {
               </Box>
             </Box>
 
+            {/* PROOF OF COMPLETION SECTION */}
             {(normalized.afterImages.length > 0 ||
               normalized.resolution_details ||
               normalized.status === "Resolved" ||
@@ -983,113 +1048,174 @@ const handleResolveSubmit = async () => {
               <>
                 <Divider sx={{ my: 4 }} />
                 <Box>
-                  <Box
+                  <Typography
+                    variant="subtitle1"
+                    fontWeight="600"
                     sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
                       mb: 3,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
                     }}
                   >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <CheckCircle size={20} color="#059669" />
+                    <CheckCircle size={20} color="#059669" /> Proof of
+                    Completion
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                      gap: 4,
+                    }}
+                  >
+                    <Box>
                       <Typography
                         variant="subtitle1"
                         fontWeight="600"
-                        sx={{ color: "#059669" }}
-                      >
-                        Proof of Completion
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight="600"
-                      sx={{ color: "#059669" }}
-                    >
-                      After Resolution Images
-                    </Typography>
-                  </Box>
-                  <Box sx={{ mb: 4 }}>
-                    {normalized.afterImages.length > 0 ? (
-                      <ImageGallery
-                        images={normalized.afterImages}
-                        onImageClick={openImagePreview}
-                      />
-                    ) : (
-                      <Paper
+                        gutterBottom
                         sx={{
-                          p: 3,
-                          textAlign: "center",
-                          bgcolor: "#f9fafc",
-                          borderRadius: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 2,
                         }}
                       >
-                        <ImageIcon size={32} color="#9ca3af" />
-                        <Typography color="text.secondary">
-                          No after images uploaded
-                        </Typography>
-                      </Paper>
-                    )}
-                  </Box>
-                  <Box
-                    sx={{
-                      bgcolor: "#f0fdf4",
-                      borderRadius: 3,
-                      p: 3,
-                      border: "1px solid #a7f3d0",
-                    }}
-                  >
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight="600"
-                      gutterBottom
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        color: "#059669",
-                      }}
-                    >
-                      <FileText size={18} /> Resolution Details
-                    </Typography>
-                    {normalized.resolution_details ? (
-                      <>
-                        <Typography
-                          variant="body2"
+                        <FileText size={18} /> Resolution Details
+                      </Typography>
+                      {normalized.resolution_details ? (
+                        <Paper
+                          variant="outlined"
                           sx={{
-                            whiteSpace: "pre-wrap",
-                            lineHeight: 1.6,
-                            mb: 2,
+                            p: 3,
+                            bgcolor: "#f9f9fc",
+                            borderRadius: 2,
+                            minHeight: 200,
                           }}
                         >
-                          {normalized.resolution_details}
-                        </Typography>
-                        {normalized.resolvedDate && (
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              pt: 2,
-                              borderTop: "1px dashed #a7f3d0",
-                            }}
+                          <Typography
+                            variant="body2"
+                            sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}
                           >
-                            <Calendar size={14} color="#059669" />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
+                            {normalized.resolution_details}
+                          </Typography>
+                          {normalized.resolvedDate && (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mt: 2,
+                                pt: 2,
+                                borderTop: "1px solid #e5e7eb",
+                              }}
                             >
-                              Resolved on: {formatDate(normalized.resolvedDate)}
-                            </Typography>
-                          </Box>
-                        )}
-                      </>
-                    ) : (
-                      <Typography color="text.secondary">
-                        No resolution details added
+                              <Calendar size={14} color="#6b7280" />
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                Resolved on:{" "}
+                                {formatDate(normalized.resolvedDate)}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Paper>
+                      ) : (
+                        <Paper
+                          sx={{
+                            p: 3,
+                            textAlign: "center",
+                            bgcolor: "#f9fafc",
+                            borderRadius: 2,
+                          }}
+                        >
+                          <Typography color="text.secondary">
+                            No resolution details added
+                          </Typography>
+                        </Paper>
+                      )}
+                    </Box>
+                    <Box>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="600"
+                        gutterBottom
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 2,
+                        }}
+                      >
+                        <ImageIcon size={18} /> After Resolution Images
                       </Typography>
-                    )}
+                      {normalized.afterImages.length > 0 ? (
+                        <ImageGallery
+                          images={normalized.afterImages}
+                          onImageClick={openImagePreview}
+                        />
+                      ) : (
+                        <Paper
+                          sx={{
+                            p: 3,
+                            textAlign: "center",
+                            bgcolor: "#f9fafc",
+                            borderRadius: 2,
+                          }}
+                        >
+                          <ImageIcon size={32} color="#9ca3af" />
+                          <Typography color="text.secondary">
+                            No after images uploaded
+                          </Typography>
+                        </Paper>
+                      )}
+                    </Box>
                   </Box>
+
+                  {/* Admin Confirmation Block (shows current admin from localStorage) */}
+                  {(normalized.resolvedByAdminName ||
+                    normalized.resolutionConfirmationStatement) && (
+                    <Box
+                      sx={{
+                        mt: 4,
+                        p: 3,
+                        bgcolor: "#e8f5e9",
+                        borderRadius: 3,
+                        border: "1px solid #c8e6c9",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 1,
+                        }}
+                      >
+                        <CheckCircle size={20} color="#2e7d32" />
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight="bold"
+                          color="success.dark"
+                        >
+                          Resolution Confirmation
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2">
+                        <strong>Resolved by:</strong>{" "}
+                        {normalized.resolutionOfficerName}
+                        {normalized.resolvedByAdminMunicipality &&
+                          ` (${normalized.resolvedByAdminMunicipality} Municipality)`}
+                        {normalized.resolutionDepartment &&
+                          ` - ${normalized.resolutionDepartment} Department`}
+                      </Typography>
+
+                      <Typography variant="body2">
+                        <strong>Viewed by:</strong> {adminProfile.name}(
+                        {adminProfile.district} District Administrator)
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </>
             )}
@@ -1152,7 +1278,7 @@ const handleResolveSubmit = async () => {
         </StyledCard>
       </Container>
 
-      {/* ==================== RESOLVE MODAL ==================== */}
+      {/* Resolve Modal with Municipality, Department, Officer Name */}
       {showResolveModal && (
         <Box
           sx={{
@@ -1179,7 +1305,6 @@ const handleResolveSubmit = async () => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Gradient Header */}
             <Box
               sx={{
                 background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
@@ -1217,7 +1342,7 @@ const handleResolveSubmit = async () => {
             </Box>
 
             <Box sx={{ p: 4 }}>
-              {/* Upload Section */}
+              {/* After-Resolution Images */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="subtitle1" fontWeight="600" gutterBottom>
                   After-Resolution Images{" "}
@@ -1265,7 +1390,6 @@ const handleResolveSubmit = async () => {
                 )}
               </Box>
 
-              {/* Image Previews */}
               {afterImages.length > 0 && (
                 <Box sx={{ mb: 4 }}>
                   <Box
@@ -1345,7 +1469,7 @@ const handleResolveSubmit = async () => {
                 </Box>
               )}
 
-              {/* Resolution Details Section */}
+              {/* Resolution Details */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="subtitle1" fontWeight="600" gutterBottom>
                   Resolution Details <span style={{ color: "#ef4444" }}>*</span>
@@ -1370,12 +1494,98 @@ const handleResolveSubmit = async () => {
                   placeholder="Example: Collected 3 tons of garbage from the site, cleaned the area, and installed new bins..."
                   variant="outlined"
                   disabled={actionLoading}
-                  error={!!detailsError}
+                  error={!!detailsError && resolutionDetails.trim().length < 10}
                   helperText={detailsError}
                 />
               </Box>
 
-              {/* Action Buttons */}
+              {/* Municipality, Department, Officer Name fields */}
+              <Grid container spacing={3} sx={{ mb: 4 }}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                    Municipality <span style={{ color: "#ef4444" }}>*</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={resolutionMunicipality}
+                    onChange={(e) => setResolutionMunicipality(e.target.value)}
+                    placeholder="e.g., Greater Chennai Corporation"
+                    variant="outlined"
+                    size="small"
+                    disabled={actionLoading}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                    Department <span style={{ color: "#ef4444" }}>*</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={resolutionDepartment}
+                    onChange={(e) => setResolutionDepartment(e.target.value)}
+                    placeholder="e.g., Public Works, Health, Sanitation"
+                    variant="outlined"
+                    size="small"
+                    disabled={actionLoading}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                    Officer Name (Person who resolved the issue){" "}
+                    <span style={{ color: "#ef4444" }}>*</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={resolutionOfficerName}
+                    onChange={(e) => setResolutionOfficerName(e.target.value)}
+                    placeholder="Full name of the responsible officer"
+                    variant="outlined"
+                    size="small"
+                    disabled={actionLoading}
+                    required
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Admin acknowledgment summary (current admin) */}
+              <Box sx={{ mb: 4, p: 2, bgcolor: "#f0fdf4", borderRadius: 2 }}>
+                <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                  Resolution Acknowledgment
+                </Typography>
+
+                <Typography variant="body2">
+                  <strong>Viewed and Verified by:</strong> {adminProfile.name}(
+                  {adminProfile.district} District Administrator)
+                </Typography>
+              </Box>
+
+              {/* Confirmation Checkbox */}
+              <Box sx={{ mb: 4 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={confirmationChecked}
+                      onChange={(e) => setConfirmationChecked(e.target.checked)}
+                      disabled={actionLoading}
+                      sx={{
+                        color: "#10b981",
+                        "&.Mui-checked": { color: "#059669" },
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      I confirm that I have reviewed the after-resolution images
+                      and resolution details, and they accurately represent the
+                      issue resolution. This submission is true and correct to
+                      the best of my knowledge.
+                    </Typography>
+                  }
+                />
+              </Box>
+
               <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
                 <Button
                   variant="outlined"
@@ -1390,7 +1600,11 @@ const handleResolveSubmit = async () => {
                   disabled={
                     actionLoading ||
                     afterImages.length === 0 ||
-                    resolutionDetails.trim().length < 10
+                    resolutionDetails.trim().length < 10 ||
+                    !confirmationChecked ||
+                    !resolutionMunicipality.trim() ||
+                    !resolutionDepartment.trim() ||
+                    !resolutionOfficerName.trim()
                   }
                   startIcon={
                     actionLoading ? (
@@ -1410,7 +1624,6 @@ const handleResolveSubmit = async () => {
         </Box>
       )}
 
-      {/* Image Preview Modal */}
       {imagePreview && (
         <Box
           sx={{

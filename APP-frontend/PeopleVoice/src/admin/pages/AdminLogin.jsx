@@ -41,7 +41,6 @@ const AdminLogin = () => {
       `;
       document.head.appendChild(style);
     }
-    // Cleanup timeout on unmount
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
@@ -79,6 +78,7 @@ const AdminLogin = () => {
       /* 🔐 Store Auth Data immediately */
       localStorage.setItem("adminToken", res.data.token);
       localStorage.setItem("adminDistrict", res.data.admin.district);
+      localStorage.setItem("adminName", res.data.admin.name);
 
       /* 💾 Remember Me */
       if (rememberMe) {
@@ -98,7 +98,7 @@ const AdminLogin = () => {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Invalid email or password. Please try again."
+          "Invalid email or password. Please try again.",
       );
       setLoading(false); // Stop loading on error immediately
     }

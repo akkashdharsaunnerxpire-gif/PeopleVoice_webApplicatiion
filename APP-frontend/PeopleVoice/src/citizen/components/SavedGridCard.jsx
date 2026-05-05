@@ -13,8 +13,8 @@ const SavedGridCard = ({ post, onClick, isDark }) => {
     <div
       onClick={onClick}
       className={`relative aspect-square cursor-pointer group overflow-hidden 
-        bg-gray-100 dark:bg-zinc-800 rounded-2xl shadow-sm 
-        transition-all duration-300 hover:shadow-xl`}
+  bg-black rounded-lg 
+  transition-all duration-300`}
     >
       {image ? (
         <img
@@ -29,9 +29,11 @@ const SavedGridCard = ({ post, onClick, isDark }) => {
       )}
 
       {/* Overlay with stats */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent 
-                      opacity-0 group-hover:opacity-100 transition-opacity duration-300 
-                      flex items-end justify-between p-4">
+      <div
+        className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent 
+                      opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300 
+                      flex items-end justify-between p-4"
+      >
         <div className="flex items-center gap-5 text-white">
           <div className="flex items-center gap-1.5">
             <Heart className="w-4 h-4 fill-white" />

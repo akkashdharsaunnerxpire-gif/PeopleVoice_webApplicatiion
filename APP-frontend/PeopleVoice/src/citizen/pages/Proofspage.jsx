@@ -573,7 +573,7 @@ const ProofsPage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[999] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-[999] flex items-center justify-center p-2"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 30 }}

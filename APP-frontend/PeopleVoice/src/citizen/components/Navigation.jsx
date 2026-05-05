@@ -64,17 +64,25 @@ const Navigation = () => {
       console.log(err);
     }
   };
+  
 
   // initial + polling
-  useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
+useEffect(() => {
+  fetchUnreadCount(); // only once
+}, []);
   // custom event listener
   useEffect(() => {
-    const handleUpdate = () => fetchUnreadCount();
+    const handleUpdate = (event) => {
+      const type = event.detail?.type;
+
+      if (type === "DECREMENT") {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      } else if (type === "RESET") {
+        setUnreadCount(0);
+      } else if (type === "NEW") {
+        setUnreadCount((prev) => prev + 1);
+      } 
+    };
     window.addEventListener("notification_update", handleUpdate);
     return () =>
       window.removeEventListener("notification_update", handleUpdate);
@@ -223,10 +231,14 @@ const Navigation = () => {
           <motion.button
             whileTap={{ scale: 0.96 }}
             onClick={() => navigate(`${BASE}/proofspage`)}
-            className={`relative flex items-center gap-4 w-full px-4 py-3 rounded-xl ${
+            className={`relative flex items-center gap-4 w-full px-4 py-3 rounded-xl transition-all ${
               activeNav === "complaintproofs"
-                ? "bg-green-500/10 text-green-600 font-bold"
-                : "text-gray-600"
+                ? isDark
+                  ? "bg-green-500/20 text-green-400 font-bold"
+                  : "bg-green-500/10 text-green-600 font-bold"
+                : isDark
+                  ? "text-gray-400 hover:bg-white/5"
+                  : "text-gray-600 hover:bg-gray-50"
             }`}
           >
             <FileText className="w-5 h-5" />

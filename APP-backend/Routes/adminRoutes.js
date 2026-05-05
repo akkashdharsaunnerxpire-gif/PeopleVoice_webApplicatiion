@@ -12,7 +12,11 @@ const {
   updateIssueStatus,
   getDistrictPoints,
   notifyIssueOpened,
-  notifyImproperIssueOpened // ✅ Import the new function
+  notifyImproperIssueOpened ,
+  forgotPassword,
+  resetPassword,
+  verifyOtp,
+  resendOtp
 } = require("../Controller/adminController");
 
 /* AUTH */
@@ -83,6 +87,10 @@ router.post("/issues/:issueId/notify-view", async (req, res) => {
     res.status(500).json({ message: "Failed to send notification" });
   }
 });
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
+router.post("/verify-otp", verifyOtp);
+router.post("/resend-otp", resendOtp);
 
 // Alternative: Use the controller function if you prefer
 // router.post("/issues/:issueId/notify-view", notifyIssueOpened);

@@ -177,6 +177,7 @@ const ResolutionConfirmationModal = ({
   const [validReason, setValidReason] = useState("");
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isDark } = useTheme();
 
   if (!isOpen) return null;
 
@@ -231,7 +232,7 @@ const ResolutionConfirmationModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] flex items-center justify-center p-3">
       <motion.div
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -247,7 +248,7 @@ const ResolutionConfirmationModal = ({
               onClick={onClose}
               className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
             >
-              <X size={20} />
+              <X size={20} className="text-gray-500 dark:text-gray-400" />
             </button>
           </div>
           <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
@@ -261,7 +262,7 @@ const ResolutionConfirmationModal = ({
               className={`w-full py-3.5 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 font-medium ${
                 selectedOption === "YES"
                   ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 shadow-md"
-                  : "border-gray-200 dark:border-gray-700 hover:border-emerald-300 hover:bg-emerald-50/50"
+                  : "border-gray-200 dark:border-gray-700 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20"
               }`}
             >
               <CheckCircle size={20} />
@@ -274,7 +275,7 @@ const ResolutionConfirmationModal = ({
               className={`w-full py-3.5 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 font-medium ${
                 selectedOption === "NO"
                   ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 shadow-md"
-                  : "border-gray-200 dark:border-gray-700 hover:border-red-300 hover:bg-red-50/50"
+                  : "border-gray-200 dark:border-gray-700 hover:border-red-300 hover:bg-red-50/50 dark:hover:bg-red-950/20"
               }`}
             >
               <X size={20} />
@@ -324,7 +325,7 @@ const ResolutionConfirmationModal = ({
                   ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-xl"
                   : selectedOption === "NO" && validReason.trim()
                     ? "bg-gradient-to-r from-red-600 to-rose-600 text-white hover:shadow-xl"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
               }`}
             >
               {isSubmitting ? (
@@ -355,6 +356,7 @@ const ReconfirmationModal = ({
   const [validReason, setValidReason] = useState("");
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isDark } = useTheme();
 
   if (!isOpen) return null;
 
@@ -443,7 +445,7 @@ const ReconfirmationModal = ({
               onClick={onClose}
               className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
             >
-              <X size={20} />
+              <X size={20} className="text-gray-500 dark:text-gray-400" />
             </button>
           </div>
 
@@ -471,7 +473,7 @@ const ReconfirmationModal = ({
               className={`w-full py-3.5 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 font-medium ${
                 selectedOption === "YES"
                   ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 shadow-md"
-                  : "border-gray-200 dark:border-gray-700 hover:border-emerald-300 hover:bg-emerald-50/50"
+                  : "border-gray-200 dark:border-gray-700 hover:border-emerald-300 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20"
               }`}
             >
               <CheckCircle size={20} />
@@ -484,7 +486,7 @@ const ReconfirmationModal = ({
               className={`w-full py-3.5 px-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 font-medium ${
                 selectedOption === "NO"
                   ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 shadow-md"
-                  : "border-gray-200 dark:border-gray-700 hover:border-red-300 hover:bg-red-50/50"
+                  : "border-gray-200 dark:border-gray-700 hover:border-red-300 hover:bg-red-50/50 dark:hover:bg-red-950/20"
               }`}
             >
               <X size={20} />
@@ -534,7 +536,7 @@ const ReconfirmationModal = ({
                   ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-xl"
                   : selectedOption === "NO" && validReason.trim()
                     ? "bg-gradient-to-r from-red-600 to-rose-600 text-white hover:shadow-xl"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
               }`}
             >
               {isSubmitting ? (
@@ -572,6 +574,7 @@ const Proofpop = () => {
   const [allowResubmit, setAllowResubmit] = useState(false);
   const [previousFeedback, setPreviousFeedback] = useState("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -583,6 +586,20 @@ const Proofpop = () => {
       setLoading(false);
     }
   }, [id]);
+
+  const extractAdminDetails = (statement) => {
+    if (!statement) return { name: "", district: "" };
+
+    const match = statement.match(/I,\s*(.*?)\s*\((.*?)\)/);
+
+    return {
+      name: match?.[1]?.trim() || "",
+      district:
+        match?.[2]?.replace(/Administration|Administrator/i, "").trim() || "",
+    };
+  };
+  const { name: extractedName, district: extractedDistrict } =
+    extractAdminDetails(issue?.resolutionConfirmationStatement);
 
   const fetchIssue = async () => {
     try {
@@ -645,8 +662,6 @@ const Proofpop = () => {
       console.error("Check review error:", err);
     }
   };
-
-  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const handleResolutionConfirm = async (issueId, response) => {
     if (response !== "YES" || confirmLoading) return;
@@ -737,7 +752,18 @@ const Proofpop = () => {
         location: issue.location,
         description: issue.description,
       };
-      await axios.post(`${BACKEND_URL}/api/proofs/save`, proofData);
+      const res = await axios.post(`${BACKEND_URL}/api/proofs/save`, proofData);
+      if (res.data?.proof) {
+        setIssue((prev) => ({
+          ...prev,
+          adminName: res.data.proof.adminName,
+          adminDistrict: res.data.proof.adminDistrict,
+          municipality: res.data.proof.municipality,
+          officerName: res.data.proof.officerName,
+          resolutionConfirmationStatement:
+            res.data.proof.resolutionConfirmationStatement,
+        }));
+      }
       localStorage.setItem("hasNewProof", "true");
       window.dispatchEvent(new Event("proof_update"));
       setSavedToProofs(true);
@@ -751,12 +777,14 @@ const Proofpop = () => {
   const handleAddToMyProofs = () => {
     if (!savedToProofs && !saving) saveProofToCollection();
   };
-const downloadPDF = async () => {
+
+  const downloadPDF = async () => {
   if (!issue || isGeneratingPDF) return;
 
   setIsGeneratingPDF(true);
 
   try {
+    // Show loading toast
     const loadingToast = document.createElement("div");
     loadingToast.id = "pdf-loading-toast";
     loadingToast.innerHTML = `
@@ -768,47 +796,33 @@ const downloadPDF = async () => {
     `;
     document.body.appendChild(loadingToast);
 
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     let yPos = 20;
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 15;
-    const maxWidth = pageWidth - (margin * 2);
+    const maxWidth = pageWidth - margin * 2;
 
-    // Remove all special symbols, keep only alphanumeric, spaces, basic punctuation, and Tamil
     const cleanText = (text) => {
       if (!text) return "";
       let cleaned = String(text);
-      // Remove HTML tags
-      cleaned = cleaned.replace(/<[^>]*>/g, '');
-      // Remove special symbols like ^, |, □, ±, ©, ™, ®, ¾, etc
-      cleaned = cleaned.replace(/[^\w\s\u0B80-\u0BFF\u0B85-\u0BF9\u0B83\u0BBE-\u0BCD\u0BD0\u0BEA-\u0BEF\u0980-\u09FF.,!?()\-:;'"/]/g, '');
-      // Remove math operators
-      cleaned = cleaned.replace(/[\^|□±©™®¾½¼§¶†‡•○●◆◇■▲▼→←↑↓↔]/g, '');
-      // Remove extra spaces
-      cleaned = cleaned.replace(/\s+/g, ' ');
+      cleaned = cleaned.replace(/<[^>]*>/g, "");
+      cleaned = cleaned.replace(/[^\w\s\u0B80-\u0BFF.,!?()\-:;'"/]/g, "");
+      cleaned = cleaned.replace(/\s+/g, " ");
       return cleaned.trim();
     };
 
-    // Helper function to add wrapped text
     const addWrappedText = (text, y, size = 10, isBold = false) => {
       if (!text) return y;
       const cleanTxt = cleanText(text);
       if (!cleanTxt || cleanTxt.length === 0) return y;
-      
       pdf.setFontSize(size);
       pdf.setFont("helvetica", isBold ? "bold" : "normal");
       pdf.setTextColor(0, 0, 0);
       const lines = pdf.splitTextToSize(cleanTxt, maxWidth);
       pdf.text(lines, margin, y);
-      return y + (lines.length * (size * 0.35));
+      return y + lines.length * (size * 0.35);
     };
 
-    // Helper to add image safely
     const addImageToPDF = async (imgUrl, y, maxHeight = 60) => {
       try {
         const response = await fetch(imgUrl);
@@ -819,36 +833,32 @@ const downloadPDF = async () => {
           reader.onerror = () => resolve(null);
           reader.readAsDataURL(blob);
         });
-        
         if (base64) {
-          const imgWidth = maxWidth;
-          const imgHeight = maxHeight;
-          pdf.addImage(base64, 'JPEG', margin, y, imgWidth, imgHeight);
-          return y + imgHeight + 5;
+          pdf.addImage(base64, "JPEG", margin, y, maxWidth, maxHeight);
+          return y + maxHeight + 5;
         }
         return y;
       } catch (err) {
+        console.warn("Image failed to load:", imgUrl);
         return y;
       }
     };
 
-    // ============ HEADER ============
+    // ---------- HEADER ----------
     pdf.setFontSize(20);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(6, 95, 70);
     pdf.text("RESOLUTION REPORT", pageWidth / 2, yPos, { align: "center" });
     yPos += 10;
-    
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(107, 114, 128);
     pdf.text("Official Resolution Document - PeopleVoice System", pageWidth / 2, yPos, { align: "center" });
     yPos += 15;
 
-    // ============ INFO CARD ============
+    // ---------- INFO CARD (ID, Status, Dept, Location) ----------
     pdf.setFillColor(240, 253, 244);
-    pdf.rect(margin, yPos - 5, maxWidth, 40, 'F');
-    
+    pdf.rect(margin, yPos - 5, maxWidth, 45, "F");
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(6, 95, 70);
@@ -857,7 +867,7 @@ const downloadPDF = async () => {
     pdf.setTextColor(75, 85, 99);
     pdf.text(`#${id.slice(-8)}`, margin + 35, yPos);
     yPos += 7;
-    
+
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(6, 95, 70);
     pdf.text("Status:", margin + 5, yPos);
@@ -865,51 +875,47 @@ const downloadPDF = async () => {
     pdf.setTextColor(5, 150, 105);
     pdf.text("RESOLVED", margin + 35, yPos);
     yPos += 7;
-    
+
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(6, 95, 70);
     pdf.text("Department:", margin + 5, yPos);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(75, 85, 99);
-    let deptText = (issue.department || "Not Specified").substring(0, 40);
+    const deptText = (issue.department || "Not Specified").substring(0, 40);
     pdf.text(deptText, margin + 35, yPos);
     yPos += 7;
-    
+
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(6, 95, 70);
     pdf.text("Location:", margin + 5, yPos);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(75, 85, 99);
-    let locationText = (issue.area || issue.district || "Not Specified").substring(0, 55);
+    const locationText = (issue.area || issue.district || issue.location || "Not Specified").substring(0, 55);
     pdf.text(locationText, margin + 35, yPos);
-    yPos += 12;
+    yPos += 10;
 
-    // ============ TITLE ============
+    // ---------- TITLE ----------
     pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(31, 41, 55);
-    let titleText = (issue.title || "Issue Resolution Report").substring(0, 60);
+    const titleText = (issue.title || "Issue Resolution Report").substring(0, 60);
     pdf.text(titleText, margin, yPos);
     yPos += 12;
 
-    // ============ BEFORE RESOLUTION ============
+    // ---------- BEFORE RESOLUTION ----------
     pdf.setFillColor(255, 251, 235);
-    pdf.rect(margin, yPos - 4, maxWidth, 8, 'F');
+    pdf.rect(margin, yPos - 4, maxWidth, 8, "F");
     pdf.setFontSize(12);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(180, 83, 9);
     pdf.text("BEFORE RESOLUTION", margin + 5, yPos);
     yPos += 10;
 
-    // Before Images
     const beforeImages = (issue.images || []).map(img => typeof img === "string" ? img : img.url).filter(Boolean);
     if (beforeImages.length > 0) {
       const imgHeight = beforeImages.length === 1 ? 70 : 50;
       for (let i = 0; i < Math.min(beforeImages.length, 3); i++) {
-        if (yPos > 250) {
-          pdf.addPage();
-          yPos = 20;
-        }
+        if (yPos > 250) { pdf.addPage(); yPos = 20; }
         yPos = await addImageToPDF(beforeImages[i], yPos, imgHeight);
       }
     } else {
@@ -921,28 +927,18 @@ const downloadPDF = async () => {
     }
     yPos += 3;
 
-    // Description - English only (avoid Tamil symbols issue)
-    if (yPos > 250) {
-      pdf.addPage();
-      yPos = 20;
-    }
+    if (yPos > 250) { pdf.addPage(); yPos = 20; }
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(0, 0, 0);
     pdf.text("Issue Description:", margin, yPos);
     yPos += 5;
-    
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
-    let descText = issue.description_en || "No description provided.";
-    // Clean the description text thoroughly
-    descText = descText.replace(/[^a-zA-Z0-9\s.,!?\-':;()]/g, '');
-    descText = descText.replace(/\s+/g, ' ');
-    const descLines = pdf.splitTextToSize(descText, maxWidth);
+    const descText = issue.description_en || issue.description || "No description provided.";
+    const descLines = pdf.splitTextToSize(cleanText(descText), maxWidth);
     pdf.text(descLines, margin, yPos);
-    yPos += (descLines.length * 4) + 5;
-    
-    // Reported Date
+    yPos += descLines.length * 4 + 5;
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(107, 114, 128);
@@ -951,15 +947,10 @@ const downloadPDF = async () => {
     pdf.text(`Reported: ${reportedDate} at ${reportedTime}`, margin, yPos);
     yPos += 15;
 
-    // Check page break
-    if (yPos > 250) {
-      pdf.addPage();
-      yPos = 20;
-    }
-
-    // ============ AFTER RESOLUTION ============
+    // ---------- AFTER RESOLUTION (with full details) ----------
+    if (yPos > 250) { pdf.addPage(); yPos = 20; }
     pdf.setFillColor(236, 253, 245);
-    pdf.rect(margin, yPos - 4, maxWidth, 8, 'F');
+    pdf.rect(margin, yPos - 4, maxWidth, 8, "F");
     pdf.setFontSize(12);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(6, 95, 70);
@@ -971,10 +962,7 @@ const downloadPDF = async () => {
     if (afterImages.length > 0) {
       const imgHeight = afterImages.length === 1 ? 70 : 50;
       for (let i = 0; i < Math.min(afterImages.length, 3); i++) {
-        if (yPos > 250) {
-          pdf.addPage();
-          yPos = 20;
-        }
+        if (yPos > 250) { pdf.addPage(); yPos = 20; }
         yPos = await addImageToPDF(afterImages[i], yPos, imgHeight);
       }
     } else {
@@ -986,42 +974,79 @@ const downloadPDF = async () => {
     }
     yPos += 3;
 
-    // Resolution Details
-    if (yPos > 250) {
-      pdf.addPage();
-      yPos = 20;
-    }
+    if (yPos > 250) { pdf.addPage(); yPos = 20; }
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(0, 0, 0);
     pdf.text("Resolution Details:", margin, yPos);
     yPos += 5;
-    
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
-    let resText = issue.resolution_details || "No resolution details provided.";
-    // Clean resolution text thoroughly
-    resText = resText.replace(/[^a-zA-Z0-9\s.,!?\-':;()]/g, '');
-    resText = resText.replace(/\s+/g, ' ');
-    const resLines = pdf.splitTextToSize(resText, maxWidth);
+    const resText = issue.resolution_details || "No resolution details provided.";
+    const resLines = pdf.splitTextToSize(cleanText(resText), maxWidth);
     pdf.text(resLines, margin, yPos);
-    yPos += (resLines.length * 4) + 5;
-    
-    // Resolved Date
+    yPos += resLines.length * 4 + 5;
+
+    // Resolved by (officer, municipality, department)
+    if (issue.officerName || issue.municipality || issue.department) {
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(0, 0, 0);
+      pdf.text("Resolved by:", margin, yPos);
+      yPos += 4;
+      pdf.setFont("helvetica", "normal");
+      let resolvedByText = "";
+      if (issue.officerName) resolvedByText += `${issue.officerName}`;
+      if (issue.municipality) resolvedByText += ` (${issue.municipality} Municipality`;
+      if (issue.department) resolvedByText += ` - ${issue.department}`;
+      if (issue.municipality) resolvedByText += `)`;
+      if (resolvedByText) {
+        const resolvedLines = pdf.splitTextToSize(cleanText(resolvedByText), maxWidth);
+        pdf.text(resolvedLines, margin, yPos);
+        yPos += resolvedLines.length * 4 + 3;
+      }
+    }
+
+    // Viewed and verified by (admin name, district)
+    const { name: extractedName, district: extractedDistrict } = extractAdminDetails(issue?.resolutionConfirmationStatement);
+    if (extractedName || extractedDistrict) {
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(0, 0, 0);
+      pdf.text("Viewed and verified by:", margin, yPos);
+      yPos += 4;
+      pdf.setFont("helvetica", "normal");
+      let verifiedText = "";
+      if (extractedName) verifiedText += extractedName;
+      if (extractedDistrict) verifiedText += ` (${extractedDistrict})`;
+      if (verifiedText) {
+        const verifiedLines = pdf.splitTextToSize(cleanText(verifiedText), maxWidth);
+        pdf.text(verifiedLines, margin, yPos);
+        yPos += verifiedLines.length * 4 + 3;
+      }
+    }
+
+    // Resolution confirmation statement (quote)
+    if (issue.resolutionConfirmationStatement) {
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "italic");
+      pdf.setTextColor(75, 85, 99);
+      const statementLines = pdf.splitTextToSize(cleanText(`“${issue.resolutionConfirmationStatement}”`), maxWidth);
+      pdf.text(statementLines, margin, yPos);
+      yPos += statementLines.length * 4 + 5;
+    }
+
+    // Resolution date
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(107, 114, 128);
     const resolvedDate = new Date(issue.updatedAt).toLocaleDateString();
     const resolvedTime = new Date(issue.updatedAt).toLocaleTimeString();
-    pdf.text(`Resolved: ${resolvedDate} at ${resolvedTime}`, margin, yPos);
+    pdf.text(`Resolved on: ${resolvedDate} at ${resolvedTime}`, margin, yPos);
     yPos += 12;
 
-    // ============ FOOTER ============
-    if (yPos > 270) {
-      pdf.addPage();
-      yPos = 20;
-    }
-    
+    // ---------- FOOTER ----------
+    if (yPos > 270) { pdf.addPage(); yPos = 20; }
     pdf.setDrawColor(229, 231, 235);
     pdf.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 6;
@@ -1045,7 +1070,6 @@ const downloadPDF = async () => {
     if (loadingToast && loadingToast.parentNode) {
       document.body.removeChild(loadingToast);
     }
-
   } catch (error) {
     console.error("PDF error:", error);
     const toast = document.getElementById("pdf-loading-toast");
@@ -1055,6 +1079,7 @@ const downloadPDF = async () => {
     setIsGeneratingPDF(false);
   }
 };
+
   const shareIssue = () => {
     if (navigator.share) {
       navigator.share({
@@ -1121,14 +1146,18 @@ const downloadPDF = async () => {
 
   return (
     <div
-      className="min-h-screen bg-white dark:bg-gray-900 p-3"
+      className={`min-h-screen ${isDark ? "bg-gray-900" : "bg-white"} p-3`}
       style={{ scrollBehavior: "smooth" }}
     >
       {/* Header */}
       <motion.div
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className={`fixed top-0 left-0 right-0 ${isDark ? "bg-gray-900/95 border-gray-800" : "bg-white/95 border-gray-200"} backdrop-blur-xl border-b z-50 px-4 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between shadow-lg`}
+        className={`fixed top-0 left-0 right-0 ${
+          isDark
+            ? "bg-gray-900/95 border-gray-800"
+            : "bg-white/95 border-gray-200"
+        } backdrop-blur-xl border-b z-50 px-4 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between shadow-lg`}
       >
         <button
           onClick={handleClose}
@@ -1226,7 +1255,11 @@ const downloadPDF = async () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight mb-8 bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent"
+          className={`text-2xl sm:text-3xl md:text-4xl font-bold leading-tight mb-8 ${
+            isDark
+              ? "text-white"
+              : "bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent"
+          }`}
         >
           {issue?.title || "Resolution Report"}
         </motion.h2>
@@ -1288,6 +1321,22 @@ const downloadPDF = async () => {
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 leading-relaxed">
                 {issue?.resolution_details || "No resolution details provided."}
               </p>
+              <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl">
+                <p className="text-sm">
+                  <strong>Resolved by:</strong> {issue.officerName} (
+                  {issue.municipality} Municipality - {issue.department})
+                </p>
+
+                <p className="text-sm mt-1">
+                  <strong>Viewed and verified by:</strong> {extractedName} (
+                  {extractedDistrict})
+                </p>
+              </div>
+              {issue.resolutionConfirmationStatement && (
+                <p className="text-sm mt-2 italic text-gray-600 dark:text-gray-300">
+                  “{issue.resolutionConfirmationStatement}”
+                </p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg">
                   <Calendar size={14} className="text-emerald-600" />
@@ -1314,7 +1363,6 @@ const downloadPDF = async () => {
           transition={{ delay: 0.2 }}
           className="space-y-4"
         >
-          {/* Case 1: Improper issue - Show Re-confirm button */}
           {allowResubmit && (
             <motion.button
               whileTap={{ scale: 0.98 }}
@@ -1326,7 +1374,6 @@ const downloadPDF = async () => {
             </motion.button>
           )}
 
-          {/* Case 2: Normal issue - NOT submitted yet - Show Confirm button */}
           {!hasSubmitted && !allowResubmit && (
             <motion.button
               whileTap={{ scale: 0.98 }}
@@ -1338,7 +1385,6 @@ const downloadPDF = async () => {
             </motion.button>
           )}
 
-          {/* Case 3: Normal issue - Already submitted - Show message */}
           {hasSubmitted && !allowResubmit && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -1360,7 +1406,7 @@ const downloadPDF = async () => {
             disabled={savedToProofs || saving}
             className={`w-full py-4 rounded-2xl font-semibold text-base flex items-center justify-center gap-3 transition-all shadow-lg active:scale-[0.98] ${
               savedToProofs
-                ? "bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed"
+                ? "bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                 : "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-xl hover:from-emerald-700 hover:to-teal-700"
             }`}
           >
@@ -1385,7 +1431,11 @@ const downloadPDF = async () => {
               whileTap={{ scale: 0.98 }}
               onClick={downloadPDF}
               disabled={isGeneratingPDF}
-              className="download-pdf-btn py-3.5 rounded-2xl border-2 flex items-center justify-center gap-2 font-medium text-sm sm:text-base transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`download-pdf-btn py-3.5 rounded-2xl border-2 flex items-center justify-center gap-2 font-medium text-sm sm:text-base transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+                isDark
+                  ? "border-gray-700 bg-gray-900 hover:bg-gray-800 text-white"
+                  : "border-gray-200 bg-white hover:bg-gray-50 text-gray-800"
+              }`}
             >
               {isGeneratingPDF ? (
                 <>

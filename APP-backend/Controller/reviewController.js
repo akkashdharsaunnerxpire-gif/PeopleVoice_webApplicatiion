@@ -46,6 +46,7 @@ exports.createReview = async (req, res) => {
         isResolved,
         rating: rating || null,
         feedback: feedback?.trim() || "",
+        district: issue.district   
       });
 
       // If citizen says NOT resolved, mark issue as Reopened
@@ -185,10 +186,20 @@ exports.checkReviewSubmitted = async (req, res) => {
 /* ================= GET ALL REVIEWS ================= */
 exports.getAllReviews = async (req, res) => {
   try {
-    const reviews = await Review.find()
+    const { district } = req.query;
+
+    let filter = {};
+
+    if (district && district !== "All-Districts") {
+      filter.district = district;   // ✅ direct filter
+    }
+
+    const reviews = await Review.find(filter)
       .sort({ createdAt: -1 })
       .populate("issueId");
+
     res.json({ success: true, reviews });
+
   } catch (err) {
     console.error("Fetch reviews error:", err);
     res.status(500).json({

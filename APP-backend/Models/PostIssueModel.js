@@ -67,6 +67,30 @@ const PostIssueSchema = new mongoose.Schema(
 
     resolution_details: String,
 
+        resolvedByAdminName: {
+      type: String,
+    },
+
+    resolvedByAdminDistrict: {
+      type: String,
+    },
+
+    resolvedByAdminMunicipality: {
+      type: String,
+    },
+
+    resolutionDepartment: {
+      type: String,
+    },
+
+    resolutionOfficerName: {
+      type: String,
+    },
+
+    resolutionConfirmationStatement: {
+      type: String,
+    },
+
     /* ⏱ STATUS (Citizen-visible only) */
     status: {
       type: String,

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Database,
@@ -29,6 +30,7 @@ const Issues = () => {
   // Data states
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [feedbackPopup, setFeedbackPopup] = useState(null);
   const [globalStats, setGlobalStats] = useState({
     new: 0,
     ongoing: 0,
@@ -248,32 +250,38 @@ const Issues = () => {
     }
   };
 
- const handleTakeAction = async (issueId) => {
-  if (!openedIssues[issueId]) {
-    try {
-      // Check if this is an improper issue (has negative review)
-      const checkRes = await axios.get(
-        `${API_URL}/api/reviews/check/${issueId}?citizenId=${localStorage.getItem("citizenId")}`
-      );
-      
-      // Use different endpoint for improper issues
-      const endpoint = checkRes.data.allowResubmit 
-        ? `${API_URL}/api/admin/issues/${issueId}/notify-improper-view`
-        : `${API_URL}/api/admin/issues/${issueId}/notify-view`;
-      
-      await axios.post(endpoint, {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
-      });
-      
-      const updated = { ...openedIssues, [issueId]: true };
-      setOpenedIssues(updated);
-      localStorage.setItem("openedIssues", JSON.stringify(updated));
-    } catch (err) {
-      console.error("Notification error:", err);
+  const handleTakeAction = async (issueId) => {
+    if (!openedIssues[issueId]) {
+      try {
+        // Check if this is an improper issue (has negative review)
+        const checkRes = await axios.get(
+          `${API_URL}/api/reviews/check/${issueId}?citizenId=${localStorage.getItem("citizenId")}`,
+        );
+
+        // Use different endpoint for improper issues
+        const endpoint = checkRes.data.allowResubmit
+          ? `${API_URL}/api/admin/issues/${issueId}/notify-improper-view`
+          : `${API_URL}/api/admin/issues/${issueId}/notify-view`;
+
+        await axios.post(
+          endpoint,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+            },
+          },
+        );
+
+        const updated = { ...openedIssues, [issueId]: true };
+        setOpenedIssues(updated);
+        localStorage.setItem("openedIssues", JSON.stringify(updated));
+      } catch (err) {
+        console.error("Notification error:", err);
+      }
     }
-  }
-  navigate(`/admin/dashboard/issues/${issueId}`);
-};
+    navigate(`/admin/dashboard/issues/${issueId}`);
+  };
 
   const goToPrevPage = () => setPage((p) => Math.max(1, p - 1));
   const goToNextPage = () => setPage((p) => Math.min(totalPages, p + 1));
@@ -312,349 +320,387 @@ const Issues = () => {
   `;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50/20 p-6 md:p-10">
-      <style>{blinkKeyframes}</style>
-      <div className="max-w-[1600px] mx-auto">
-        {/* Header */}
-        <div className="mb-8 flex flex-wrap justify-between items-center gap-4">
-          <div>
-            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent flex items-center gap-3">
-              <BarChart3 className="text-blue-600 drop-shadow-md" size={36} />
-              {showClosedIssues ? "Archived Issues" : "Active Issues Dashboard"}
-            </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <Database size={14} className="text-gray-500" />
-              <span className="text-gray-600 font-medium">
-                {adminDistrict} Municipality
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              <span className="text-emerald-600 text-sm font-medium">
-                Live Updates (8s)
-              </span>
-              {statusFilter && (
-                <span className="ml-3 inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                  Filter: {statusFilter === "Sent" ? "New" : statusFilter}
-                  <button
-                    onClick={() => setStatusFilter(null)}
-                    className="ml-1 hover:text-blue-600"
-                  >
-                    ×
-                  </button>
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50/20 p-6 md:p-10">
+        <style>{blinkKeyframes}</style>
+        <div className="max-w-[1600px] mx-auto">
+          {/* Header */}
+          <div className="mb-8 flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent flex items-center gap-3">
+                <BarChart3 className="text-blue-600 drop-shadow-md" size={36} />
+                {showClosedIssues
+                  ? "Archived Issues"
+                  : "Active Issues Dashboard"}
+              </h1>
+              <div className="flex items-center gap-2 mt-1">
+                <Database size={14} className="text-gray-500" />
+                <span className="text-gray-600 font-medium">
+                  {adminDistrict}
                 </span>
-              )}
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="text-emerald-600 text-sm font-medium">
+                  Live Updates (8s)
+                </span>
+                {statusFilter && (
+                  <span className="ml-3 inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                    Filter: {statusFilter === "Sent" ? "New" : statusFilter}
+                    <button
+                      onClick={() => setStatusFilter(null)}
+                      className="ml-1 hover:text-blue-600"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )}
+              </div>
             </div>
+            <button
+              onClick={() => {
+                fetchIssues(true);
+                fetchGlobalStats();
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white/70 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 text-gray-700 font-semibold hover:bg-white hover:shadow-md transition-all duration-200"
+            >
+              <RefreshCw
+                size={16}
+                className="group-hover:rotate-180 transition-transform"
+              />{" "}
+              Manual Refresh
+            </button>
           </div>
-          <button
-            onClick={() => {
-              fetchIssues(true);
-              fetchGlobalStats();
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white/70 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 text-gray-700 font-semibold hover:bg-white hover:shadow-md transition-all duration-200"
-          >
-            <RefreshCw
-              size={16}
-              className="group-hover:rotate-180 transition-transform"
-            />{" "}
-            Manual Refresh
-          </button>
-        </div>
 
-        {/* Stats Cards - Clickable */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-10">
-          {[
-            {
-              label: "New Reports",
-              val: globalStats.new,
-              icon: AlertCircle,
-              gradient: "from-blue-500 to-blue-600",
-              bg: "from-blue-50 to-blue-100/50",
-              status: "Sent",
-            },
-            {
-              label: "In Progress",
-              val: globalStats.ongoing,
-              icon: Clock,
-              gradient: "from-amber-500 to-amber-600",
-              bg: "from-amber-50 to-amber-100/50",
-              status: "In Progress",
-            },
-            {
-              label: "Resolved",
-              val: globalStats.resolved,
-              icon: CheckCircle,
-              gradient: "from-emerald-500 to-emerald-600",
-              bg: "from-emerald-50 to-emerald-100/50",
-              status: "Resolved",
-            },
-            {
-              label: "Closed",
-              val: globalStats.closed,
-              icon: Archive,
-              gradient: "from-gray-500 to-gray-600",
-              bg: "from-gray-50 to-gray-100/50",
-              status: "Closed",
-            },
-            {
-              label: "Improperly Resolved",
-              val: globalStats.reopened,
-              icon: AlertCircle,
-              gradient: "from-red-500 to-red-600",
-              bg: "from-red-50 to-red-100/50",
-              status: "Reopened",
-            },
-          ].map((s, i) => (
-            <div
-              key={i}
-              onClick={() => handleStatusCardClick(s.status)}
-              className={`bg-gradient-to-br ${s.bg} backdrop-blur-sm p-5 rounded-2xl shadow-lg border border-white/50 transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer group ${
-                statusFilter === s.status
-                  ? "ring-2 ring-blue-500 ring-offset-2"
-                  : ""
+          {/* Stats Cards - Clickable */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-10">
+            {[
+              {
+                label: "New Reports",
+                val: globalStats.new,
+                icon: AlertCircle,
+                gradient: "from-blue-500 to-blue-600",
+                bg: "from-blue-50 to-blue-100/50",
+                status: "Sent",
+              },
+              {
+                label: "In Progress",
+                val: globalStats.ongoing,
+                icon: Clock,
+                gradient: "from-amber-500 to-amber-600",
+                bg: "from-amber-50 to-amber-100/50",
+                status: "In Progress",
+              },
+              {
+                label: "Resolved",
+                val: globalStats.resolved,
+                icon: CheckCircle,
+                gradient: "from-emerald-500 to-emerald-600",
+                bg: "from-emerald-50 to-emerald-100/50",
+                status: "Resolved",
+              },
+              {
+                label: "Closed",
+                val: globalStats.closed,
+                icon: Archive,
+                gradient: "from-gray-500 to-gray-600",
+                bg: "from-gray-50 to-gray-100/50",
+                status: "Closed",
+              },
+              {
+                label: "Improperly Resolved",
+                val: globalStats.reopened,
+                icon: AlertCircle,
+                gradient: "from-red-500 to-red-600",
+                bg: "from-red-50 to-red-100/50",
+                status: "Reopened",
+              },
+            ].map((s, i) => (
+              <div
+                key={i}
+                onClick={() => handleStatusCardClick(s.status)}
+                className={`bg-gradient-to-br ${s.bg} backdrop-blur-sm p-5 rounded-2xl shadow-lg border border-white/50 transition-all duration-300 hover:scale-105 hover:shadow-xl cursor-pointer group ${
+                  statusFilter === s.status
+                    ? "ring-2 ring-blue-500 ring-offset-2"
+                    : ""
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                      {s.label}
+                    </p>
+                    <p className="text-3xl font-black mt-2 text-gray-800">
+                      {s.val}
+                    </p>
+                  </div>
+                  <div
+                    className={`p-3 rounded-full bg-gradient-to-br ${s.gradient} shadow-lg group-hover:scale-110 transition-transform`}
+                  >
+                    <s.icon className="text-white" size={24} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Filter Bar */}
+          <div className="bg-white/70 backdrop-blur-md p-5 rounded-2xl shadow-lg border border-white/50 mb-6 flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
+              <input
+                className="w-full pl-11 pr-5 py-3 bg-white/80 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 transition-all"
+                placeholder="Search by reason, area or description..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="relative">
+              <Filter
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={16}
+              />
+              <select
+                className="bg-white/80 pl-9 pr-8 py-3 rounded-xl outline-none border border-gray-200 font-medium appearance-none cursor-pointer hover:bg-white transition"
+                value={problemType}
+                onChange={(e) => setProblemType(e.target.value)}
+              >
+                <option value="All">All Departments</option>
+                <option value="Garbage">🗑️ Garbage</option>
+                <option value="Road">🛣️ Road</option>
+                <option value="Water">💧 Water Supply</option>
+              </select>
+            </div>
+            <button
+              onClick={() => {
+                if (statusFilter) setStatusFilter(null);
+                setShowClosedIssues(!showClosedIssues);
+              }}
+              className={`px-5 py-3 rounded-xl font-bold transition-all duration-200 flex items-center gap-2 shadow-sm ${
+                showClosedIssues
+                  ? "bg-gradient-to-r from-slate-800 to-slate-900 text-white hover:shadow-md"
+                  : "bg-white text-slate-700 border border-gray-300 hover:bg-gray-50"
               }`}
             >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                    {s.label}
-                  </p>
-                  <p className="text-3xl font-black mt-2 text-gray-800">
-                    {s.val}
-                  </p>
-                </div>
-                <div
-                  className={`p-3 rounded-full bg-gradient-to-br ${s.gradient} shadow-lg group-hover:scale-110 transition-transform`}
-                >
-                  <s.icon className="text-white" size={24} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Filter Bar */}
-        <div className="bg-white/70 backdrop-blur-md p-5 rounded-2xl shadow-lg border border-white/50 mb-6 flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-              size={18}
-            />
-            <input
-              className="w-full pl-11 pr-5 py-3 bg-white/80 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 transition-all"
-              placeholder="Search by reason, area or description..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="relative">
-            <Filter
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={16}
-            />
-            <select
-              className="bg-white/80 pl-9 pr-8 py-3 rounded-xl outline-none border border-gray-200 font-medium appearance-none cursor-pointer hover:bg-white transition"
-              value={problemType}
-              onChange={(e) => setProblemType(e.target.value)}
+              {showClosedIssues ? <Eye size={16} /> : <Archive size={16} />}
+              {showClosedIssues ? "View Active Issues" : "View Closed Issues"}
+            </button>
+            <button
+              onClick={clearAllFilters}
+              className="px-5 py-3 rounded-xl font-bold bg-gray-200 text-gray-700 hover:bg-gray-300 transition flex items-center gap-2"
             >
-              <option value="All">All Departments</option>
-              <option value="Garbage">🗑️ Garbage</option>
-              <option value="Road">🛣️ Road</option>
-              <option value="Water">💧 Water Supply</option>
-            </select>
+              <XCircle size={16} /> Clear Filters
+            </button>
           </div>
-          <button
-            onClick={() => {
-              if (statusFilter) setStatusFilter(null);
-              setShowClosedIssues(!showClosedIssues);
-            }}
-            className={`px-5 py-3 rounded-xl font-bold transition-all duration-200 flex items-center gap-2 shadow-sm ${
-              showClosedIssues
-                ? "bg-gradient-to-r from-slate-800 to-slate-900 text-white hover:shadow-md"
-                : "bg-white text-slate-700 border border-gray-300 hover:bg-gray-50"
-            }`}
-          >
-            {showClosedIssues ? <Eye size={16} /> : <Archive size={16} />}
-            {showClosedIssues ? "View Active Issues" : "View Closed Issues"}
-          </button>
-          <button
-            onClick={clearAllFilters}
-            className="px-5 py-3 rounded-xl font-bold bg-gray-200 text-gray-700 hover:bg-gray-300 transition flex items-center gap-2"
-          >
-            <XCircle size={16} /> Clear Filters
-          </button>
-        </div>
 
-        {/* Issues Table */}
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 rounded-full border-4 border-blue-200"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+          {/* Issues Table */}
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 rounded-full border-4 border-blue-200"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+              </div>
             </div>
-          </div>
-        ) : filteredIssues.length === 0 ? (
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-md p-12 text-center border border-white/50">
-            <XCircle className="text-gray-300 mx-auto mb-4" size={64} />
-            <h3 className="text-xl font-semibold text-gray-600">
-              No issues found
-            </h3>
-            <p className="text-gray-400 mt-1">
-              Try adjusting your search or filters
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-white/50">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        S.No
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Issue
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Department
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Location
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
-                        Action
-                      </th>
-                      {/* Optional column for negative review feedback */}
-                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        Citizen Feedback
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredIssues.map((issue, idx) => {
-                      const statusDisplay = getStatusDisplay(issue.status);
-                      const action = getActionButton(issue);
-                      // Check if issue has negative review feedback (attached by backend)
-                      const negativeFeedback =
-                        issue.negativeReview?.feedback || "";
-                      return (
-                        <tr
-                          key={issue._id}
-                          className="hover:bg-white/50 transition-all duration-200 group"
-                        >
-                          <td className="px-6 py-4 text-sm font-medium text-gray-500">
-                            {(page - 1) * limit + idx + 1}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="relative w-12 h-12 rounded-lg overflow-hidden shadow-md group-hover:scale-105 transition-transform">
-                              <img
-                                src={
-                                  getImageUrl(issue.images?.[0]) ||
-                                  "https://via.placeholder.com/400"
-                                }
-                                className="w-full h-full object-cover"
-                                alt="issue"
-                              />
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="px-3 py-1 bg-gray-100/80 rounded-full text-xs font-medium text-gray-700 backdrop-blur-sm">
-                              {issue.department}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600 font-medium">
-                            {issue.area || "Not specified"}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {new Date(issue.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm ${statusDisplay.color}`}
-                            >
-                              {statusDisplay.icon} {statusDisplay.text}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <button
-                              onClick={() => handleTakeAction(issue._id)}
-                              className={`bg-gradient-to-r ${action.color} text-white px-4 py-1.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center gap-1 mx-auto ${
-                                action.blink ? "blink-opened" : ""
-                              }`}
-                            >
-                              {action.icon} {action.text}
-                            </button>
-                          </td>
-                          <td className="px-6 py-4">
-                            {issue.status === "Reopened" && negativeFeedback ? (
-                              <div className="group relative cursor-help">
-                                <MessageSquare
-                                  size={18}
-                                  className="text-red-500"
+          ) : filteredIssues.length === 0 ? (
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-md p-12 text-center border border-white/50">
+              <XCircle className="text-gray-300 mx-auto mb-4" size={64} />
+              <h3 className="text-xl font-semibold text-gray-600">
+                No issues found
+              </h3>
+              <p className="text-gray-400 mt-1">
+                Try adjusting your search or filters
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-white/50">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          S.No
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Issue
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Department
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Location
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">
+                          Action
+                        </th>
+                        {/* Optional column for negative review feedback */}
+                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Citizen Feedback
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredIssues.map((issue, idx) => {
+                        const statusDisplay = getStatusDisplay(issue.status);
+                        const action = getActionButton(issue);
+                        // Check if issue has negative review feedback (attached by backend)
+                        const negativeFeedback =
+                          issue.negativeReview?.feedback || "";
+                        return (
+                          <tr
+                            key={issue._id}
+                            className="hover:bg-white/50 transition-all duration-200 group"
+                          >
+                            <td className="px-6 py-4 text-sm font-medium text-gray-500">
+                              {(page - 1) * limit + idx + 1}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="relative w-12 h-12 rounded-lg overflow-hidden shadow-md group-hover:scale-105 transition-transform">
+                                <img
+                                  src={
+                                    getImageUrl(issue.images?.[0]) ||
+                                    "https://via.placeholder.com/400"
+                                  }
+                                  className="w-full h-full object-cover"
+                                  alt="issue"
                                 />
-                                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 w-48 z-10">
-                                  {negativeFeedback.length > 100
-                                    ? negativeFeedback.slice(0, 100) + "..."
-                                    : negativeFeedback}
-                                </div>
                               </div>
-                            ) : issue.status === "Reopened" ? (
-                              <span className="text-xs text-red-500 italic">
-                                No feedback yet
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="px-3 py-1 bg-gray-100/80 rounded-full text-xs font-medium text-gray-700 backdrop-blur-sm">
+                                {issue.department}
                               </span>
-                            ) : (
-                              <span className="text-gray-400 text-xs">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600 font-medium">
+                              {issue.area || "Not specified"}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {new Date(issue.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm ${statusDisplay.color}`}
+                              >
+                                {statusDisplay.icon} {statusDisplay.text}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <button
+                                onClick={() => handleTakeAction(issue._id)}
+                                className={`bg-gradient-to-r ${action.color} text-white px-4 py-1.5 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg flex items-center gap-1 mx-auto ${
+                                  action.blink ? "blink-opened" : ""
+                                }`}
+                              >
+                                {action.icon} {action.text}
+                              </button>
+                            </td>
+                            <td className="px-6 py-4">
+                              {issue.status === "Reopened" &&
+                              negativeFeedback ? (
+                                <div>
+                                  <button
+                                    onClick={() =>
+                                      setFeedbackPopup(negativeFeedback)
+                                    }
+                                    className="text-red-500 hover:scale-110 transition"
+                                  >
+                                    <MessageSquare size={18} />
+                                  </button>
+                                </div>
+                              ) : issue.status === "Reopened" ? (
+                                <span className="text-xs text-red-500 italic">
+                                  No feedback yet
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-xs">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+              <AnimatePresence>
+                {feedbackPopup && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                    onClick={() => setFeedbackPopup(null)}
+                  >
+                    <motion.div
+                      initial={{ scale: 0.8 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0.8 }}
+                      className="bg-white max-w-md w-[90%] p-5 rounded-xl shadow-2xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <h3 className="text-lg font-bold mb-3 text-red-600">
+                        Citizen Feedback
+                      </h3>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-between items-center mt-6 bg-white/50 backdrop-blur-sm p-3 rounded-xl border border-white/50">
-                <div className="text-sm text-gray-500 font-medium">
-                  Page {page} of {totalPages}
+<p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line max-h-[300px] overflow-y-auto">
+                        {feedbackPopup}
+                      </p>
+
+                      <button
+                        onClick={() => setFeedbackPopup(null)}
+                        className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg w-full hover:bg-red-600 transition"
+                      >
+                        Close
+                      </button>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-between items-center mt-6 bg-white/50 backdrop-blur-sm p-3 rounded-xl border border-white/50">
+                  <div className="text-sm text-gray-500 font-medium">
+                    Page {page} of {totalPages}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={goToPrevPage}
+                      disabled={page === 1}
+                      className={`p-2 rounded-lg transition-all ${
+                        page === 1
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"
+                      }`}
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                    <button
+                      onClick={goToNextPage}
+                      disabled={page === totalPages}
+                      className={`p-2 rounded-lg transition-all ${
+                        page === totalPages
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"
+                      }`}
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={goToPrevPage}
-                    disabled={page === 1}
-                    className={`p-2 rounded-lg transition-all ${
-                      page === 1
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"
-                    }`}
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
-                  <button
-                    onClick={goToNextPage}
-                    disabled={page === totalPages}
-                    className={`p-2 rounded-lg transition-all ${
-                      page === totalPages
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"
-                    }`}
-                  >
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

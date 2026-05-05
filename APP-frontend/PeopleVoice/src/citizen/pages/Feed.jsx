@@ -509,15 +509,15 @@ const Feed = () => {
         <div
           className={`backdrop-blur-xl border-b ${
             isDark
-              ? "bg-violet-950/85 border-violet-500/30"
+              ? "bg-[#0a0a0a] border-gray-800 border-violet-500/30"
               : "bg-white/90 border-green-100/60"
           }`}
         >
           <div className="px-4 py-3 flex items-center justify-between">
             <div>
               <p
-                className={`text-[10px] uppercase tracking-wider ${
-                  isDark ? "text-violet-400" : "text-green-600"
+                className={`text-[12px] uppercase tracking-wider ${
+                  isDark ? "text-gray-300" : "text-green-600"
                 }`}
               >
                 Public Reports
@@ -529,7 +529,7 @@ const Feed = () => {
                 onClick={() => setIsMobileFilterOpen(true)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium shadow-md ${
                   isDark
-                    ? "bg-violet-700/80 text-violet-100 hover:bg-violet-600"
+                    ? "bg-gray-900 text-white hover:bg-gray-800 text-violet-100 hover:bg-violet-600"
                     : "bg-green-600 text-white hover:bg-green-700"
                 } transition-colors`}
               >
@@ -731,7 +731,7 @@ const Feed = () => {
                   onClick={() => setIsMobileFilterOpen(false)}
                   className={`p-3 rounded-xl ${isDark ? "hover:bg-violet-900/50" : "hover:bg-green-50"}`}
                 >
-                  <X size={22} className={isDark ? "text-violet-300" : "text-green-600"} />
+                  <X size={22} className={isDark ? "text-gray-300" : "text-green-600"} />
                 </motion.button>
               </div>
               <div className="flex-1 overflow-y-auto p-5">

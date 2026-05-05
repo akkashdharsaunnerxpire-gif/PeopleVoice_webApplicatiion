@@ -108,7 +108,11 @@ const Notifications = () => {
           playNotificationSound();
 
           // 🔥 ADD THIS LINE
-          window.dispatchEvent(new Event("notification_update"));
+          window.dispatchEvent(
+            new CustomEvent("notification_update", {
+              detail: { type: "NEW" },
+            }),
+          );
 
           freshNew.forEach((n) => {
             const notificationImage = getNotificationImage(n);
@@ -196,10 +200,19 @@ const Notifications = () => {
     if (!id) return;
     try {
       await axios.put(`${BACKEND_URL}/api/notifications/read/${id}`);
+
       setNotifications((prev) =>
         prev.map((n) => (n._id === id ? { ...n, read: true } : n)),
       );
+
       setNewNotificationCount((prev) => Math.max(0, prev - 1));
+
+      // 🔥 ADD THIS LINE
+      window.dispatchEvent(
+        new CustomEvent("notification_update", {
+          detail: { type: "DECREMENT" },
+        }),
+      );
     } catch (err) {
       console.error("Mark as read error:", err);
     }
@@ -209,7 +222,15 @@ const Notifications = () => {
   const markAllAsRead = async () => {
     const unread = notifications.filter((n) => !n.read);
     await Promise.all(unread.map((n) => markAsRead(n._id)));
+
     setNewNotificationCount(0);
+
+    // 🔥 ADD THIS ALSO
+    window.dispatchEvent(
+      new CustomEvent("notification_update", {
+        detail: { type: "RESET" },
+      }),
+    );
   };
 
   /* ================= DELETE NOTIFICATION ================= */

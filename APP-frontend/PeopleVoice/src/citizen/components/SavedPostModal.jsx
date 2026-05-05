@@ -1,29 +1,30 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  X, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
   Bookmark,
   Heart,
   MessageCircle,
   MapPin,
   Calendar,
   Tag,
-  Share2
+  Share2,
 } from "lucide-react";
 import { useState } from "react";
-
+import { useOutletContext } from "react-router-dom";
 const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
 const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
   const [index, setIndex] = useState(0);
   const [isUnsaving, setIsUnsaving] = useState(false);
   const [error, setError] = useState(null);
+  const { setCommentModalData } = useOutletContext();
 
   const issue = post.issueData || {};
-  const images = (issue.images || []).map(img =>
-  typeof img === "string" ? img : img.url
-);
+  const images = (issue.images || []).map((img) =>
+    typeof img === "string" ? img : img.url,
+  );
 
   /* UNSAVE */
   const handleUnsave = async () => {
@@ -84,7 +85,7 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* LEFT IMAGE SECTION */}
-        <motion.div 
+        <motion.div
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.1 }}
@@ -185,7 +186,7 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 <MapPin className="w-4 h-4" />
-                <span>{issue.area || 'Location not specified'}</span>
+                <span>{issue.area || "Location not specified"}</span>
               </div>
               <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 <Calendar className="w-4 h-4" />
@@ -199,14 +200,16 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
                 <Tag className="w-3 h-3" />
                 {issue.department}
               </span>
-              
-              <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-                issue.status === "Resolved"
-                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  : issue.status === "In Progress"
-                  ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-              }`}>
+
+              <span
+                className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
+                  issue.status === "Resolved"
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : issue.status === "In Progress"
+                      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                }`}
+              >
                 {issue.status}
               </span>
             </div>
@@ -215,7 +218,10 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
             {issue.hashtags?.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {issue.hashtags.map((tag, i) => (
-                  <span key={i} className="text-blue-600 dark:text-blue-400 text-sm">
+                  <span
+                    key={i}
+                    className="text-blue-600 dark:text-blue-400 text-sm"
+                  >
                     {tag}
                   </span>
                 ))}
@@ -231,10 +237,29 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
-                <MessageCircle className="w-5 h-5 text-green-600" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {issue.comments?.length || 0}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() =>
+                      setCommentModalData({
+                        open: true,
+                        issueId: issue?._id,
+                        comments: issue.comments || [],
+                        images: issue.images || [],
+                        citizenId: citizenId,
+                        postOwnerId: issue.citizenId,
+                        district: issue.district,
+                        hideImage: true,
+                      })
+                    }
+                    className="transition hover:scale-110"
+                  >
+                    <MessageCircle className="w-5 h-5 text-green-600" />
+                  </button>
+
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {issue.comments?.length || 0}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -258,11 +283,13 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
                   onClick={() => {
                     const shareUrl = `${window.location.origin}/issue/${post.issueId}`;
                     if (navigator.share) {
-                      navigator.share({
-                        title: issue.description_en,
-                        text: issue.description_en,
-                        url: shareUrl,
-                      }).catch(console.log);
+                      navigator
+                        .share({
+                          title: issue.description_en,
+                          text: issue.description_en,
+                          url: shareUrl,
+                        })
+                        .catch(console.log);
                     } else {
                       navigator.clipboard.writeText(shareUrl);
                       alert("Link copied!");
@@ -279,9 +306,10 @@ const SavedPostModal = ({ post, citizenId, onClose, onUnsave, isDark }) => {
                 onClick={handleUnsave}
                 disabled={isUnsaving || !citizenId}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all
-                  ${isUnsaving || !citizenId
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
-                    : 'bg-red-600 hover:bg-red-700 text-white shadow-lg'
+                  ${
+                    isUnsaving || !citizenId
+                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      : "bg-red-600 hover:bg-red-700 text-white shadow-lg"
                   }`}
               >
                 {isUnsaving ? (

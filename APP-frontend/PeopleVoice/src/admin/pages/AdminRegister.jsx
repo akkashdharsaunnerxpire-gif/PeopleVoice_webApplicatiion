@@ -11,7 +11,8 @@ import {
   EyeOff,
   ShieldCheck,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  User
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -22,8 +23,10 @@ const AdminRegister = () => {
   const timeoutRef = useRef(null);
 
   const [formData, setFormData] = useState({
+    fullName: "",
     district: "",
-    email: "",
+    email: "",               // Auto‑generated government email (login)
+    contactEmail: "",        // NEW: separate admin user email (contact)
     password: "",
     confirmPassword: "",
     secretKey: ""
@@ -61,7 +64,6 @@ const AdminRegister = () => {
       `;
       document.head.appendChild(style);
     }
-    // Cleanup timeout on unmount
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
@@ -69,22 +71,11 @@ const AdminRegister = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    if (name === "email") {
-      setFormData({
-        ...formData,
-        [name]: value
-      });
-      return;
-    }
-    
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const validateForm = () => {
+
     if (!formData.district) {
       setError("Please select your district");
       return false;
@@ -92,6 +83,13 @@ const AdminRegister = () => {
 
     if (!formData.email.endsWith("@gov.in") && !formData.email.endsWith("@tn.gov.in")) {
       setError("Only government email addresses (@gov.in or @tn.gov.in) are allowed");
+      return false;
+    }
+
+    // NEW: validate admin user email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.contactEmail.trim() || !emailRegex.test(formData.contactEmail)) {
+      setError("Please enter a valid admin user email address");
       return false;
     }
 
@@ -118,30 +116,25 @@ const AdminRegister = () => {
     setError("");
     setSuccess("");
 
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setLoading(true);
 
     try {
-      const res = await axios.post(
-        `${API_BASE}/api/admin/register`,
-        {
-          district: formData.district,
-          email: formData.email,
-          password: formData.password,
-          secretKey: formData.secretKey
-        }
-      );
+      const res = await axios.post(`${API_BASE}/api/admin/register`, {
+        fullName: formData.fullName,
+        district: formData.district,
+        email: formData.email,              // government email (login)
+        contactEmail: formData.contactEmail, // NEW: admin user email
+        password: formData.password,
+        secretKey: formData.secretKey
+      });
 
       setSuccess("Admin account created successfully! Redirecting to login...");
       
-      // Store temporary data
       localStorage.setItem("registeredEmail", formData.email);
       localStorage.setItem("registeredDistrict", formData.district);
       
-      // ⏳ Wait 3 seconds before redirecting (simulate processing)
       timeoutRef.current = setTimeout(() => {
         navigate("/admin/login");
       }, 3000);
@@ -149,18 +142,17 @@ const AdminRegister = () => {
     } catch (err) {
       const errorMsg = err.response?.data?.message || "Registration failed. Please try again.";
       setError(errorMsg);
-      setLoading(false); // Stop loading on error immediately
+      setLoading(false);
     }
   };
 
   const handleDistrictSelect = (district) => {
     const districtForEmail = district.toLowerCase().replace(/\s+/g, '');
-    
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       district,
       email: `${districtForEmail}@gov.in`
-    });
+    }));
   };
 
   const generateEmailFromDistrict = (districtName) => {
@@ -170,7 +162,6 @@ const AdminRegister = () => {
 
   return (
     <>
-      {/* ================= LINEAR PROGRESS BAR ================= */}
       {loading && (
         <div className="fixed top-0 left-0 w-full h-1 bg-blue-100 z-50 overflow-hidden shadow-sm">
           <div
@@ -188,14 +179,12 @@ const AdminRegister = () => {
         </div>
 
         <div className="relative w-full max-w-4xl">
-          {/* Main Container */}
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden border border-white/20">
             {/* Header Section */}
             <div className="relative bg-gradient-to-r from-blue-700 to-purple-700 p-8 text-white">
               <div className="absolute top-4 right-4 opacity-20">
                 <Building2 size={48} />
               </div>
-              
               <div className="flex items-center gap-4 mb-4">
                 <div className="relative">
                   <UserPlus size={36} className="drop-shadow-lg" />
@@ -208,7 +197,6 @@ const AdminRegister = () => {
                   </p>
                 </div>
               </div>
-              
               <div className="flex items-center gap-2 text-sm">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -235,7 +223,6 @@ const AdminRegister = () => {
                   </p>
                 </div>
 
-                {/* Success Message */}
                 {success && (
                   <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-r-lg">
                     <div className="flex items-center gap-2">
@@ -245,7 +232,6 @@ const AdminRegister = () => {
                   </div>
                 )}
 
-                {/* Error Message */}
                 {error && (
                   <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
                     <div className="flex items-center gap-2">
@@ -256,6 +242,31 @@ const AdminRegister = () => {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Full Name */}
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
+                      <User size={14} />
+                      Full Name
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User className="text-gray-400 group-hover:text-blue-500 transition-colors" size={18} />
+                      </div>
+                      <input
+                        type="text"
+                        name="fullName"
+                        required
+                        value={formData.fullName}
+                        onChange={handleChange}
+                        placeholder="Enter your full name as per government ID"
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm placeholder:text-gray-400 hover:border-gray-400"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Your full name will be used for official verification
+                    </p>
+                  </div>
+
                   {/* District Selection */}
                   <div>
                     <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
@@ -288,11 +299,11 @@ const AdminRegister = () => {
                     )}
                   </div>
 
-                  {/* Email Field */}
+                  {/* Government Email (auto‑generated) */}
                   <div>
                     <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
                       <Mail size={14} />
-                      Government Email
+                      Government Email (Login ID)
                     </label>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -325,7 +336,32 @@ const AdminRegister = () => {
                     </p>
                   </div>
 
-                  {/* Password Field */}
+                  {/* NEW: Admin User Email (Contact Email) */}
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
+                      <Mail size={14} />
+                      Admin User Email
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Mail className="text-gray-400 group-hover:text-blue-500 transition-colors" size={18} />
+                      </div>
+                      <input
+                        type="email"
+                        name="contactEmail"
+                        required
+                        value={formData.contactEmail}
+                        onChange={handleChange}
+                        placeholder="your.personal@example.com"
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm placeholder:text-gray-400 hover:border-gray-400"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      This email will be used for contact & notifications (can be a personal/organisational email).
+                    </p>
+                  </div>
+
+                  {/* Password */}
                   <div>
                     <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
                       <Lock size={14} />
@@ -349,22 +385,16 @@ const AdminRegister = () => {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute inset-y-0 right-0 pr-3 flex items-center"
                       >
-                        {showPassword ? (
-                          <EyeOff className="text-gray-400 hover:text-gray-600 transition-colors" size={18} />
-                        ) : (
-                          <Eye className="text-gray-400 hover:text-gray-600 transition-colors" size={18} />
-                        )}
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <div className={`w-2 h-2 rounded-full ${formData.password.length >= 8 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <p className="text-xs text-gray-500">
-                        Must be at least 8 characters with letters, numbers, and symbols
-                      </p>
+                      <p className="text-xs text-gray-500">Minimum 8 characters with letters, numbers & symbols</p>
                     </div>
                   </div>
 
-                  {/* Confirm Password Field */}
+                  {/* Confirm Password */}
                   <div>
                     <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
                       <Lock size={14} />
@@ -388,11 +418,7 @@ const AdminRegister = () => {
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                         className="absolute inset-y-0 right-0 pr-3 flex items-center"
                       >
-                        {showConfirmPassword ? (
-                          <EyeOff className="text-gray-400 hover:text-gray-600 transition-colors" size={18} />
-                        ) : (
-                          <Eye className="text-gray-400 hover:text-gray-600 transition-colors" size={18} />
-                        )}
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                     {formData.password && formData.confirmPassword && (
@@ -405,7 +431,7 @@ const AdminRegister = () => {
                     )}
                   </div>
 
-                  {/* Secret Key Field */}
+                  {/* Secret Key */}
                   <div>
                     <label className="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-2">
                       <KeyRound size={14} />
@@ -421,7 +447,7 @@ const AdminRegister = () => {
                         required
                         value={formData.secretKey}
                         onChange={handleChange}
-                        placeholder="Enter government-issued secret key"
+                        placeholder="Government‑issued secret key"
                         className="w-full pl-10 pr-12 py-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm placeholder:text-gray-400 hover:border-gray-400 tracking-widest"
                       />
                       <button
@@ -429,19 +455,12 @@ const AdminRegister = () => {
                         onClick={() => setShowSecretKey(!showSecretKey)}
                         className="absolute inset-y-0 right-0 pr-3 flex items-center"
                       >
-                        {showSecretKey ? (
-                          <EyeOff className="text-gray-400 hover:text-gray-600 transition-colors" size={18} />
-                        ) : (
-                          <Eye className="text-gray-400 hover:text-gray-600 transition-colors" size={18} />
-                        )}
+                        {showSecretKey ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Provided by state government authorities
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Provided by state government authorities</p>
                   </div>
 
-                  {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={loading}
@@ -464,7 +483,6 @@ const AdminRegister = () => {
                     )}
                   </button>
 
-                  {/* Login Link */}
                   <div className="text-center pt-4">
                     <p className="text-sm text-gray-600">
                       Already have an account?{" "}
@@ -480,7 +498,7 @@ const AdminRegister = () => {
                 </form>
               </div>
 
-              {/* Right Column - Information */}
+              {/* Right Column - Information (unchanged except added note about new email) */}
               <div className="lg:border-l lg:border-gray-200 lg:pl-8">
                 <div className="mb-8">
                   <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -488,58 +506,18 @@ const AdminRegister = () => {
                     Registration Guidelines
                   </h3>
                   <ul className="space-y-3">
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">District Selection</span>
-                        <p className="text-xs text-gray-600">Select your administrative district from Tamil Nadu</p>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Auto-generated Email</span>
-                        <p className="text-xs text-gray-600">Email will be: <code className="bg-gray-100 px-1 rounded">districtname@gov.in</code></p>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Examples</span>
-                        <div className="text-xs text-gray-600 space-y-1">
-                          <div>Chennai → <code className="bg-gray-100 px-1 rounded">chennai@gov.in</code></div>
-                          <div>Coimbatore → <code className="bg-gray-100 px-1 rounded">coimbatore@gov.in</code></div>
-                          <div>Madurai → <code className="bg-gray-100 px-1 rounded">madurai@gov.in</code></div>
-                        </div>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Password Requirements</span>
-                        <p className="text-xs text-gray-600">Minimum 8 characters with complexity requirements</p>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Secret Key</span>
-                        <p className="text-xs text-gray-600">Obtain secret key from state government authorities</p>
-                      </div>
-                    </li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div><div><span className="text-sm font-medium text-gray-700">Full Name</span><p className="text-xs text-gray-600">As per government ID</p></div></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div><div><span className="text-sm font-medium text-gray-700">District Selection</span><p className="text-xs text-gray-600">Select your administrative district</p></div></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div><div><span className="text-sm font-medium text-gray-700">Government Email (Login)</span><p className="text-xs text-gray-600">Auto‑generated as <code className="bg-gray-100 px-1 rounded">districtname@gov.in</code></p></div></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div><div><span className="text-sm font-medium text-gray-700">Admin User Email (New)</span><p className="text-xs text-gray-600">Separate contact email – used for notifications & communication</p></div></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div><div><span className="text-sm font-medium text-gray-700">Password Requirements</span><p className="text-xs text-gray-600">Minimum 8 characters, mix of letters/numbers/symbols</p></div></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div><div><span className="text-sm font-medium text-gray-700">Secret Key</span><p className="text-xs text-gray-600">From Tamil Nadu government authorities</p></div></li>
                   </ul>
                 </div>
 
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                  <h4 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
-                    <KeyRound size={16} />
-                    About Secret Key
-                  </h4>
-                  <p className="text-xs text-blue-700">
-                    The secret key is a unique authentication code provided by the Tamil Nadu 
-                    State Government to authorized district administrators. This ensures only 
-                    verified government personnel can create admin accounts.
-                  </p>
+                  <h4 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2"><KeyRound size={16} /> About Secret Key</h4>
+                  <p className="text-xs text-blue-700">Unique authentication code for authorised district administrators.</p>
                 </div>
 
                 <div className="mt-6 p-4 bg-gray-50 rounded-xl">
@@ -548,28 +526,17 @@ const AdminRegister = () => {
                     <div className="p-3 bg-white rounded-lg border border-gray-200">
                       <div className="font-medium text-gray-800 mb-1">Chennai District</div>
                       <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Email:</span>
-                          <code className="bg-gray-100 px-2 rounded">chennai@gov.in</code>
-                        </div>
+                        <div className="flex justify-between"><span className="text-gray-600">Name:</span><code>K. Rajesh Kumar</code></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Gov Email:</span><code>chennai@gov.in</code></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Admin Email:</span><code>rajesh.kumar@tn.gov.in</code></div>
                       </div>
                     </div>
                     <div className="p-3 bg-white rounded-lg border border-gray-200">
                       <div className="font-medium text-gray-800 mb-1">Coimbatore District</div>
                       <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Email:</span>
-                          <code className="bg-gray-100 px-2 rounded">coimbatore@gov.in</code>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200">
-                      <div className="font-medium text-gray-800 mb-1">Madurai District</div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Email:</span>
-                          <code className="bg-gray-100 px-2 rounded">madurai@gov.in</code>
-                        </div>
+                        <div className="flex justify-between"><span className="text-gray-600">Name:</span><code>S. Vanitha</code></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Gov Email:</span><code>coimbatore@gov.in</code></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Admin Email:</span><code>vanitha.s@coimbatore.nic.in</code></div>
                       </div>
                     </div>
                   </div>
@@ -577,24 +544,15 @@ const AdminRegister = () => {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="px-8 py-4 bg-gray-50 border-t border-gray-100">
               <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-500">
-                  © {new Date().getFullYear()} PeopleVoice · Tamil Nadu Government
-                </div>
+                <div className="text-xs text-gray-500">© {new Date().getFullYear()} PeopleVoice · Tamil Nadu Government</div>
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-xs font-medium text-green-700">Secure Registration</span>
-                  </div>
-                  <span className="text-xs text-gray-400">•</span>
-                  <span className="text-xs text-gray-500">Authorized Access Only</span>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-green-500 rounded-full"></div><span className="text-xs font-medium text-green-700">Secure Registration</span></div>
+                  <span className="text-xs text-gray-400">•</span><span className="text-xs text-gray-500">Authorized Access Only</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2">
-                Government of Tamil Nadu · Digital Governance Initiative
-              </p>
+              <p className="text-xs text-gray-400 mt-2">Government of Tamil Nadu · Digital Governance Initiative</p>
             </div>
           </div>
         </div>

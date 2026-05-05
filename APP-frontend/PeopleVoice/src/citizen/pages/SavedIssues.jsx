@@ -293,7 +293,7 @@ const SavedIssues = () => {
           animate="visible"
           className={`${
             viewMode === "grid"
-              ? "grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1"
+              ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2"
               : "space-y-3 max-w-3xl mx-auto"
           }`}
         >

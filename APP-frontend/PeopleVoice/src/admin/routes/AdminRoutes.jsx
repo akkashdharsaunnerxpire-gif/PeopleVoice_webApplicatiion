@@ -10,12 +10,13 @@ import ReviewPage from "../pages/ReviewPage";
 import Departments from "../pages/Departments";
 import Settings from "../pages/Settings";
 import AdminRegister from "../pages/AdminRegister.jsx";
-
+import AdminForgotPassword from "../pages/AdminForgotPassword.jsx";
 const AdminRoutes = () => (
   <Routes>
     {/* PUBLIC */}
     <Route path="login" element={<AdminLogin />} />
     <Route path="register" element={<AdminRegister />} />
+    <Route path="forgot-password" element={<AdminForgotPassword />} />
 
     {/* PROTECTED */}
     <Route element={<AdminLayout />}>

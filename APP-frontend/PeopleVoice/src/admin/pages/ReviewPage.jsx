@@ -10,15 +10,20 @@ const ReviewPage = () => {
   }, []);
 
   const fetchReviews = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/reviews");
-      setReviews(res.data.reviews || []);
-    } catch (err) {
-      console.error("Error fetching reviews:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const adminDistrict = localStorage.getItem("adminDistrict");
+
+    const res = await axios.get(
+      `http://localhost:5000/api/reviews?district=${adminDistrict}`
+    );
+
+    setReviews(res.data.reviews || []);
+  } catch (err) {
+    console.error("Error fetching reviews:", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const renderStars = (rating) => {
     return "⭐".repeat(rating || 0);
@@ -42,10 +47,18 @@ const ReviewPage = () => {
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="px-6 py-4 font-semibold text-gray-700">Citizen ID</th>
-                  <th className="px-6 py-4 font-semibold text-gray-700">Feedback</th>
-                  <th className="px-6 py-4 font-semibold text-gray-700 text-center">Rating</th>
-                  <th className="px-6 py-4 font-semibold text-gray-700 text-center">Status</th>
+                  <th className="px-6 py-4 font-semibold text-gray-700">
+                    Citizen ID
+                  </th>
+                  <th className="px-6 py-4 font-semibold text-gray-700">
+                    Feedback
+                  </th>
+                  <th className="px-6 py-4 font-semibold text-gray-700 text-center">
+                    Rating
+                  </th>
+                  <th className="px-6 py-4 font-semibold text-gray-700 text-center">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
