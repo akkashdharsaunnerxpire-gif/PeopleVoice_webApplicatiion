@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Hash,
   Camera,
@@ -15,7 +15,8 @@ import {
   Edit,
   Check,
   ShieldCheck,
-  Upload, // new icon for gallery
+  Upload,
+  CheckCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DISTRICTS } from "../components/constants";
@@ -117,7 +118,7 @@ const TEXTS = {
     selectDepartment: "Select Department",
     photos: "Photos",
     takePhoto: "Take Photo",
-    chooseGallery: "Choose from Gallery", // new
+    chooseGallery: "Choose from Gallery",
     selectDeptFirst: "Select Dept First",
     location: "Location",
     clickToEnterLocation: "Click to enter location manually",
@@ -173,7 +174,7 @@ const TEXTS = {
     readyToCapture: "✓ Ready to capture {department} issues",
     enterValidLocation: "Please enter valid location",
     pleaseLogin: "Please login first",
-    processingImages: "Processing images...", // new
+    processingImages: "Processing images...",
   },
   ta: {
     title: "பொது புகார் பதிவு",
@@ -267,13 +268,22 @@ const PostIssue = () => {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [error, setError] = useState("");
   const [tamilEdited, setTamilEdited] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [cameraAllowed, setCameraAllowed] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
   const [isValidatingImage, setIsValidatingImage] = useState(false);
   const [isProcessingUpload, setIsProcessingUpload] = useState(false); // for gallery uploads
+
+  // Toast state
+  const [toast, setToast] = useState({ message: "", type: "", visible: false });
+  
+  const showToast = useCallback((message, type = "error", duration = 4000) => {
+    setToast({ message, type, visible: true });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    }, duration);
+  }, []);
 
   // Description view toggle
   const [descView, setDescView] = useState("both");
@@ -307,10 +317,10 @@ const PostIssue = () => {
 
   useEffect(() => {
     if (!citizenId) {
-      alert(t("pleaseLogin"));
+      showToast(t("pleaseLogin"), "error");
       navigateToLogin();
     }
-  }, [citizenId]);
+  }, [citizenId, showToast, t, navigateToLogin]);
 
   useEffect(() => {
     if (department) {
@@ -427,12 +437,20 @@ const PostIssue = () => {
 
   // Camera functions
   const startCamera = async () => {
-    if (!department) return setError(t("selectDepartment"));
-    if (!cameraAllowed) return setError(t("selectDeptFirst"));
+    if (!department) {
+      showToast(t("selectDepartment"), "error");
+      return;
+    }
+    if (!cameraAllowed) {
+      showToast(t("selectDeptFirst"), "error");
+      return;
+    }
     if (images.length >= getDepartmentDetails(department).maxImages) {
-      return setError(
+      showToast(
         `Max ${getDepartmentDetails(department).maxImages} photos allowed`,
+        "error",
       );
+      return;
     }
 
     setIsCameraOpen(true);
@@ -443,7 +461,7 @@ const PostIssue = () => {
       });
       if (videoRef.current) videoRef.current.srcObject = stream;
     } catch (err) {
-      setError(t("cameraDenied"));
+      showToast(t("cameraDenied"), "error");
       setIsCameraOpen(false);
     }
   };
@@ -462,7 +480,7 @@ const PostIssue = () => {
     const imgHash = hashImage(compressed);
 
     if (images.some((i) => i.hash === imgHash)) {
-      setError(t("duplicatePhoto"));
+      showToast(t("duplicatePhoto"), "error");
       stopCamera();
       return;
     }
@@ -491,7 +509,7 @@ const PostIssue = () => {
         }
       }
     } catch (err) {
-      setError(err.message || "Failed to capture location");
+      showToast(err.message || "Failed to capture location", "error");
     } finally {
       setIsValidatingImage(false);
       stopCamera();
@@ -515,14 +533,13 @@ const PostIssue = () => {
     const remainingSlots = maxImages - images.length;
 
     if (remainingSlots <= 0) {
-      setError(`Maximum ${maxImages} photos allowed`);
+      showToast(`Maximum ${maxImages} photos allowed`, "error");
       return;
     }
 
     // Limit to remaining slots
     const selectedFiles = files.slice(0, remainingSlots);
     setIsProcessingUpload(true);
-    setError("");
 
     try {
       // Get current location once for all uploaded images
@@ -543,7 +560,7 @@ const PostIssue = () => {
 
         // Check duplicate
         if (images.some((i) => i.hash === imgHash)) {
-          setError(t("duplicatePhoto"));
+          showToast(t("duplicatePhoto"), "error");
           continue; // skip duplicate, continue with next
         }
 
@@ -568,7 +585,7 @@ const PostIssue = () => {
         }
       }
     } catch (err) {
-      setError(err.message || "Failed to process images");
+      showToast(err.message || "Failed to process images", "error");
     } finally {
       setIsProcessingUpload(false);
       // Clear file input so same file can be selected again
@@ -587,9 +604,8 @@ const PostIssue = () => {
     if (manualLocation.trim()) {
       setArea(manualLocation.trim());
       setIsEditingLocation(false);
-      setError("");
     } else {
-      setError(t("enterValidLocation"));
+      showToast(t("enterValidLocation"), "error");
     }
   };
 
@@ -640,16 +656,19 @@ const PostIssue = () => {
       !descEn.trim() ||
       !descTa.trim()
     ) {
-      return setError(t("fillAllFields"));
+      showToast(t("fillAllFields"), "error");
+      return;
     }
 
     if (images.length < dept.minImages) {
-      return setError(
+      showToast(
         t("minPhotosRequired", {
           minImages: dept.minImages,
           department: dept.name,
         }),
+        "error",
       );
+      return;
     }
 
     // Reset verification checks before showing modal
@@ -664,92 +683,93 @@ const PostIssue = () => {
     setShowVerification(true);
   };
 
- const handleVerificationSubmit = async () => {
-  const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
-  const allRequiredChecked = requiredChecks.every(
-    (check) => verificationChecks[check]
-  );
+  const handleVerificationSubmit = async () => {
+    const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
+    const allRequiredChecked = requiredChecks.every(
+      (check) => verificationChecks[check]
+    );
 
-  if (!allRequiredChecked) {
-    return setError(t("confirmAllPoints"));
-  }
+    if (!allRequiredChecked) {
+      showToast(t("confirmAllPoints"), "error");
+      return;
+    }
 
-  setIsSubmittingVerification(true);
+    setIsSubmittingVerification(true);
 
-  try {
-    const uploadedImages = [];
+    try {
+      const uploadedImages = [];
 
-    // 🔥 LOOP THROUGH ALL IMAGES
-    for (const img of images) {
-      const res = await fetch(`${APIURL}/upload`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // 🔥 LOOP THROUGH ALL IMAGES
+      for (const img of images) {
+        const res = await fetch(`${APIURL}/uploadimage`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: img.data }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error("Upload failed:", errText);
+          throw new Error("Cloudinary upload failed");
+        }
+
+        const data = await res.json();
+
+        if (!data.url) {
+          console.error("Invalid response:", data);
+          throw new Error("No URL returned");
+        }
+
+        uploadedImages.push({
+          url: data.url,
+          publicId: data.publicId,
+        });
+      }
+
+      // 🔥 FINAL PAYLOAD
+      const payload = {
+        citizenId,
+        district,
+        area: area.trim(),
+        department,
+        reason,
+        description_en: descEn.trim(),
+        description_ta: descTa.trim(),
+        hashtags: hashtags.split(" ").filter((h) => h.startsWith("#")),
+        images: uploadedImages,
+        device_fingerprint,
+        photo_locations: images.map((i) => i.location),
+        verification_metadata: {
+          verified_by_user: true,
+          verification_timestamp: new Date().toISOString(),
+          verification_checks: verificationChecks,
         },
-        body: JSON.stringify({ image: img.data }),
+      };
+
+      const res = await fetch(`${APIURL}/post-issue-data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error("Upload failed:", errText);
-        throw new Error("Cloudinary upload failed");
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        showToast(t("complaintRegistered"), "success");
+        navigate("/feed");
+      } else {
+        showToast(result.message || "Submission failed", "error");
       }
 
-      const data = await res.json();
-
-      if (!data.url) {
-        console.error("Invalid response:", data);
-        throw new Error("No URL returned");
-      }
-
-      uploadedImages.push({
-        url: data.url,
-        publicId: data.publicId,
-      });
+    } catch (err) {
+      console.error(err);
+      showToast("Upload failed", "error");
+    } finally {
+      setIsSubmittingVerification(false);
     }
-
-    // 🔥 FINAL PAYLOAD
-    const payload = {
-      citizenId,
-      district,
-      area: area.trim(),
-      department,
-      reason,
-      description_en: descEn.trim(),
-      description_ta: descTa.trim(),
-      hashtags: hashtags.split(" ").filter((h) => h.startsWith("#")),
-      images: uploadedImages,
-      device_fingerprint,
-      photo_locations: images.map((i) => i.location),
-      verification_metadata: {
-        verified_by_user: true,
-        verification_timestamp: new Date().toISOString(),
-        verification_checks: verificationChecks,
-      },
-    };
-
-    const res = await fetch(`${APIURL}/post-issue-data`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const result = await res.json();
-
-    if (res.ok && result.success) {
-      alert("Uploaded successfully");
-      navigate("/feed");
-    } else {
-      setError(result.message || "Submission failed");
-    }
-
-  } catch (err) {
-    console.error(err);
-    setError("Upload failed");
-  } finally {
-    setIsSubmittingVerification(false);
-  }
-};
+  };
   const toggleLanguage = () => {
     setLanguage(language === "en" ? "ta" : "en");
   };
@@ -763,6 +783,28 @@ const PostIssue = () => {
   /* ================= RENDER ================= */
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toast Notification */}
+      {toast.visible && (
+        <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 z-50 animate-slide-up">
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm sm:text-base ${
+            toast.type === "error" ? "bg-red-600 text-white" : 
+            toast.type === "success" ? "bg-green-600 text-white" : 
+            "bg-yellow-600 text-white"
+          }`}>
+            {toast.type === "error" && <AlertCircle size={16} />}
+            {toast.type === "success" && <CheckCircle size={16} />}
+            {toast.type === "warning" && <AlertTriangle size={16} />}
+            <span>{toast.message}</span>
+            <button 
+              onClick={() => setToast(prev => ({ ...prev, visible: false }))}
+              className="ml-2 hover:opacity-80"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Container with responsive padding */}
       <div className="w-full max-w-[700px] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-24 sm:pb-32">
         {/* Header with Language Toggle - Responsive */}
@@ -782,19 +824,6 @@ const PostIssue = () => {
             </span>
           </button>
         </div>
-
-        {/* Error Message - Responsive */}
-        {error && (
-          <div className="mb-4 sm:mb-6 bg-red-50 border-l-4 border-red-500 p-3 sm:p-4 rounded-lg flex items-center gap-2 sm:gap-3 text-sm sm:text-base">
-            <AlertCircle className="text-red-600 flex-shrink-0" size={18} />
-            <span className="text-red-700 flex-1">{error}</span>
-            <X
-              className="cursor-pointer flex-shrink-0"
-              onClick={() => setError("")}
-              size={18}
-            />
-          </div>
-        )}
 
         {/* VERIFICATION MODAL - Fully Responsive */}
         {showVerification && (
@@ -1414,6 +1443,23 @@ const PostIssue = () => {
           </button>
         </form>
       </div>
+
+      {/* Add animation keyframes */}
+      <style>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translate(-50%, 1rem);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, 0);
+          }
+        }
+        .animate-slide-up {
+          animation: slideUp 0.2s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };
