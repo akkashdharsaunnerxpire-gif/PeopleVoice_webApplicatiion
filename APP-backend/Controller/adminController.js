@@ -6,9 +6,8 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const Review = require("../Models/Review");
 const mongoose = require("mongoose");
-const { saveNotification } = require("../Controller/notificationController");
-const Notification = require("../Models/Notification");
 const sendEmail = require("../utils/sendEmail");
+const { saveNotification } = require("./notificationController");
 
 /* ================= ADMIN REGISTER ================= */
 exports.registerAdmin = async (req, res) => {
@@ -131,7 +130,7 @@ exports.getAllIssues = async (req, res) => {
       department,
       district,
       page = 1,
-      limit = 10,
+      limit = 200,
     } = req.query;
 
     const query = {};
@@ -148,10 +147,8 @@ exports.getAllIssues = async (req, res) => {
     if (department && department !== "All") query.department = department;
     if (district && district !== "All") query.district = district;
 
-    const skip = (page - 1) * limit;
-
     const [rawIssues, total] = await Promise.all([
-      Issue.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+      Issue.find(query).sort({ createdAt: -1 }).limit(Number(limit)),
       Issue.countDocuments(query),
     ]);
 
@@ -190,8 +187,6 @@ exports.getAllIssues = async (req, res) => {
 
     res.json({
       total,
-      page: Number(page),
-      totalPages: Math.ceil(total / limit),
       issues,
     });
   } catch (err) {
@@ -253,9 +248,19 @@ exports.updateIssueStatus = async (req, res) => {
     } = req.body;
     const { id } = req.params;
 
-    console.log("🔄 Updating issue status:", { id, status, hasAfterImages: !!afterImages?.length });
+    console.log("🔄 Updating issue status:", {
+      id,
+      status,
+      hasAfterImages: !!afterImages?.length,
+    });
 
-    const validStatuses = ["Sent", "In Progress", "Resolved", "Closed"];
+    const validStatuses = [
+      "Sent",
+      "In Progress",
+      "Resolved",
+      "Closed",
+      "Reopened",
+    ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status value" });
     }
@@ -286,26 +291,41 @@ exports.updateIssueStatus = async (req, res) => {
       updateFields.resolved_date = new Date();
       updateFields.lastOpenedNotified = false;
     }
+    if (status === "Reopened") {
+      updateFields.lastOpenedNotified = false;
+    }
     if (status === "Closed") {
       updateFields.closedDate = new Date();
     }
 
     // ✅ Store the new resolution acknowledgment fields (if provided)
-    if (resolvedByAdminMunicipality) updateFields.resolvedByAdminMunicipality = resolvedByAdminMunicipality;
-    if (resolutionDepartment) updateFields.resolutionDepartment = resolutionDepartment;
-    if (resolutionOfficerName) updateFields.resolutionOfficerName = resolutionOfficerName;
-    if (resolutionConfirmationStatement) updateFields.resolutionConfirmationStatement = resolutionConfirmationStatement;
+    if (resolvedByAdminMunicipality)
+      updateFields.resolvedByAdminMunicipality = resolvedByAdminMunicipality;
+    if (resolutionDepartment)
+      updateFields.resolutionDepartment = resolutionDepartment;
+    if (resolutionOfficerName)
+      updateFields.resolutionOfficerName = resolutionOfficerName;
+    if (resolutionConfirmationStatement)
+      updateFields.resolutionConfirmationStatement =
+        resolutionConfirmationStatement;
 
-    const issue = await Issue.findByIdAndUpdate(id, updateFields, { new: true, runValidators: true });
+    const issue = await Issue.findByIdAndUpdate(id, updateFields, {
+      new: true,
+      runValidators: true,
+    });
     if (!issue) return res.status(404).json({ message: "Issue not found" });
 
     console.log("✅ Issue updated:", issue._id, "Status:", status);
 
     // Notifications (unchanged)
     if (status !== "Sent") {
-      const hasNegativeReview = await Review.findOne({ issueId: id, isResolved: false });
+      const hasNegativeReview = await Review.findOne({
+        issueId: id,
+        isResolved: false,
+      });
       const wasImproper = hasNegativeReview !== null;
-      let message = "", type = "info";
+      let message = "",
+        type = "info";
       if (status === "Resolved") {
         message = wasImproper
           ? `⚠️ Municipality has made a new resolution attempt for your improperly reported issue "${issue.reason || "Report"}". Please review and confirm.`
@@ -325,13 +345,16 @@ exports.updateIssueStatus = async (req, res) => {
       await saveNotification(issue, status, message, wasImproper);
     }
 
-    res.json({ success: true, message: "Issue status updated successfully", issue });
+    res.json({
+      success: true,
+      message: "Issue status updated successfully",
+      issue,
+    });
   } catch (error) {
     console.error("❌ Update Status Error:", error);
     res.status(500).json({ message: "Status update failed: " + error.message });
   }
 };
-
 
 /* ================= GET DISTRICT POINTS ================= */
 exports.getDistrictPoints = async (req, res) => {
@@ -394,33 +417,23 @@ exports.notifyImproperIssueOpened = async (req, res) => {
     });
 
     let message = "";
-    let type = "info";
 
     if (hasNegativeReview) {
       message = `⚠️ Officer is reviewing your improperly reported issue "${issue.reason || "Report"}".`;
-      type = "warning";
     } else if (issue.status === "Sent") {
       message = `👀 Officer has viewed your issue "${issue.reason || "Report"}" and will address it soon.`;
-      type = "info";
     }
 
     if (message) {
-      await Notification.create({
-        citizenId: String(issue.citizenId),
-        issueId: issue._id,
+      await saveNotification(
+        issue,
+        "Opened",
         message,
-        status: "Opened",
-        type,
-        location: issue.area || issue.district || "",
-        image:
-          typeof issue.images?.[0] === "string"
-            ? issue.images[0]
-            : issue.images?.[0]?.url || null,
-        read: false,
-        createdAt: new Date(),
-      });
+        issue.status === "Reopened",
+      );
 
       issue.lastOpenedNotified = true;
+
       await issue.save();
     }
 
@@ -439,18 +452,21 @@ exports.forgotPassword = async (req, res) => {
     const admin = await Admin.findOne({ contactEmail: email });
 
     if (!admin) {
-      return res.json({ success: true, message: "If account exists, OTP sent" });
+      return res.json({
+        success: true,
+        message: "If account exists, OTP sent",
+      });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    admin.resetOtp = otp;                // store as string
+    admin.resetOtp = otp; // store as string
     admin.resetOtpExpires = Date.now() + 10 * 60 * 1000;
     await admin.save();
 
     await sendEmail(
       admin.contactEmail,
       "Password Reset OTP - PeopleVoice Admin",
-      `<h2>Your OTP is: ${otp}</h2><p>Valid for 10 minutes.</p>`
+      `<h2>Your OTP is: ${otp}</h2><p>Valid for 10 minutes.</p>`,
     );
 
     res.json({ success: true, message: "OTP sent to email" });
@@ -467,14 +483,18 @@ exports.verifyOtp = async (req, res) => {
     const admin = await Admin.findOne({ contactEmail: email });
 
     if (!admin) {
-      return res.status(404).json({ success: false, message: "Admin not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Admin not found" });
     }
 
     // Convert stored OTP to string for comparison
     const storedOtp = admin.resetOtp ? String(admin.resetOtp) : null;
     if (!storedOtp || storedOtp !== otp || admin.resetOtpExpires < Date.now()) {
       console.log(`OTP mismatch: stored=${storedOtp}, received=${otp}`);
-      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired OTP" });
     }
 
     res.json({ success: true, message: "OTP verified" });
@@ -490,14 +510,24 @@ exports.resetPassword = async (req, res) => {
     const { email, otp, newPassword } = req.body;
 
     if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ success: false, message: "Password must be at least 8 characters" });
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters",
+      });
     }
 
     const admin = await Admin.findOne({ contactEmail: email });
     const storedOtp = admin?.resetOtp ? String(admin.resetOtp) : null;
 
-    if (!admin || !storedOtp || storedOtp !== otp || admin.resetOtpExpires < Date.now()) {
-      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    if (
+      !admin ||
+      !storedOtp ||
+      storedOtp !== otp ||
+      admin.resetOtpExpires < Date.now()
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired OTP" });
     }
 
     admin.password = await bcrypt.hash(newPassword, 10);
@@ -510,13 +540,15 @@ exports.resetPassword = async (req, res) => {
     await sendEmail(
       admin.contactEmail,
       "Password Reset Successful",
-      `<p>Your admin password has been successfully reset.</p>`
+      `<p>Your admin password has been successfully reset.</p>`,
     ).catch(console.error);
 
     res.json({ success: true, message: "Password reset successful" });
   } catch (err) {
     console.error("Reset password error:", err);
-    res.status(500).json({ success: false, message: "Error resetting password" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error resetting password" });
   }
 };
 // ================= (Optional) RESEND OTP =================
@@ -526,7 +558,10 @@ exports.resendOtp = async (req, res) => {
     const admin = await Admin.findOne({ contactEmail: email });
 
     if (!admin) {
-      return res.json({ success: true, message: "If account exists, OTP sent" });
+      return res.json({
+        success: true,
+        message: "If account exists, OTP sent",
+      });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -537,7 +572,7 @@ exports.resendOtp = async (req, res) => {
     await sendEmail(
       admin.contactEmail,
       "New Password Reset OTP",
-      `<h2>Your new OTP is: ${otp}</h2><p>Valid for 10 minutes.</p>`
+      `<h2>Your new OTP is: ${otp}</h2><p>Valid for 10 minutes.</p>`,
     );
 
     res.json({ success: true, message: "New OTP sent" });
@@ -546,3 +581,77 @@ exports.resendOtp = async (req, res) => {
   }
 };
 
+exports.notifyIssueOpened = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const issue = await Issue.findById(id);
+
+    if (!issue) {
+      return res.status(404).json({ message: "Issue not found" });
+    }
+
+    if (issue.lastOpenedNotified) {
+      return res.json({
+        success: true,
+        message: "Already notified",
+      });
+    }
+
+    let message = "";
+
+    if (issue.status === "Reopened") {
+      message = `⚠️ Officer is reviewing your improperly resolved issue "${issue.reason || "Report"}".`;
+    } else {
+      message = `👀 Officer has viewed your "${issue.reason || "Report"}" complaint`;
+    }
+
+    await saveNotification(issue, "Opened", message);
+
+    issue.lastOpenedNotified = true;
+
+    await issue.save();
+
+    res.json({
+      success: true,
+      message: "Notification sent",
+    });
+  } catch (error) {
+    console.error("Notify Issue Opened Error:", error);
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
+
+exports.getIssueStats = async (req, res) => {
+  try {
+    const { district } = req.query;
+
+    if (!district) {
+      return res.status(400).json({
+        message: "District is required",
+      });
+    }
+
+    const issues = await Issue.find({ district });
+
+    const stats = {
+      new: issues.filter((i) => i.status === "Sent").length,
+      ongoing: issues.filter((i) => i.status === "In Progress").length,
+      resolved: issues.filter((i) => i.status === "Resolved").length,
+      closed: issues.filter((i) => i.status === "Closed").length,
+      reopened: issues.filter((i) => i.status === "Reopened").length,
+      total: issues.length,
+    };
+
+    res.json(stats);
+  } catch (error) {
+    console.error("Stats Error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch stats",
+    });
+  }
+};

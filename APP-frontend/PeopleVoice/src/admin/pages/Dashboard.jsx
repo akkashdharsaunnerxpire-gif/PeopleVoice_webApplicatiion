@@ -157,7 +157,7 @@ const calculateEfficiencyScore = (
   resolutionRate,
   avgTime,
   pendingIssues,
-  recentActivity
+  recentActivity,
 ) => {
   let score = resolutionRate;
   if (avgTime > 0) {
@@ -280,7 +280,10 @@ const Dashboard = () => {
       if (districtPointsMap[districtName]) {
         districtPointsMap[districtName].totalCount++;
 
-        if (issue.status === "resolved" || issue.status === "closed") {
+        if (
+          issue.status?.toLowerCase() === "resolved" ||
+          issue.status?.toLowerCase() === "closed"
+        ) {
           districtPointsMap[districtName].resolvedCount++;
 
           // Points for resolution
@@ -290,43 +293,49 @@ const Dashboard = () => {
           if (issue.createdAt && issue.resolvedAt) {
             const resolutionDays = Math.ceil(
               (new Date(issue.resolvedAt) - new Date(issue.createdAt)) /
-                (1000 * 60 * 60 * 24)
+                (1000 * 60 * 60 * 24),
             );
-            if (resolutionDays <= 1) districtPointsMap[districtName].points += 20;
-            else if (resolutionDays <= 3) districtPointsMap[districtName].points += 10;
-            else if (resolutionDays <= 7) districtPointsMap[districtName].points += 5;
+            if (resolutionDays <= 1)
+              districtPointsMap[districtName].points += 20;
+            else if (resolutionDays <= 3)
+              districtPointsMap[districtName].points += 10;
+            else if (resolutionDays <= 7)
+              districtPointsMap[districtName].points += 5;
           }
 
           // Priority bonus
           if (issue.priority === "high" || issue.severity === "high") {
             districtPointsMap[districtName].points += 15;
-          } else if (issue.priority === "medium" || issue.severity === "medium") {
+          } else if (
+            issue.priority === "medium" ||
+            issue.severity === "medium"
+          ) {
             districtPointsMap[districtName].points += 10;
           } else {
             districtPointsMap[districtName].points += 5;
           }
-        } else if (issue.status === "pending") {
-          districtPointsMap[districtName].pendingCount++;
-        }
+        } else if (issue.status?.toLowerCase() === "pending") {
+         districtPointsMap[districtName].pendingCount++;
+        } 
       }
     });
 
     // Calculate average resolution time for each district
     Object.values(districtPointsMap).forEach((district) => {
       const districtIssues = issuesData.filter(
-        (issue) => issue.district === district.district
+        (issue) => issue.district === district.district,
       );
       const resolvedWithTime = districtIssues.filter(
         (issue) =>
-          (issue.status === "resolved" || issue.status === "closed") &&
+          (issue.status?.toLowerCase() === "resolved" || issue.status?.toLowerCase() === "closed") &&
           issue.createdAt &&
-          issue.resolvedAt
+          issue.resolvedAt,
       );
       if (resolvedWithTime.length > 0) {
         const totalDays = resolvedWithTime.reduce((sum, issue) => {
           const days = Math.ceil(
             (new Date(issue.resolvedAt) - new Date(issue.createdAt)) /
-              (1000 * 60 * 60 * 24)
+              (1000 * 60 * 60 * 24),
           );
           return sum + days;
         }, 0);
@@ -346,19 +355,20 @@ const Dashboard = () => {
         (issue) =>
           issue.district === district.district &&
           issue.createdAt &&
-          new Date(issue.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          new Date(issue.createdAt) >
+            new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
       ).length;
 
       const efficiencyScore = calculateEfficiencyScore(
         resolutionRate,
         district.avgResolutionTime,
         district.pendingCount,
-        recentActivity
+        recentActivity,
       );
       const safetyScore = calculateSafetyScore(
         resolutionRate,
         district.pendingCount,
-        district.totalCount
+        district.totalCount,
       );
 
       // Bonus points from scores
@@ -417,28 +427,28 @@ const Dashboard = () => {
   const districtRankings = useMemo(() => {
     return districtPoints.map((district, index) => {
       const districtIssues = filteredIssues.filter(
-        (issue) => issue.district === district.district
+        (issue) => issue.district === district.district,
       );
       const totalIssues = districtIssues.length;
       const resolvedIssues = districtIssues.filter(
-        (issue) => issue.status === "resolved" || issue.status === "closed"
+        (issue) => issue.status?.toLowerCase() === "resolved" || issue.status?.toLowerCase() === "closed",
       ).length;
       const pendingIssues = districtIssues.filter(
-        (issue) => issue.status === "pending"
+        (issue) => issue.status?.toLowerCase() === "pending",
       ).length;
 
       const resolvedWithTime = districtIssues.filter(
         (issue) =>
-          (issue.status === "resolved" || issue.status === "closed") &&
+          (issue.status?.toLowerCase() === "resolved" || issue.status?.toLowerCase() === "closed") &&
           issue.createdAt &&
-          issue.resolvedAt
+          issue.resolvedAt,
       );
       const avgResolutionTime =
         resolvedWithTime.length > 0
           ? resolvedWithTime.reduce((sum, issue) => {
               const days = Math.ceil(
                 (new Date(issue.resolvedAt) - new Date(issue.createdAt)) /
-                  (1000 * 60 * 60 * 24)
+                  (1000 * 60 * 60 * 24),
               );
               return sum + days;
             }, 0) / resolvedWithTime.length
@@ -501,7 +511,7 @@ const Dashboard = () => {
       }
       if (
         issue.resolvedAt &&
-        (issue.status === "resolved" || issue.status === "closed")
+        (issue.status?.toLowerCase() === "resolved" || issue.status?.toLowerCase() === "closed")
       ) {
         const resolvedDate = issue.resolvedAt.split("T")[0];
         const dayIndex = days.findIndex((d) => d.fullDate === resolvedDate);
@@ -514,19 +524,46 @@ const Dashboard = () => {
 
   const deptPerformance = useMemo(() => {
     const departments = [
-      { name: "Road Safety", key: "Road", icon: "🛣️", color: COLOR_SCHEMES.departments.Road },
-      { name: "Water Supply", key: "Water", icon: "💧", color: COLOR_SCHEMES.departments.Water },
-      { name: "Electricity", key: "Electricity", icon: "⚡", color: COLOR_SCHEMES.departments.Electricity },
-      { name: "Sanitation", key: "Garbage", icon: "🗑️", color: COLOR_SCHEMES.departments.Garbage },
-      { name: "Public Works", key: "Other", icon: "🏗️", color: COLOR_SCHEMES.departments.Other },
+      {
+        name: "Road Safety",
+        key: "Road",
+        icon: "🛣️",
+        color: COLOR_SCHEMES.departments.Road,
+      },
+      {
+        name: "Water Supply",
+        key: "Water",
+        icon: "💧",
+        color: COLOR_SCHEMES.departments.Water,
+      },
+      {
+        name: "Electricity",
+        key: "Electricity",
+        icon: "⚡",
+        color: COLOR_SCHEMES.departments.Electricity,
+      },
+      {
+        name: "Sanitation",
+        key: "Garbage",
+        icon: "🗑️",
+        color: COLOR_SCHEMES.departments.Garbage,
+      },
+      {
+        name: "Public Works",
+        key: "Other",
+        icon: "🏗️",
+        color: COLOR_SCHEMES.departments.Other,
+      },
     ];
 
     return departments
       .map((dept) => {
-        const deptIssues = filteredIssues.filter((i) => i.department === dept.key);
+        const deptIssues = filteredIssues.filter(
+          (i) => i.department === dept.key,
+        );
         const total = deptIssues.length;
         const resolved = deptIssues.filter(
-          (i) => i.status === "resolved" || i.status === "closed"
+          (i) => i.status?.toLowerCase() === "resolved" || i.status?.toLowerCase() === "closed",
         ).length;
         const resolutionRate = total > 0 ? (resolved / total) * 100 : 0;
         return {
@@ -548,7 +585,7 @@ const Dashboard = () => {
       rejected: 0,
     };
     filteredIssues.forEach((issue) => {
-      const status = issue.status || "pending";
+      const status = issue.status?.toLowerCase() || "pending";
       if (statusCounts[status] !== undefined) statusCounts[status]++;
       else statusCounts.pending++;
     });
@@ -598,7 +635,10 @@ const Dashboard = () => {
     const summaryData = [
       { Metric: "Total Districts", Value: "38" },
       { Metric: "Top District", Value: districtRankings[0]?.name || "N/A" },
-      { Metric: "Top District Points", Value: districtRankings[0]?.points || 0 },
+      {
+        Metric: "Top District Points",
+        Value: districtRankings[0]?.points || 0,
+      },
       {
         Metric: "Total Points (All Districts)",
         Value: districtRankings.reduce((sum, d) => sum + d.points, 0),
@@ -607,7 +647,7 @@ const Dashboard = () => {
         Metric: "Average Resolution Rate (State)",
         Value: `${Math.round(
           districtRankings.reduce((sum, d) => sum + d.resolutionRate, 0) /
-            districtRankings.length
+            districtRankings.length,
         )}%`,
       },
       {
@@ -651,7 +691,7 @@ const Dashboard = () => {
     // Write file
     XLSX.writeFile(
       wb,
-      `dashboard_export_${new Date().toISOString().split("T")[0]}.xlsx`
+      `dashboard_export_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
   };
 
@@ -774,8 +814,10 @@ const Dashboard = () => {
             value={`${
               districtRankings.length > 0
                 ? Math.round(
-                    districtRankings.reduce((sum, d) => sum + d.resolutionRate, 0) /
-                      districtRankings.length
+                    districtRankings.reduce(
+                      (sum, d) => sum + d.resolutionRate,
+                      0,
+                    ) / districtRankings.length,
                   )
                 : 0
             }%`}
@@ -815,97 +857,98 @@ const Dashboard = () => {
             </div>
 
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-              {(showAllDistricts ? districtRankings : districtRankings.slice(0, 10)).map(
-                (district, index) => (
-                  <motion.div
-                    key={district.name}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`flex items-center p-4 rounded-xl transition-all hover:shadow-md ${
-                      index === 0
-                        ? "bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200"
-                        : index === 1
+              {(showAllDistricts
+                ? districtRankings
+                : districtRankings.slice(0, 10)
+              ).map((district, index) => (
+                <motion.div
+                  key={district.name}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={`flex items-center p-4 rounded-xl transition-all hover:shadow-md ${
+                    index === 0
+                      ? "bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200"
+                      : index === 1
                         ? "bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200"
                         : index === 2
-                        ? "bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200"
-                        : "bg-gray-50 hover:bg-gray-100 border border-gray-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-4 flex-1">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          index === 0
-                            ? "bg-yellow-500 text-white"
-                            : index === 1
+                          ? "bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200"
+                          : "bg-gray-50 hover:bg-gray-100 border border-gray-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-4 flex-1">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        index === 0
+                          ? "bg-yellow-500 text-white"
+                          : index === 1
                             ? "bg-gray-500 text-white"
                             : index === 2
-                            ? "bg-orange-500 text-white"
-                            : "bg-blue-100 text-blue-600"
-                        } font-bold`}
-                      >
-                        {district.rank}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">
-                            {district.name}
-                          </h3>
-                          {index < 3 && (
-                            <span
-                              className={`px-2 py-0.5 text-xs rounded-full ${
-                                index === 0
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : index === 1
+                              ? "bg-orange-500 text-white"
+                              : "bg-blue-100 text-blue-600"
+                      } font-bold`}
+                    >
+                      {district.rank}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">
+                          {district.name}
+                        </h3>
+                        {index < 3 && (
+                          <span
+                            className={`px-2 py-0.5 text-xs rounded-full ${
+                              index === 0
+                                ? "bg-yellow-100 text-yellow-800"
+                                : index === 1
                                   ? "bg-gray-100 text-gray-800"
                                   : "bg-orange-100 text-orange-800"
-                              }`}
-                            >
-                              {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 mt-1">
-                          <span className="text-sm text-gray-600">
-                            {district.resolvedIssues} resolved •{" "}
-                            {district.pendingIssues} pending
+                            }`}
+                          >
+                            {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
                           </span>
-                          <span className="text-xs px-2 py-1 bg-gray-200 rounded-full">
-                            {district.resolutionRate}% rate
-                          </span>
-                        </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1">
+                        <span className="text-sm text-gray-600">
+                          {district.resolvedIssues} resolved •{" "}
+                          {district.pendingIssues} pending
+                        </span>
+                        <span className="text-xs px-2 py-1 bg-gray-200 rounded-full">
+                          {district.resolutionRate}% rate
+                        </span>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <div className="text-2xl font-bold text-gray-900">
-                          {district.points}
-                        </div>
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            district.points >= 500
-                              ? "bg-green-500"
-                              : district.points >= 300
+                  <div className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {district.points}
+                      </div>
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          district.points >= 500
+                            ? "bg-green-500"
+                            : district.points >= 300
                               ? "bg-yellow-500"
                               : district.points >= 100
-                              ? "bg-orange-500"
-                              : "bg-red-500"
-                          }`}
-                        />
-                      </div>
-                      <div className="text-sm text-gray-500">Points</div>
+                                ? "bg-orange-500"
+                                : "bg-red-500"
+                        }`}
+                      />
                     </div>
+                    <div className="text-sm text-gray-500">Points</div>
+                  </div>
 
-                    <div className="ml-6 text-right hidden md:block">
-                      <div className="text-lg font-semibold text-gray-900">
-                        {district.efficiencyScore}%
-                      </div>
-                      <div className="text-xs text-gray-500">Efficiency</div>
+                  <div className="ml-6 text-right hidden md:block">
+                    <div className="text-lg font-semibold text-gray-900">
+                      {district.efficiencyScore}%
                     </div>
-                  </motion.div>
-                )
-              )}
+                    <div className="text-xs text-gray-500">Efficiency</div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
 
             {!showAllDistricts && districtRankings.length > 10 && (

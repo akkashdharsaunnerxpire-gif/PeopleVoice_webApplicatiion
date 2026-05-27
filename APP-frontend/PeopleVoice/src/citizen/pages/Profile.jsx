@@ -98,8 +98,6 @@ const Profile = () => {
     { label: "Privacy & Security", icon: <Shield size={20} />, path: "/peopleVoice/privacy" },
   ];
 
-  // Quick stats - using real proof count
-  const resolvedCount = myIssues.filter(i => i.status?.toLowerCase() === "resolved").length;
 
   return (
     <div
@@ -149,22 +147,6 @@ const Profile = () => {
               <p className="text-sm mt-3 opacity-80 leading-relaxed max-w-md">
                 {user.bio}
               </p>
-            </div>
-          </div>
-
-          {/* Stats Cards - Shows real proof count */}
-          <div className="grid grid-cols-3 gap-2 mb-6">
-            <div className={`text-center p-3 rounded-xl ${isDark ? "bg-gray-800/50" : "bg-gray-100"}`}>
-              <p className="text-2xl font-bold">{myIssues.length}</p>
-              <p className="text-xs opacity-70">Complaints</p>
-            </div>
-            <div className={`text-center p-3 rounded-xl ${isDark ? "bg-gray-800/50" : "bg-gray-100"}`}>
-              <p className="text-2xl font-bold">{proofsCount}</p>
-              <p className="text-xs opacity-70">Proofs</p>
-            </div>
-            <div className={`text-center p-3 rounded-xl ${isDark ? "bg-gray-800/50" : "bg-gray-100"}`}>
-              <p className="text-2xl font-bold">{resolvedCount}</p>
-              <p className="text-xs opacity-70">Resolved</p>
             </div>
           </div>
 

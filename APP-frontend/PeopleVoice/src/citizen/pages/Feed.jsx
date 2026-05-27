@@ -6,6 +6,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import AIChatbot from "../components/AIChatbot";
 import {
   Filter,
   X,
@@ -181,9 +182,6 @@ const Feed = () => {
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [error, setError] = useState(null);
 
-  // Notification state for mobile
-  const [unreadCount, setUnreadCount] = useState(0);
-
   // Advanced loader for ANY filter change
   const [showAdvancedLoader, setShowAdvancedLoader] = useState(false);
 
@@ -206,22 +204,7 @@ const Feed = () => {
   const ITEMS_PER_PAGE = 5;
   const citizenId = localStorage.getItem("citizenId") || "CID-XXXX";
 
-  // =============================
-  // Notification Functions (Mobile)
-  // =============================
-  const fetchUnreadCount = useCallback(async () => {
-    if (!citizenId) return;
-    try {
-      const res = await axios.get(
-        `${BACKEND_URL}/api/notifications?citizenId=${citizenId}`
-      );
-      const unread = (res.data || []).filter((n) => n.read === false).length;
-      setUnreadCount(unread);
-    } catch (err) {
-      console.log("Error fetching notifications:", err);
-    }
-  }, [citizenId]);
-
+ 
   useEffect(() => {
     if (location.pathname !== "/peopleVoice/feed") return;
 
@@ -239,17 +222,6 @@ const Feed = () => {
     };
   }, [location.pathname]);
 
-  useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
-
-  useEffect(() => {
-    const handleUpdate = () => fetchUnreadCount();
-    window.addEventListener("notification_update", handleUpdate);
-    return () => window.removeEventListener("notification_update", handleUpdate);
-  }, [fetchUnreadCount]);
 
   // =============================
   // Normalisation & Data Fetching
@@ -536,18 +508,6 @@ const Feed = () => {
                 <Filter size={18} />
                 <span className="text-sm">Filter</span>
               </motion.button>
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                onClick={() => navigate(`${BASE}/notifications`)}
-                className="relative p-2 rounded-xl"
-              >
-                <Bell size={22} className={isDark ? "text-violet-300" : "text-gray-700"} />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </motion.button>
             </div>
           </div>
         </div>
@@ -773,6 +733,7 @@ const Feed = () => {
           </>
         )}
       </AnimatePresence>
+       <AIChatbot isDark={isDark} />
     </div>
   );
 };

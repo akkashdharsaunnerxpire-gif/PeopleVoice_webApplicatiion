@@ -1,13 +1,16 @@
 const Notification = require("../Models/Notification");
 
-const saveNotification = async (issue, status, customMessage = null, isImproper = false) => {
+const saveNotification = async (
+  issue,
+  status,
+  customMessage = null,
+  isImproper = false,
+) => {
   try {
     if (!issue || !issue.citizenId) return;
 
     let type = "info";
     let message = "";
-
-    if (status === "Reopened") return;
 
     if (status === "Resolved") {
       type = isImproper ? "warning" : "success";
@@ -15,22 +18,36 @@ const saveNotification = async (issue, status, customMessage = null, isImproper 
       message = isImproper
         ? `⚠️ Municipality has made a new resolution attempt for your improperly reported issue "${title}". Please review and confirm.`
         : `✅ Your issue "${title}" has been resolved. Please confirm.`;
-    } 
-    else if (status === "Closed") {
+    } else if (status === "Closed") {
       type = "success";
-      message = customMessage || `🎉 Your issue "${issue.reason || "Report"}" has been closed. Thank you!`;
-    }
-    else if (status === "In Progress") {
+      message =
+        customMessage ||
+        `🎉 Your issue "${issue.reason || "Report"}" has been closed. Thank you!`;
+    } else if (status === "In Progress") {
       type = "warning";
-      message = customMessage || `🔄 Your issue "${issue.reason || "Report"}" is now in progress.`;
-    }
-    else if (status === "Opened") {
+      message =
+        customMessage ||
+        `🔄 Your issue "${issue.reason || "Report"}" is now in progress.`;
+    } else if (status === "Opened") {
       type = "info";
-      message = customMessage || `👀 Your issue "${issue.reason || "Report"}" has been viewed.`;
+      message =
+        customMessage ||
+        `👀 Your issue "${issue.reason || "Report"}" has been viewed.`;
+    } else {
+      message =
+        customMessage ||
+        `Your issue "${issue.reason || "Report"}" status: ${status}`;
     }
-    else {
-      message = customMessage || `Your issue "${issue.reason || "Report"}" status: ${status}`;
-    }
+
+    const existingNotification = await Notification.findOne({
+      citizenId: String(issue.citizenId),
+      issueId: issue._id,
+      status,
+      message,
+      read: false,
+    });
+
+    if (existingNotification) return;
 
     await Notification.create({
       citizenId: String(issue.citizenId),
@@ -39,7 +56,10 @@ const saveNotification = async (issue, status, customMessage = null, isImproper 
       status,
       type,
       location: issue.area || issue.district || "",
-      image: typeof issue.images?.[0] === "string" ? issue.images[0] : issue.images?.[0]?.url || null,
+      image:
+        typeof issue.images?.[0] === "string"
+          ? issue.images[0]
+          : issue.images?.[0]?.url || null,
       read: false,
       createdAt: new Date(),
     });
@@ -76,7 +96,7 @@ const markAsRead = async (req, res) => {
     const notification = await Notification.findByIdAndUpdate(
       req.params.id,
       { read: true },
-      { new: true }
+      { new: true },
     );
     res.json({ success: true, notification });
   } catch (error) {

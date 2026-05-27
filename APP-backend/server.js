@@ -27,6 +27,7 @@ app.use("/api/notifications", require("./Routes/notificationRoutes"));
 app.use("/api/proofs", require("./Routes/proofRoutes"));
 app.use("/api/reviews", require("./Routes/reviewRoutes"));
 app.use("/api", require("./Routes/uploadRoutes")); // ✅ image upload
+app.use("/api/ai", require("./Routes/aiRoutes"));
 
 // ✅ 404 handler
 app.use((req, res) => {

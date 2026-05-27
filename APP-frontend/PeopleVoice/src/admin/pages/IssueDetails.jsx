@@ -304,7 +304,6 @@ export default function IssueDetails() {
       district: district || "",
     });
 
-    setResolutionOfficerName(name || "");
   }, []);
 
   // Revoke object URLs when afterImages change (cleanup)
@@ -322,7 +321,6 @@ export default function IssueDetails() {
       setConfirmationChecked(false);
       setResolutionMunicipality("");
       setResolutionDepartment("");
-      setResolutionOfficerName(adminProfile.name || "");
       if (modalDescriptionRef.current) {
         setTimeout(() => modalDescriptionRef.current.focus(), 100);
       }

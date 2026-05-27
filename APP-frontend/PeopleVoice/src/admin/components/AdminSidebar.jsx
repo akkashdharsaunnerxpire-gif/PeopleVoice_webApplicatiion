@@ -23,7 +23,7 @@ const links = [
   { name: "Settings", to: "/admin/dashboard/settings", icon: Settings },
 ];
 
-const POLLING_INTERVAL = 30000;
+const POLLING_INTERVAL = 5000;
 
 const AdminSidebar = () => {
   const navigate = useNavigate();
@@ -64,6 +64,23 @@ const AdminSidebar = () => {
       if (isMounted.current) setPendingIssuesCount(0);
     }
   };
+  useEffect(() => {
+  const handleIssueUpdate = () => {
+    fetchPendingIssuesCount();
+  };
+
+  window.addEventListener(
+    "admin_issue_update",
+    handleIssueUpdate
+  );
+
+  return () => {
+    window.removeEventListener(
+      "admin_issue_update",
+      handleIssueUpdate
+    );
+  };
+}, []);
 
   useEffect(() => {
     isMounted.current = true;

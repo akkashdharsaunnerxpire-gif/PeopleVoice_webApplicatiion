@@ -61,37 +61,65 @@ const ProofsPage = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("hasNewProof", "false");
-    window.dispatchEvent(new Event("proof_update"));
-  }, []);
-
-  useEffect(() => {
     sortProofs();
   }, [proofs, sortType]);
 
-  useEffect(() => {
-    if (proofs.length > 0) {
-      const oldCount = parseInt(localStorage.getItem("proofCount") || "0");
-      if (proofs.length > oldCount) {
-        localStorage.setItem("hasNewProof", "true");
-      }
-      localStorage.setItem("proofCount", proofs.length);
-    }
-  }, [proofs]);
-
   const fetchProofs = async () => {
-    if (!citizenId) return;
-    try {
-      const res = await axios.get(
-        `${BACKEND_URL}/api/proofs?citizenId=${citizenId}`,
+  if (!citizenId) return;
+
+  try {
+    const res = await axios.get(
+      `${BACKEND_URL}/api/proofs?citizenId=${citizenId}`
+    );
+
+    const newProofs = res.data.proofs || [];
+
+    // OLD COUNT
+    const oldCount = parseInt(
+      localStorage.getItem("proofCount") || "0"
+    );
+
+    // CHECK NEW PROOF
+    if (newProofs.length > oldCount) {
+
+      // only if NOT already inside proofs page
+      if (
+        !window.location.pathname.includes(
+          "/proofspage"
+        )
+      ) {
+        localStorage.setItem(
+          "hasNewProof",
+          "true"
+        );
+      }
+    } else {
+
+      // user already viewed
+      localStorage.setItem(
+        "hasNewProof",
+        "false"
       );
-      setProofs(res.data.proofs || []);
-    } catch (err) {
-      console.error("Fetch proofs error:", err);
-    } finally {
-      setLoading(false);
     }
-  };
+
+    // save latest count
+    localStorage.setItem(
+      "proofCount",
+      newProofs.length
+    );
+
+    window.dispatchEvent(
+      new Event("proof_update")
+    );
+
+    setProofs(newProofs);
+
+  } catch (err) {
+    console.error("Fetch proofs error:", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const sortProofs = () => {
     const sorted = [...proofs];
@@ -103,7 +131,6 @@ const ProofsPage = () => {
     setFilteredProofs(sorted);
     setCurrentPage(1);
   };
-
 
   const getBase64FromUrl = async (url) => {
     const response = await fetch(url);

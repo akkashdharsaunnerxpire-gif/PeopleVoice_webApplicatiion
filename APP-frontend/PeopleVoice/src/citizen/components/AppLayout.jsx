@@ -9,7 +9,7 @@ const AppLayout = () => {
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
 
   const [isDark, setIsDark] = useState(
-    localStorage.getItem("theme") === "dark"
+    localStorage.getItem("theme") === "dark",
   );
 
   // Disable zooming (optional, keeps pinch zoom off)
@@ -22,13 +22,13 @@ const AppLayout = () => {
     }
     metaViewport.setAttribute(
       "content",
-      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
     );
     return () => {
       if (metaViewport) {
         metaViewport.setAttribute(
           "content",
-          "width=device-width, initial-scale=1.0"
+          "width=device-width, initial-scale=1.0",
         );
       }
     };
@@ -48,11 +48,6 @@ const AppLayout = () => {
 
   const [commentModalData, setCommentModalData] = useState(null);
   const publicRoutes = ["/peopleVoice/login", "/peopleVoice/register"];
-
-  useEffect(() => {
-    document.body.style.overflow = commentModalData ? "hidden" : "";
-  }, [commentModalData]);
-
   if (!isLoggedIn && !publicRoutes.includes(location.pathname)) {
     return <Navigate to="/peopleVoice/login" replace />;
   }
@@ -90,7 +85,9 @@ const AppLayout = () => {
       <div className="relative flex">
         {isLoggedIn && <Navigation />}
 
-        <main className={`flex-1 w-full min-h-screen ${isLoggedIn ? "md:ml-72" : ""}`}>
+        <main
+          className={`flex-1 w-full min-h-screen ${isLoggedIn ? "md:ml-72" : ""}`}
+        >
           {/* Single Outlet – context passed directly */}
           <Outlet context={{ setCommentModalData, isDark }} />
         </main>

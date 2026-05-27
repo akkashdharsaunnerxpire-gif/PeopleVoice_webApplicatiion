@@ -45,12 +45,6 @@ const Issues = () => {
   const [problemType, setProblemType] = useState("All");
   const [showClosedIssues, setShowClosedIssues] = useState(false);
   const [statusFilter, setStatusFilter] = useState(null); // NEW: filter by status
-
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 8;
-
   // Opened issues tracking
   const [openedIssues, setOpenedIssues] = useState(() => {
     return JSON.parse(localStorage.getItem("openedIssues") || "{}");
@@ -67,12 +61,15 @@ const Issues = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
           },
-          params: { district: adminDistrict, search, page, limit },
+          params: {
+            district: adminDistrict,
+            search,
+            status: showClosedIssues ? "Closed" : statusFilter || undefined,
+          },
         });
 
         const fetchedIssues = res.data.issues || [];
         setIssues(fetchedIssues);
-        setTotalPages(res.data.totalPages || 1);
 
         // Clean openedIssues when status changes
         setOpenedIssues((prev) => {
@@ -91,7 +88,7 @@ const Issues = () => {
         if (showLoading) setLoading(false);
       }
     },
-    [adminDistrict, search, page, limit],
+    [adminDistrict, search, showClosedIssues, statusFilter],
   );
 
   // Fetch Global Stats
@@ -137,26 +134,38 @@ const Issues = () => {
     return () => clearInterval(interval);
   }, [fetchIssues, fetchGlobalStats]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, statusFilter]); // reset page when filter changes
-
   // Client-side filtering (respects statusFilter, showClosedIssues, problemType)
   const filteredIssues = useMemo(() => {
     let base = [...issues];
 
-    // Apply status filter (takes precedence over showClosedIssues)
-    if (statusFilter) {
-      base = base.filter((i) => i.status === statusFilter);
-    } else if (!showClosedIssues) {
-      base = base.filter((i) => i.status !== "Closed");
-    } else {
+    // CLOSED ISSUES VIEW
+    if (showClosedIssues) {
       base = base.filter((i) => i.status === "Closed");
     }
 
+    // STATUS FILTER
+    else if (statusFilter) {
+      base = base.filter((i) => i.status === statusFilter);
+    }
+
+    // DEFAULT ACTIVE ISSUES
+    else {
+      base = base.filter((i) => i.status !== "Closed");
+    }
+
+    // DEPARTMENT FILTER
     if (problemType !== "All") {
       base = base.filter((i) => i.department === problemType);
     }
+
+    // PRIORITY SORT
+    base.sort((a, b) => {
+      if (a.status === "Reopened" && b.status !== "Reopened") return -1;
+      if (a.status !== "Reopened" && b.status === "Reopened") return 1;
+
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
     return base;
   }, [issues, problemType, showClosedIssues, statusFilter]);
 
@@ -283,19 +292,21 @@ const Issues = () => {
     navigate(`/admin/dashboard/issues/${issueId}`);
   };
 
-  const goToPrevPage = () => setPage((p) => Math.max(1, p - 1));
-  const goToNextPage = () => setPage((p) => Math.min(totalPages, p + 1));
-
   // Handle stats card click to filter by status
   const handleStatusCardClick = (status) => {
     if (statusFilter === status) {
-      // If same status is clicked again, clear the filter
       setStatusFilter(null);
+      setShowClosedIssues(false);
     } else {
       setStatusFilter(status);
-      setShowClosedIssues(false); // reset closed toggle when status filtering
+
+      // ✅ closed card click
+      if (status === "Closed") {
+        setShowClosedIssues(true);
+      } else {
+        setShowClosedIssues(false);
+      }
     }
-    setPage(1);
   };
 
   // Clear all filters (status, search, problemType, closed toggle)
@@ -304,7 +315,6 @@ const Issues = () => {
     setShowClosedIssues(false);
     setProblemType("All");
     setSearch("");
-    setPage(1);
   };
 
   // Animation keyframes
@@ -515,13 +525,10 @@ const Issues = () => {
           ) : (
             <>
               <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-white/50">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-auto max-h-[650px]">
                   <table className="w-full text-left">
-                    <thead className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 border-b border-gray-200">
+                    <thead className="sticky top-0 z-10 bg-gradient-to-r from-gray-50/95 to-gray-100/95 border-b border-gray-200 backdrop-blur-md">
                       <tr>
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                          S.No
-                        </th>
                         <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                           Issue
                         </th>
@@ -558,9 +565,9 @@ const Issues = () => {
                             key={issue._id}
                             className="hover:bg-white/50 transition-all duration-200 group"
                           >
-                            <td className="px-6 py-4 text-sm font-medium text-gray-500">
-                              {(page - 1) * limit + idx + 1}
-                            </td>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                              Issue
+                            </th>
                             <td className="px-6 py-4">
                               <div className="relative w-12 h-12 rounded-lg overflow-hidden shadow-md group-hover:scale-105 transition-transform">
                                 <img
@@ -649,7 +656,7 @@ const Issues = () => {
                         Citizen Feedback
                       </h3>
 
-<p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line max-h-[300px] overflow-y-auto">
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line max-h-[300px] overflow-y-auto">
                         {feedbackPopup}
                       </p>
 
@@ -663,39 +670,6 @@ const Issues = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-between items-center mt-6 bg-white/50 backdrop-blur-sm p-3 rounded-xl border border-white/50">
-                  <div className="text-sm text-gray-500 font-medium">
-                    Page {page} of {totalPages}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={goToPrevPage}
-                      disabled={page === 1}
-                      className={`p-2 rounded-lg transition-all ${
-                        page === 1
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"
-                      }`}
-                    >
-                      <ChevronLeft size={18} />
-                    </button>
-                    <button
-                      onClick={goToNextPage}
-                      disabled={page === totalPages}
-                      className={`p-2 rounded-lg transition-all ${
-                        page === totalPages
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          : "bg-white text-gray-700 hover:bg-gray-100 shadow-sm hover:shadow"
-                      }`}
-                    >
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>

@@ -92,3 +92,68 @@ select {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(300%); }
 }
+
+@keyframes chatOpen {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-chatOpen {
+  animation: chatOpen 0.35s ease;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease;
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.4s ease;
+}
+
+.animate-float {
+  animation: float 2.5s ease-in-out infinite;
+}

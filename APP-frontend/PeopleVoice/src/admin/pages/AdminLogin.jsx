@@ -28,6 +28,24 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  /* ================= INJECT KEYFRAMES FOR PROGRESS BAR ================= */
+  useEffect(() => {
+    if (!document.getElementById("linear-progress-keyframes")) {
+      const style = document.createElement("style");
+      style.id = "linear-progress-keyframes";
+      style.textContent = `
+        @keyframes progressSlide {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(300%); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   /* ================= LOAD EMAIL (CORRECT LOGIC) ================= */
   useEffect(() => {
@@ -61,7 +79,6 @@ const AdminLogin = () => {
       /* 🔐 Store Auth Data immediately */
       localStorage.setItem("adminToken", res.data.token);
       localStorage.setItem("adminDistrict", res.data.admin.district);
-      localStorage.setItem("adminName", res.data.admin.name);
 
       /* 💾 Remember Me */
       if (rememberMe) {
@@ -81,7 +98,7 @@ const AdminLogin = () => {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Invalid email or password. Please try again.",
+          "Invalid email or password. Please try again."
       );
       setLoading(false); // Stop loading on error immediately
     }
@@ -89,6 +106,15 @@ const AdminLogin = () => {
 
   return (
     <>
+      {/* ================= LINEAR PROGRESS BAR ================= */}
+      {loading && (
+        <div className="fixed top-0 left-0 w-full h-1 bg-blue-100 z-50 overflow-hidden shadow-sm">
+          <div
+            className="h-full bg-gradient-to-r from-blue-600 to-green-600 w-1/3"
+            style={{ animation: "progressSlide 1.2s ease-in-out infinite" }}
+          />
+        </div>
+      )}
 
       <div className="min-h-screen grid lg:grid-cols-2 bg-gradient-to-br from-blue-50 via-white to-green-50">
         {/* ================= LEFT BRANDING ================= */}
