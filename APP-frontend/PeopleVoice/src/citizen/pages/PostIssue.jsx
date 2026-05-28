@@ -15,6 +15,8 @@ import {
   Save,
   RefreshCw,
   Trash2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../Context/ThemeContext";
@@ -366,6 +368,13 @@ const PostIssue = () => {
   // Draft message
   const [draftMessage, setDraftMessage] = useState("");
 
+  // Camera zoom states
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [minZoom, setMinZoom] = useState(1);
+  const [maxZoom, setMaxZoom] = useState(1);
+  const [zoomSupported, setZoomSupported] = useState(false);
+  const videoTrackRef = useRef(null);
+
   const t = (key, params = {}) => {
     let text = TEXTS[language][key] || key;
     Object.keys(params).forEach((param) => {
@@ -586,6 +595,10 @@ const PostIssue = () => {
           recognitionRef.current.abort();
         } catch (e) {}
       }
+      // Cleanup video track if any
+      if (videoTrackRef.current) {
+        videoTrackRef.current.stop();
+      }
     };
   }, []);
 
@@ -660,6 +673,32 @@ const PostIssue = () => {
     return hash.toString();
   };
 
+  // Zoom control functions
+  const applyZoom = async (newZoom) => {
+    if (!videoTrackRef.current || !zoomSupported) return;
+    try {
+      const constraints = {
+        advanced: [{ zoom: newZoom }]
+      };
+      await videoTrackRef.current.applyConstraints(constraints);
+      setZoomLevel(newZoom);
+    } catch (err) {
+      console.error("Zoom apply failed:", err);
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (!zoomSupported) return;
+    const newZoom = Math.min(maxZoom, zoomLevel + 0.2);
+    applyZoom(newZoom);
+  };
+
+  const handleZoomOut = () => {
+    if (!zoomSupported) return;
+    const newZoom = Math.max(minZoom, zoomLevel - 0.2);
+    applyZoom(newZoom);
+  };
+
   const startCamera = async () => {
     if (!department) return setError(t("selectDepartment"));
     if (department === "Other" && !otherDetail.trim()) {
@@ -672,6 +711,11 @@ const PostIssue = () => {
 
     setIsCameraOpen(true);
     setError("");
+    // Reset zoom states
+    setZoomLevel(1);
+    setMinZoom(1);
+    setMaxZoom(1);
+    setZoomSupported(false);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -685,6 +729,22 @@ const PostIssue = () => {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+      }
+      
+      // Get video track for zoom capabilities
+      const track = stream.getVideoTracks()[0];
+      videoTrackRef.current = track;
+      
+      // Check zoom capabilities
+      const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+      if (capabilities.zoom && capabilities.zoom.max > 1) {
+        setZoomSupported(true);
+        const currentZoom = track.getSettings().zoom || 1;
+        setZoomLevel(currentZoom);
+        setMinZoom(capabilities.zoom.min || 1);
+        setMaxZoom(capabilities.zoom.max);
+      } else {
+        setZoomSupported(false);
       }
     } catch (err) {
       console.error("Camera access error:", err.name, err.message);
@@ -707,6 +767,7 @@ const PostIssue = () => {
       }
       setError(friendlyMsg + ` (${err.name})`);
       setIsCameraOpen(false);
+      videoTrackRef.current = null;
     }
   };
 
@@ -762,6 +823,7 @@ const PostIssue = () => {
       videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
       videoRef.current.srcObject = null;
     }
+    videoTrackRef.current = null;
     setIsCameraOpen(false);
   };
 
@@ -1313,6 +1375,30 @@ const PostIssue = () => {
             </div>
             <div className="bg-gradient-to-t from-black/90 to-transparent p-4 sm:p-6 pb-[env(safe-area-inset-bottom)]">
               <div className="flex flex-col items-center gap-4 sm:gap-6">
+                {/* Zoom controls - only show if supported */}
+                {zoomSupported && (
+                  <div className="flex items-center gap-4 bg-black/50 backdrop-blur-md rounded-full px-4 py-2">
+                    <button
+                      type="button"
+                      onClick={handleZoomOut}
+                      disabled={zoomLevel <= minZoom + 0.01}
+                      className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition disabled:opacity-40"
+                    >
+                      <ZoomOut size={24} className="text-white" />
+                    </button>
+                    <span className="text-white text-sm font-mono">
+                      {Math.round(zoomLevel * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleZoomIn}
+                      disabled={zoomLevel >= maxZoom - 0.01}
+                      className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition disabled:opacity-40"
+                    >
+                      <ZoomIn size={24} className="text-white" />
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={takePhoto}
