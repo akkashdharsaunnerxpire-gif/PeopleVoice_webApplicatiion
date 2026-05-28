@@ -15,6 +15,7 @@ import {
   Loader2,
   Bell,
   BellDot,
+  Inbox,
 } from "lucide-react";
 import { useUserValues } from "../../Context/UserValuesContext";
 import IssueCard from "../components/IssueCard";
@@ -34,7 +35,7 @@ const APIURL = `${BACKEND_URL}/api`;
 const BASE = "/peopleVoice";
 
 // =============================
-// Helper Components
+// Enhanced Loaders & Spinners
 // =============================
 const SmallSpinner = ({ size = "md", isDark }) => {
   const sizeClasses = {
@@ -55,110 +56,102 @@ const SmallSpinner = ({ size = "md", isDark }) => {
   );
 };
 
-const SkeletonIssueCard = ({ isDark }) => {
-  return (
-    <div
-      className={`rounded-2xl p-5 border ${
-        isDark
-          ? "bg-violet-950/30 border-violet-500/20"
-          : "bg-white/80 border-green-100"
-      } animate-pulse`}
-    >
-      <div className="flex items-start gap-4">
+const SkeletonIssueCard = ({ isDark }) => (
+  <div
+    className={`rounded-2xl p-5 border ${
+      isDark
+        ? "bg-violet-950/30 border-violet-500/20"
+        : "bg-white/80 border-green-100"
+    } animate-pulse`}
+  >
+    <div className="flex items-start gap-4">
+      <div
+        className={`h-12 w-12 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
+      />
+      <div className="flex-1">
         <div
-          className={`h-12 w-12 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
+          className={`h-5 w-3/4 rounded ${isDark ? "bg-violet-800/50" : "bg-gray-200"} mb-3`}
         />
-        <div className="flex-1">
+        <div
+          className={`h-4 w-1/2 rounded ${isDark ? "bg-violet-800/50" : "bg-gray-200"} mb-4`}
+        />
+        <div
+          className={`h-20 w-full rounded-lg ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
+        />
+        <div className="flex gap-4 mt-4">
           <div
-            className={`h-5 w-3/4 rounded ${isDark ? "bg-violet-800/50" : "bg-gray-200"} mb-3`}
+            className={`h-8 w-16 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
           />
           <div
-            className={`h-4 w-1/2 rounded ${isDark ? "bg-violet-800/50" : "bg-gray-200"} mb-4`}
+            className={`h-8 w-16 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
           />
-          <div
-            className={`h-20 w-full rounded-lg ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
-          />
-          <div className="flex gap-4 mt-4">
-            <div
-              className={`h-8 w-16 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
-            />
-            <div
-              className={`h-8 w-16 rounded-full ${isDark ? "bg-violet-800/50" : "bg-gray-200"}`}
-            />
-          </div>
         </div>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
-const AdvancedLoader = ({ isDark }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="flex flex-col items-center justify-center py-20 px-4 text-center"
+const AdvancedLoader = ({ isDark }) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    exit={{ opacity: 0, scale: 0.95 }}
+    className="flex flex-col items-center justify-center py-20 px-4 text-center"
+  >
+    <div className="relative">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+        className="w-20 h-20 rounded-full border-4 border-t-transparent"
+        style={{
+          borderColor: isDark ? "#a78bfa" : "#10b981",
+          borderTopColor: "transparent",
+        }}
+      />
+      <motion.div
+        animate={{ rotate: -360 }}
+        transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+        className="absolute inset-2 w-16 h-16 rounded-full border-4 border-b-transparent"
+        style={{
+          borderColor: isDark ? "#c4b5fd" : "#34d399",
+          borderBottomColor: "transparent",
+        }}
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <Users
+          size={28}
+          className={isDark ? "text-violet-300" : "text-green-600"}
+        />
+      </div>
+    </div>
+    <motion.h3
+      initial={{ y: 10, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 0.2 }}
+      className={`mt-6 text-xl font-black ${isDark ? "text-white" : "text-gray-800"}`}
     >
-      <div className="relative">
+      Loading Issues
+    </motion.h3>
+    <motion.p
+      initial={{ y: 10, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 0.3 }}
+      className={`text-sm mt-2 ${isDark ? "text-violet-300" : "text-gray-500"}`}
+    >
+      Fetching reports based on your filters...
+    </motion.p>
+    <div className="flex gap-1 mt-6">
+      {[...Array(3)].map((_, i) => (
         <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-          className="w-20 h-20 rounded-full border-4 border-t-transparent"
-          style={{
-            borderColor: isDark ? "#a78bfa" : "#10b981",
-            borderTopColor: "transparent",
-          }}
+          key={i}
+          animate={{ y: [0, -8, 0] }}
+          transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+          className={`w-2 h-2 rounded-full ${isDark ? "bg-violet-400" : "bg-green-500"}`}
         />
-        <motion.div
-          animate={{ rotate: -360 }}
-          transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-2 w-16 h-16 rounded-full border-4 border-b-transparent"
-          style={{
-            borderColor: isDark ? "#c4b5fd" : "#34d399",
-            borderBottomColor: "transparent",
-          }}
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Users
-            size={28}
-            className={isDark ? "text-violet-300" : "text-green-600"}
-          />
-        </div>
-      </div>
-      <motion.h3
-        initial={{ y: 10, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className={`mt-6 text-xl font-black ${
-          isDark ? "text-white" : "text-gray-800"
-        }`}
-      >
-        Loading Issues
-      </motion.h3>
-      <motion.p
-        initial={{ y: 10, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className={`text-sm mt-2 ${isDark ? "text-violet-300" : "text-gray-500"}`}
-      >
-        Fetching reports based on your filters...
-      </motion.p>
-      <div className="flex gap-1 mt-6">
-        {[...Array(3)].map((_, i) => (
-          <motion.div
-            key={i}
-            animate={{ y: [0, -8, 0] }}
-            transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-            className={`w-2 h-2 rounded-full ${
-              isDark ? "bg-violet-400" : "bg-green-500"
-            }`}
-          />
-        ))}
-      </div>
-    </motion.div>
-  );
-};
+      ))}
+    </div>
+  </motion.div>
+);
 
 // =============================
 // Main Component
@@ -181,8 +174,6 @@ const Feed = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [error, setError] = useState(null);
-
-  // Advanced loader for ANY filter change
   const [showAdvancedLoader, setShowAdvancedLoader] = useState(false);
 
   // Pagination and data
@@ -204,10 +195,9 @@ const Feed = () => {
   const ITEMS_PER_PAGE = 5;
   const citizenId = localStorage.getItem("citizenId") || "CID-XXXX";
 
- 
+  // Scroll position save/restore
   useEffect(() => {
     if (location.pathname !== "/peopleVoice/feed") return;
-
     let timeout;
     const handleScroll = () => {
       clearTimeout(timeout);
@@ -222,7 +212,6 @@ const Feed = () => {
     };
   }, [location.pathname]);
 
-
   // =============================
   // Normalisation & Data Fetching
   // =============================
@@ -234,10 +223,7 @@ const Feed = () => {
   const fetchIssues = useCallback(
     async (pageNum, append = false) => {
       if (append && isFetchingRef.current) return;
-
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      if (abortControllerRef.current) abortControllerRef.current.abort();
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
@@ -255,7 +241,6 @@ const Feed = () => {
           page: pageNum,
           limit: ITEMS_PER_PAGE,
         });
-
         if (district !== DISTRICTS[0]) params.append("district", district);
         if (department !== DEPARTMENTS[0]) params.append("department", department);
         if (status !== STATUSES[0]) params.append("status", status);
@@ -266,16 +251,13 @@ const Feed = () => {
         const res = await fetch(`${APIURL}/issues?${params.toString()}`, {
           signal: controller.signal,
         });
-
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
 
         const rawIssues = data.issues || [];
         const newIssues = rawIssues.map(normalizeIssue);
 
-        if (newIssues.length === 0) {
-          setHasMore(false);
-        }
+        if (newIssues.length === 0) setHasMore(false);
 
         if (append) {
           setDisplayedIssues((prev) => {
@@ -315,9 +297,7 @@ const Feed = () => {
   // Initial load
   useEffect(() => {
     if (!initialDataLoaded.current) {
-      if (displayedIssues.length === 0) {
-        fetchIssues(1, false);
-      }
+      if (displayedIssues.length === 0) fetchIssues(1, false);
       initialDataLoaded.current = true;
     }
   }, [fetchIssues, displayedIssues]);
@@ -327,9 +307,7 @@ const Feed = () => {
     if (displayedIssues.length > 0 && !scrollRestoredRef.current) {
       const savedScroll = sessionStorage.getItem("feed_scroll_position");
       if (savedScroll) {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, parseInt(savedScroll));
-        });
+        requestAnimationFrame(() => window.scrollTo(0, parseInt(savedScroll)));
       }
       scrollRestoredRef.current = true;
     }
@@ -339,9 +317,7 @@ const Feed = () => {
   useEffect(() => {
     const handleNewIssue = () => {
       const currentScroll = window.scrollY;
-      fetchIssues(1, false).then(() => {
-        window.scrollTo(0, currentScroll);
-      });
+      fetchIssues(1, false).then(() => window.scrollTo(0, currentScroll));
     };
     window.addEventListener("newIssueCreated", handleNewIssue);
     return () => window.removeEventListener("newIssueCreated", handleNewIssue);
@@ -428,7 +404,6 @@ const Feed = () => {
   const handleLike = useCallback(
     async (issueId) => {
       if (!citizenId) return;
-
       let previousState;
       setDisplayedIssues((prev) => {
         previousState = prev;
@@ -474,15 +449,18 @@ const Feed = () => {
     [citizenId, setDisplayedIssues]
   );
 
+  // =============================
+  // Render
+  // =============================
   return (
     <div className={`min-h-screen transition-colors duration-700 ${theme.bg} pb-20`}>
-      {/* Mobile Header */}
+      {/* Mobile Header with glass effect */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30">
         <div
           className={`backdrop-blur-xl border-b ${
             isDark
-              ? "bg-[#0a0a0a] border-gray-800 border-violet-500/30"
-              : "bg-white/90 border-green-100/60"
+              ? "bg-[#0a0a0a]/80 border-gray-800"
+              : "bg-white/80 border-green-100/60"
           }`}
         >
           <div className="px-4 py-3 flex items-center justify-between">
@@ -497,13 +475,13 @@ const Feed = () => {
             </div>
             <div className="flex items-center gap-3">
               <motion.button
-                whileTap={{ scale: 0.92 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setIsMobileFilterOpen(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium shadow-md ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium shadow-md backdrop-blur-sm ${
                   isDark
-                    ? "bg-gray-900 text-white hover:bg-gray-800 text-violet-100 hover:bg-violet-600"
+                    ? "bg-gray-900/80 text-white hover:bg-gray-800 border border-gray-700"
                     : "bg-green-600 text-white hover:bg-green-700"
-                } transition-colors`}
+                } transition-all`}
               >
                 <Filter size={18} />
                 <span className="text-sm">Filter</span>
@@ -514,7 +492,7 @@ const Feed = () => {
       </div>
 
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row-reverse items-start justify-center gap-8 px-0 lg:px-4 pt-20 lg:pt-8">
-        {/* Desktop Sidebar */}
+        {/* Desktop Sidebar - enhanced glassmorphism */}
         <aside className="hidden lg:block w-[340px] shrink-0 sticky top-8 z-20">
           <div
             className={`backdrop-blur-2xl border rounded-[2.5rem] p-6 shadow-xl transition-all duration-500 ${
@@ -554,7 +532,9 @@ const Feed = () => {
                 ))}
               </div>
             ) : error ? (
-              <div
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 className={`text-center py-16 rounded-[2.5rem] border ${
                   isDark
                     ? "bg-violet-950/20 border-violet-500/20"
@@ -567,39 +547,48 @@ const Feed = () => {
                 </p>
                 <button
                   onClick={() => fetchIssues(1, false)}
-                  className="px-6 py-2 bg-red-500 text-white rounded-full font-bold"
+                  className="px-6 py-2 bg-red-500 text-white rounded-full font-bold shadow-md hover:shadow-lg transition"
                 >
                   Try Again
                 </button>
-              </div>
+              </motion.div>
             ) : displayedIssues.length === 0 ? (
-              <div
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
                 className={`text-center py-16 rounded-[2.5rem] border-2 border-dashed ${
                   isDark
                     ? "bg-violet-900/10 border-violet-500/20"
                     : "bg-white/50 border-green-200"
                 }`}
               >
-                <p className={theme.textMuted}>Empty horizon here.</p>
+                <Inbox size={48} className={`mx-auto mb-4 ${isDark ? "text-violet-400" : "text-green-400"}`} />
+                <p className={`text-lg font-bold ${theme.text}`}>No issues found</p>
+                <p className={`text-sm mt-1 ${theme.textMuted}`}>Try adjusting your filters</p>
                 <button
                   onClick={clearFilters}
-                  className={`mt-4 font-black text-xs uppercase hover:underline tracking-widest ${
+                  className={`mt-6 font-black text-xs uppercase hover:underline tracking-widest ${
                     isDark ? "text-violet-400" : "text-green-500"
                   }`}
                 >
                   Reset Filters
                 </button>
-              </div>
+              </motion.div>
             ) : (
               <AnimatePresence mode="popLayout">
                 {displayedIssues.map((issue, index) => (
                   <motion.div
                     key={issue._id}
                     layout
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ delay: index * 0.05 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30,
+                      delay: index * 0.03,
+                    }}
                   >
                     <IssueCard
                       isDark={isDark}
@@ -627,9 +616,14 @@ const Feed = () => {
               </AnimatePresence>
             )}
 
+            {/* Bottom observer with stylish end marker */}
             <div ref={bottomObserverRef} className="py-12 flex flex-col items-center justify-center gap-3">
               {loadingMore && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-3">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col items-center gap-3"
+                >
                   <SmallSpinner size="md" isDark={isDark} />
                   <span
                     className={`text-[10px] font-black uppercase tracking-[0.2em] ${
@@ -641,7 +635,11 @@ const Feed = () => {
                 </motion.div>
               )}
               {!loadingMore && !hasMore && displayedIssues.length > 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.3 }} className="flex items-center gap-4">
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 0.5, width: "auto" }}
+                  className="flex items-center gap-4"
+                >
                   <div className={`h-[1px] w-16 ${isDark ? "bg-violet-500" : "bg-slate-400"}`} />
                   <span
                     className={`text-[11px] font-bold uppercase tracking-[0.3em] ${
@@ -658,7 +656,7 @@ const Feed = () => {
         </main>
       </div>
 
-      {/* Mobile Filter Drawer – FIXED: Apply button just closes drawer */}
+      {/* Mobile Filter Drawer – Now with smoother animation and Apply button (already live) */}
       <AnimatePresence>
         {isMobileFilterOpen && (
           <>
@@ -718,22 +716,25 @@ const Feed = () => {
                   isDark ? "border-violet-500/20" : "border-green-100"
                 }`}
               >
-                <button
-                  onClick={() => setIsMobileFilterOpen(false)} // ✅ Just close – filters already applied live
-                  className={`w-full py-3 rounded-xl font-bold ${
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => setIsMobileFilterOpen(false)}
+                  className={`w-full py-3 rounded-xl font-bold shadow-md ${
                     isDark
                       ? "bg-violet-700 hover:bg-violet-600 text-white"
                       : "bg-green-600 hover:bg-green-700 text-white"
                   } transition-colors`}
                 >
                   Done
-                </button>
+                </motion.button>
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
-       <AIChatbot isDark={isDark} />
+
+      {/* AIChatbot – still there, just better positioned */}
+      <AIChatbot isDark={isDark} />
     </div>
   );
 };
