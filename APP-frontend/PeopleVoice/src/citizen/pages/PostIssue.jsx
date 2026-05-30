@@ -23,6 +23,8 @@ import { useTheme } from "../../Context/ThemeContext";
 import { DISTRICTS } from "../components/constants";
 import { themeColors } from "../components/constants";
 import { useUserValues } from "../../Context/UserValuesContext";
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+
 
 /* ================= CONFIG ================= */
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
@@ -419,74 +421,42 @@ const PostIssue = () => {
     return recognition;
   }, [voiceLanguage]);
 
-  const startVoiceInput = async () => {
-    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
-      setError(t("micNotSupported"));
+ const startVoiceInput = async () => {
+  // Browser
+  if (!window.Capacitor || window.Capacitor.getPlatform() === "web") {
+    const SpeechRecognitionAPI =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      setError("Voice input not supported");
       return;
     }
-    if (isListening) {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-      setIsListening(false);
-      return;
-    }
 
-    const recognition = initSpeechRecognition();
-    if (!recognition) return;
-    recognitionRef.current = recognition;
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang = voiceLanguage === "ta" ? "ta-IN" : "en-US";
 
-    recognition.onresult = async (event) => {
-      const transcript = event.results[0][0].transcript;
-      setIsListening(false);
-      
-      if (voiceLanguage === "en") {
-        setDescEn((prev) => {
-          const newText = prev.trim() ? `${prev} ${transcript}` : transcript;
-          autoTranslateToTamil(newText);
-          return newText;
-        });
-      } else {
-        setIsTranslatingVoice(true);
-        try {
-          const translatedEnglish = await translateTamilToEnglish(transcript);
-          setDescEn((prev) => {
-            const newText = prev.trim() ? `${prev} ${translatedEnglish}` : translatedEnglish;
-            autoTranslateToTamil(newText);
-            return newText;
-          });
-        } catch (err) {
-          console.error(err);
-          setError("Translation failed");
-        } finally {
-          setIsTranslatingVoice(false);
-        }
-      }
+    recognition.onresult = (event) => {
+      setDescEn(event.results[0][0].transcript);
     };
 
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
-      if (event.error === "not-allowed") {
-        setError("Microphone permission denied. Please allow microphone access.");
-      } else {
-        setError(`Voice input error: ${event.error}`);
-      }
-    };
+    recognition.start();
+    return;
+  }
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+  // Android App
+  const permission = await SpeechRecognition.requestPermissions();
 
-    try {
-      recognition.start();
-      setIsListening(true);
-    } catch (err) {
-      console.error("Failed to start recognition:", err);
-      setError("Could not start voice input. Please try again.");
-    }
-  };
+  if (!permission.speechRecognition) {
+    setError("Microphone permission denied");
+    return;
+  }
 
+  await SpeechRecognition.start({
+    language: voiceLanguage === "ta" ? "ta-IN" : "en-US",
+    maxResults: 1,
+    prompt: "Speak now",
+  });
+};
   // Save draft with images (compressed base64 fits within localStorage limits)
   const saveDraft = useCallback(() => {
     const draft = {
