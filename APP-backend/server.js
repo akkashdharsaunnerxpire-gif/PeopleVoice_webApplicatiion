@@ -10,23 +10,10 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// ✅ CORS
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://peoplevoice-webapplication.onrender.com",
-  "capacitor://localhost",
-  "http://localhost"
-];
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: true,
     credentials: true,
   })
 );
