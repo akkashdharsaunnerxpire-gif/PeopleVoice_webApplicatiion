@@ -11,11 +11,21 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 
+const allowedOrigins = [
+  "https://peoplevoice-webapplicatiion.onrender.com",
+  "https://localhost",
+];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      console.log("🔥 Origin:", origin);
-      callback(null, true);
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
