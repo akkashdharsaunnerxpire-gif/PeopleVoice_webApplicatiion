@@ -1431,6 +1431,10 @@ const renderActiveShape = (props) => {
       >
         {`${payload.name}: ${value}`}
       </text>
+
+
+
+      
       <text
         x={ex + (cos >= 0 ? 1 : -1) * 12}
         y={ey}

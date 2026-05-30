@@ -1063,7 +1063,7 @@ const IssueCard = ({
         }
       `}</style>
     </>
-  );
+  );  
 };
 
 export default IssueCard;
