@@ -13,10 +13,14 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      console.log("🔥 Origin:", origin);
+      callback(null, true);
+    },
     credentials: true,
   })
 );
+
 // ✅ Routes
 app.use("/api", require("./Routes/issueRoutes"));
 app.use("/api/auth", require("./Routes/authRoutes"));
