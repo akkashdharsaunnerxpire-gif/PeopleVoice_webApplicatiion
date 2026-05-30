@@ -219,7 +219,6 @@ const TEXTS = {
     voiceLangEnglish: "English",
     voiceLangTamil: "Tamil",
     translating: "Translating...",
-    
   },
   ta: {
     title: "பொது புகார் பதிவு",
@@ -312,7 +311,8 @@ const PostIssue = () => {
   const canvasRef = useRef(null);
   const modalRef = useRef(null);
   const translateTimeoutRef = useRef(null);
-  const recognitionRef = useRef(null);
+  const recognitionRefEn = useRef(null);
+  const recognitionRefTa = useRef(null);
 
   // Form states
   const [district, setDistrict] = useState("");
@@ -337,9 +337,9 @@ const PostIssue = () => {
   const { addNewIssue } = useUserValues();
 
   // Voice input states
-  const [isListening, setIsListening] = useState(false);
+  const [isListeningEn, setIsListeningEn] = useState(false);
+  const [isListeningTa, setIsListeningTa] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
-  const [voiceLanguage, setVoiceLanguage] = useState("en");
   const [isTranslatingVoice, setIsTranslatingVoice] = useState(false);
 
   // Location fetching state
@@ -390,6 +390,20 @@ const PostIssue = () => {
   const device_fingerprint = navigator.userAgent;
   const navigateToLogin = () => navigate("/login");
 
+  const translateEnglishToTamil = async (englishText) => {
+    try {
+      const res = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+          englishText
+        )}&langpair=en|ta`
+      );
+      const data = await res.json();
+      return data?.responseData?.translatedText || englishText;
+    } catch {
+      return englishText;
+    }
+  };
+
   // Helper: translate text from Tamil to English using MyMemory
   const translateTamilToEnglish = async (tamilText) => {
     try {
@@ -408,72 +422,193 @@ const PostIssue = () => {
     }
   };
 
-  // Initialize speech recognition with dynamic language
-  const initSpeechRecognition = useCallback(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setVoiceSupported(false);
-      return null;
-    }
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = voiceLanguage === "en" ? "en-US" : "ta-IN";
-    return recognition;
-  }, [voiceLanguage]);
-
-const startVoiceInput = async () => {
-  try {
-
-    // WEB
-    if (Capacitor.getPlatform() === "web") {
-      const SpeechRecognitionAPI =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-
-      if (!SpeechRecognitionAPI) {
-        alert("Speech Recognition not supported");
-        return;
+  // -------------------- VOICE: ENGLISH --------------------
+  const startEnglishVoice = async () => {
+    if (isListeningEn) return;
+    // Stop Tamil mic if active
+    if (isListeningTa) stopTamilVoice();
+    try {
+      if (Capacitor.getPlatform() === "web") {
+        const SpeechRecognitionAPI =
+          window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognitionAPI) {
+          alert("Speech Recognition not supported");
+          return;
+        }
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = "en-US";
+        recognition.onstart = () => setIsListeningEn(true);
+        recognition.onend = () => setIsListeningEn(false);
+        recognition.onresult = async (event) => {
+          const text = event.results[0][0].transcript;
+          // Append to English description
+          setDescEn(prev => prev + " " + text);
+          setIsTranslatingVoice(true);
+          try {
+            const translated = await translateEnglishToTamil(text);
+            setDescTa(prev => prev + " " + translated);
+          } finally {
+            setIsTranslatingVoice(false);
+          }
+        };
+        recognition.start();
+        recognitionRefEn.current = recognition;
+      } else {
+        // Capacitor Android
+        const permission = await SpeechRecognition.requestPermissions();
+        if (!permission.speechRecognition) return;
+        await SpeechRecognition.start({
+          language: "en-US",
+          maxResults: 1,
+          partialResults: true,
+          prompt: "Speak now (English)",
+        });
+        setIsListeningEn(true);
+        const handlePartial = (data) => {
+          if (data.matches?.length > 0) {
+            const partialText = data.matches[0];
+            // For partial results we don't translate immediately; we'll handle final on stop.
+            // But for simplicity, we'll just update descEn with final on stop.
+          }
+        };
+        SpeechRecognition.addListener("partialResults", handlePartial);
+        const handleEnd = async () => {
+          setIsListeningEn(false);
+          SpeechRecognition.removeListener("partialResults", handlePartial);
+          // Get final result: Not directly available, but we can listen to "results" event.
+          // Capacitor community plugin doesn't give final text directly, but we'll use a workaround:
+          // We'll keep a variable to store final text from a "results" listener.
+          // Alternatively, we can use a different approach. Simpler: On Android, we only get partial results,
+          // so we'll use the last partial as final.
+          // For reliability, we'll implement a finalResult listener.
+        };
+        // For final result, we need to add a listener that gets called when user stops.
+        // Actually, start() returns a promise that resolves when recognition stops.
+        // We'll use a listener for "results" event which provides final result.
+        const handleResults = (data) => {
+          if (data.matches?.length > 0) {
+            const finalText = data.matches[0];
+            setDescEn(prev => prev + " " + finalText);
+            translateEnglishToTamil(finalText).then(translated => {
+              setDescTa(prev => prev + " " + translated);
+            });
+          }
+        };
+        SpeechRecognition.addListener("results", handleResults);
+        recognitionRefEn.current = { removeListeners: () => {
+          SpeechRecognition.removeListener("results", handleResults);
+          SpeechRecognition.removeListener("partialResults", handlePartial);
+        }};
       }
-
-      const recognition = new SpeechRecognitionAPI();
-
-      recognition.lang = voiceLanguage === "ta" ? "ta-IN" : "en-US";
-
-      recognition.onresult = (event) => {
-        const text = event.results[0][0].transcript;
-
-        setDescEn(text);
-      };
-
-      recognition.start();
-      return;
+    } catch (err) {
+      console.error(err);
+      setIsListeningEn(false);
     }
+  };
 
-    // ANDROID
-    const permission = await SpeechRecognition.requestPermissions();
-
-    if (!permission.speechRecognition) {
-      return;
+  const stopEnglishVoice = async () => {
+    if (Capacitor.getPlatform() === "android") {
+      await SpeechRecognition.stop();
+      if (recognitionRefEn.current?.removeListeners) recognitionRefEn.current.removeListeners();
+    } else if (recognitionRefEn.current) {
+      recognitionRefEn.current.abort();
     }
+    setIsListeningEn(false);
+  };
 
-    SpeechRecognition.addListener("partialResults", (data) => {
-      if (data.matches?.length > 0) {
-        setDescEn(data.matches[0]);
+  // -------------------- VOICE: TAMIL --------------------
+  const startTamilVoice = async () => {
+    if (isListeningTa) return;
+    if (isListeningEn) stopEnglishVoice();
+    try {
+      if (Capacitor.getPlatform() === "web") {
+        const SpeechRecognitionAPI =
+          window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognitionAPI) {
+          alert("Speech Recognition not supported");
+          return;
+        }
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = "ta-IN";
+        recognition.onstart = () => setIsListeningTa(true);
+        recognition.onend = () => setIsListeningTa(false);
+        recognition.onresult = async (event) => {
+          const text = event.results[0][0].transcript;
+          setDescTa(prev => prev + " " + text);
+          setIsTranslatingVoice(true);
+          try {
+            const translated = await translateTamilToEnglish(text);
+            setDescEn(prev => prev + " " + translated);
+          } finally {
+            setIsTranslatingVoice(false);
+          }
+        };
+        recognition.start();
+        recognitionRefTa.current = recognition;
+      } else {
+        // Capacitor Android
+        const permission = await SpeechRecognition.requestPermissions();
+        if (!permission.speechRecognition) return;
+        await SpeechRecognition.start({
+          language: "ta-IN",
+          maxResults: 1,
+          partialResults: true,
+          prompt: "தமிழில் பேசுங்கள்",
+        });
+        setIsListeningTa(true);
+        const handlePartial = (data) => {
+          // partial results not final, ignore for translation
+        };
+        SpeechRecognition.addListener("partialResults", handlePartial);
+        const handleResults = (data) => {
+          if (data.matches?.length > 0) {
+            const finalText = data.matches[0];
+            setDescTa(prev => prev + " " + finalText);
+            translateTamilToEnglish(finalText).then(translated => {
+              setDescEn(prev => prev + " " + translated);
+            });
+          }
+        };
+        SpeechRecognition.addListener("results", handleResults);
+        recognitionRefTa.current = { removeListeners: () => {
+          SpeechRecognition.removeListener("results", handleResults);
+          SpeechRecognition.removeListener("partialResults", handlePartial);
+        }};
       }
-    });
+    } catch (err) {
+      console.error(err);
+      setIsListeningTa(false);
+    }
+  };
 
-    await SpeechRecognition.start({
-      language: voiceLanguage === "ta" ? "ta-IN" : "en-US",
-      maxResults: 1,
-      partialResults: true,
-      prompt: "Speak now",
-    });
+  const stopTamilVoice = async () => {
+    if (Capacitor.getPlatform() === "android") {
+      await SpeechRecognition.stop();
+      if (recognitionRefTa.current?.removeListeners) recognitionRefTa.current.removeListeners();
+    } else if (recognitionRefTa.current) {
+      recognitionRefTa.current.abort();
+    }
+    setIsListeningTa(false);
+  };
 
-  } catch (err) {
-    console.error(err);
-  }
-};
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRefEn.current) {
+        if (Capacitor.getPlatform() === "web") recognitionRefEn.current.abort();
+        else if (recognitionRefEn.current.removeListeners) recognitionRefEn.current.removeListeners();
+      }
+      if (recognitionRefTa.current) {
+        if (Capacitor.getPlatform() === "web") recognitionRefTa.current.abort();
+        else if (recognitionRefTa.current.removeListeners) recognitionRefTa.current.removeListeners();
+      }
+    };
+  }, []);
+
   // Save draft with images (compressed base64 fits within localStorage limits)
   const saveDraft = useCallback(() => {
     const draft = {
@@ -611,11 +746,6 @@ const startVoiceInput = async () => {
     return () => {
       if (translateTimeoutRef.current)
         clearTimeout(translateTimeoutRef.current);
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (e) {}
-      }
       // Cleanup video track if any
       if (videoTrackRef.current) {
         videoTrackRef.current.stop();
@@ -1937,40 +2067,20 @@ const startVoiceInput = async () => {
                       {t("description")} ({t("english")})
                     </label>
                     <div className="flex items-center gap-2">
-                      <div className="flex rounded-md overflow-hidden border text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setVoiceLanguage("en")}
-                          className={`px-2 py-1 ${voiceLanguage === "en" ? "bg-green-600 text-white" : isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}
-                        >
-                          {t("voiceLangEnglish")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setVoiceLanguage("ta")}
-                          className={`px-2 py-1 ${voiceLanguage === "ta" ? "bg-green-600 text-white" : isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}
-                        >
-                          {t("voiceLangTamil")}
-                        </button>
-                      </div>
                       {voiceSupported && (
                         <button
                           type="button"
-                          onClick={startVoiceInput}
+                          onClick={isListeningEn ? stopEnglishVoice : startEnglishVoice}
                           className={`p-1 rounded-full transition ${
-                            isListening
+                            isListeningEn
                               ? "bg-red-500 text-white animate-pulse"
                               : isDark
                                 ? "text-green-400 hover:bg-gray-700"
                                 : "text-green-600 hover:bg-gray-100"
                           }`}
-                          title={t("voiceInput")}
+                          title={t("voiceInput") + " (English)"}
                         >
-                          {isListening ? (
-                            <MicOff size={16} />
-                          ) : (
-                            <Mic size={16} />
-                          )}
+                          {isListeningEn ? <MicOff size={16} /> : <Mic size={16} />}
                         </button>
                       )}
                     </div>
@@ -1996,13 +2106,10 @@ const startVoiceInput = async () => {
                       </span>
                     </div>
                   )}
-                  {isListening && (
+                  {isListeningEn && (
                     <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
                       <Mic size={12} className="animate-pulse" />
-                      <span>
-                        {t("listening")} (
-                        {voiceLanguage === "en" ? "English" : "Tamil"})
-                      </span>
+                      <span>{t("listening")} (English)</span>
                     </div>
                   )}
                 </div>
@@ -2010,11 +2117,31 @@ const startVoiceInput = async () => {
 
               {(descView === "tamil" || descView === "both") && (
                 <div>
-                  <label
-                    className={`block text-[10px] sm:text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}
-                  >
-                    {t("descriptionTamil")}
-                  </label>
+                  <div className="flex justify-between items-center mb-1 flex-wrap gap-2">
+                    <label
+                      className={`block text-[10px] sm:text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}
+                    >
+                      {t("descriptionTamil")}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {voiceSupported && (
+                        <button
+                          type="button"
+                          onClick={isListeningTa ? stopTamilVoice : startTamilVoice}
+                          className={`p-1 rounded-full transition ${
+                            isListeningTa
+                              ? "bg-red-500 text-white animate-pulse"
+                              : isDark
+                                ? "text-green-400 hover:bg-gray-700"
+                                : "text-green-600 hover:bg-gray-100"
+                          }`}
+                          title={t("voiceInput") + " (Tamil)"}
+                        >
+                          {isListeningTa ? <MicOff size={16} /> : <Mic size={16} />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <textarea
                     value={descTa}
                     onChange={(e) => setDescTa(e.target.value)}
@@ -2026,6 +2153,12 @@ const startVoiceInput = async () => {
                         : "bg-white border-gray-300 text-gray-900"
                     }`}
                   />
+                  {isListeningTa && (
+                    <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
+                      <Mic size={12} className="animate-pulse" />
+                      <span>{t("listening")} (Tamil)</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
