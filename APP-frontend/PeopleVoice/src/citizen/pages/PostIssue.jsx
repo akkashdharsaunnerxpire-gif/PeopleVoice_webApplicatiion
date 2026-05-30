@@ -23,8 +23,8 @@ import { useTheme } from "../../Context/ThemeContext";
 import { DISTRICTS } from "../components/constants";
 import { themeColors } from "../components/constants";
 import { useUserValues } from "../../Context/UserValuesContext";
-import { SpeechRecognition } from '@capacitor-community/speech-recognition';
-
+import { Capacitor } from "@capacitor/core";
+import { SpeechRecognition } from "@capacitor-community/speech-recognition";
 
 /* ================= CONFIG ================= */
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
@@ -219,6 +219,7 @@ const TEXTS = {
     voiceLangEnglish: "English",
     voiceLangTamil: "Tamil",
     translating: "Translating...",
+    
   },
   ta: {
     title: "பொது புகார் பதிவு",
@@ -394,8 +395,8 @@ const PostIssue = () => {
     try {
       const res = await fetch(
         `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
-          tamilText
-        )}&langpair=ta|en`
+          tamilText,
+        )}&langpair=ta|en`,
       );
       const data = await res.json();
       let translated = data?.responseData?.translatedText || tamilText;
@@ -409,7 +410,8 @@ const PostIssue = () => {
 
   // Initialize speech recognition with dynamic language
   const initSpeechRecognition = useCallback(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setVoiceSupported(false);
       return null;
@@ -421,41 +423,56 @@ const PostIssue = () => {
     return recognition;
   }, [voiceLanguage]);
 
- const startVoiceInput = async () => {
-  // Browser
-  if (!window.Capacitor || window.Capacitor.getPlatform() === "web") {
-    const SpeechRecognitionAPI =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+const startVoiceInput = async () => {
+  try {
 
-    if (!SpeechRecognitionAPI) {
-      setError("Voice input not supported");
+    // WEB
+    if (Capacitor.getPlatform() === "web") {
+      const SpeechRecognitionAPI =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRecognitionAPI) {
+        alert("Speech Recognition not supported");
+        return;
+      }
+
+      const recognition = new SpeechRecognitionAPI();
+
+      recognition.lang = voiceLanguage === "ta" ? "ta-IN" : "en-US";
+
+      recognition.onresult = (event) => {
+        const text = event.results[0][0].transcript;
+
+        setDescEn(text);
+      };
+
+      recognition.start();
       return;
     }
 
-    const recognition = new SpeechRecognitionAPI();
-    recognition.lang = voiceLanguage === "ta" ? "ta-IN" : "en-US";
+    // ANDROID
+    const permission = await SpeechRecognition.requestPermissions();
 
-    recognition.onresult = (event) => {
-      setDescEn(event.results[0][0].transcript);
-    };
+    if (!permission.speechRecognition) {
+      return;
+    }
 
-    recognition.start();
-    return;
+    SpeechRecognition.addListener("partialResults", (data) => {
+      if (data.matches?.length > 0) {
+        setDescEn(data.matches[0]);
+      }
+    });
+
+    await SpeechRecognition.start({
+      language: voiceLanguage === "ta" ? "ta-IN" : "en-US",
+      maxResults: 1,
+      partialResults: true,
+      prompt: "Speak now",
+    });
+
+  } catch (err) {
+    console.error(err);
   }
-
-  // Android App
-  const permission = await SpeechRecognition.requestPermissions();
-
-  if (!permission.speechRecognition) {
-    setError("Microphone permission denied");
-    return;
-  }
-
-  await SpeechRecognition.start({
-    language: voiceLanguage === "ta" ? "ta-IN" : "en-US",
-    maxResults: 1,
-    prompt: "Speak now",
-  });
 };
   // Save draft with images (compressed base64 fits within localStorage limits)
   const saveDraft = useCallback(() => {
@@ -479,9 +496,25 @@ const PostIssue = () => {
       setTimeout(() => setDraftMessage(""), 2000);
     } catch (err) {
       console.error("Failed to save draft:", err);
-      setError("Could not save draft (storage limit). Try removing some photos.");
+      setError(
+        "Could not save draft (storage limit). Try removing some photos.",
+      );
     }
-  }, [district, area, department, otherDetail, reason, descEn, descTa, hashtags, images, agree, cameraAllowed, descView, t]);
+  }, [
+    district,
+    area,
+    department,
+    otherDetail,
+    reason,
+    descEn,
+    descTa,
+    hashtags,
+    images,
+    agree,
+    cameraAllowed,
+    descView,
+    t,
+  ]);
 
   const loadDraft = () => {
     const draftJson = localStorage.getItem("complaint_draft");
@@ -526,7 +559,22 @@ const PostIssue = () => {
       }
     }, 3000);
     return () => clearTimeout(timer);
-  }, [district, area, department, otherDetail, reason, descEn, descTa, hashtags, images, agree, cameraAllowed, descView, citizenId, saveDraft]);
+  }, [
+    district,
+    area,
+    department,
+    otherDetail,
+    reason,
+    descEn,
+    descTa,
+    hashtags,
+    images,
+    agree,
+    cameraAllowed,
+    descView,
+    citizenId,
+    saveDraft,
+  ]);
 
   useEffect(() => {
     if (!citizenId) {
@@ -538,7 +586,9 @@ const PostIssue = () => {
   useEffect(() => {
     if (department) {
       setCameraAllowed(false);
-      setValidationMessage(`Ready to capture ${getDepartmentName(department)} issue`);
+      setValidationMessage(
+        `Ready to capture ${getDepartmentName(department)} issue`,
+      );
       if (department !== "Other") setOtherDetail("");
     }
   }, [department]);
@@ -559,7 +609,8 @@ const PostIssue = () => {
 
   useEffect(() => {
     return () => {
-      if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
+      if (translateTimeoutRef.current)
+        clearTimeout(translateTimeoutRef.current);
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -586,7 +637,7 @@ const PostIssue = () => {
           try {
             const res = await fetch(
               `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-              { headers: { "User-Agent": "CivicIssueApp/1.0" } }
+              { headers: { "User-Agent": "CivicIssueApp/1.0" } },
             );
             const data = await res.json();
             const address =
@@ -616,7 +667,7 @@ const PostIssue = () => {
               : "Could not get location";
           reject(new Error(msg));
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
     });
 
@@ -629,7 +680,9 @@ const PostIssue = () => {
         const scale = Math.min(800 / img.width, 800 / img.height);
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas
+          .getContext("2d")
+          .drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL("image/jpeg", 0.68));
       };
     });
@@ -648,7 +701,7 @@ const PostIssue = () => {
     if (!videoTrackRef.current || !zoomSupported) return;
     try {
       const constraints = {
-        advanced: [{ zoom: newZoom }]
+        advanced: [{ zoom: newZoom }],
       };
       await videoTrackRef.current.applyConstraints(constraints);
       setZoomLevel(newZoom);
@@ -676,7 +729,9 @@ const PostIssue = () => {
     }
     if (!cameraAllowed) return setError(t("selectDeptFirst"));
     if (images.length >= getDepartmentDetails(department).maxImages) {
-      return setError(`Max ${getDepartmentDetails(department).maxImages} photos allowed`);
+      return setError(
+        `Max ${getDepartmentDetails(department).maxImages} photos allowed`,
+      );
     }
 
     setIsCameraOpen(true);
@@ -700,11 +755,11 @@ const PostIssue = () => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-      
+
       // Get video track for zoom capabilities
       const track = stream.getVideoTracks()[0];
       videoTrackRef.current = track;
-      
+
       // Check zoom capabilities
       const capabilities = track.getCapabilities ? track.getCapabilities() : {};
       if (capabilities.zoom && capabilities.zoom.max > 1) {
@@ -719,12 +774,18 @@ const PostIssue = () => {
     } catch (err) {
       console.error("Camera access error:", err.name, err.message);
       let friendlyMsg = t("cameraDenied");
-      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+      if (
+        err.name === "NotAllowedError" ||
+        err.name === "PermissionDeniedError"
+      ) {
         friendlyMsg =
           language === "en"
             ? "Camera permission denied. Please allow camera access in your browser settings and try again."
             : "கேமரா அனுமதி மறுக்கப்பட்டது. உலாவி அமைப்புகளில் கேமரா அனுமதியை அனுமதித்து மீண்டும் முயற்சிக்கவும்.";
-      } else if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+      } else if (
+        err.name === "NotFoundError" ||
+        err.name === "OverconstrainedError"
+      ) {
         friendlyMsg =
           language === "en"
             ? "No suitable camera found on this device."
@@ -775,7 +836,7 @@ const PostIssue = () => {
         setArea(location.address);
         if (!district) {
           const found = DISTRICTS.find((d) =>
-            location.address.toLowerCase().includes(d.toLowerCase())
+            location.address.toLowerCase().includes(d.toLowerCase()),
           );
           if (found) setDistrict(found);
         }
@@ -821,7 +882,9 @@ const PostIssue = () => {
       return;
     }
     setCameraAllowed(true);
-    setValidationMessage(`Ready to capture ${getDepartmentName(department)} issue`);
+    setValidationMessage(
+      `Ready to capture ${getDepartmentName(department)} issue`,
+    );
   };
 
   const handleHashtagChange = (e) => {
@@ -834,13 +897,15 @@ const PostIssue = () => {
     if (lastWord?.startsWith("#") && lastWord.length > 1) {
       const searchTerm = lastWord.toLowerCase();
       const filtered = ALL_TAGS.filter(
-        (tag) => tag.toLowerCase().includes(searchTerm) && !value.includes(tag)
+        (tag) => tag.toLowerCase().includes(searchTerm) && !value.includes(tag),
       ).slice(0, 10);
       setSuggestions(filtered);
     } else {
       if (!lastWord?.startsWith("#") && words.length > 0) {
         const usedTags = words.filter((w) => w.startsWith("#"));
-        const popularTags = ALL_TAGS.filter((tag) => !usedTags.includes(tag)).slice(0, 8);
+        const popularTags = ALL_TAGS.filter(
+          (tag) => !usedTags.includes(tag),
+        ).slice(0, 8);
         setSuggestions(popularTags);
       } else {
         setSuggestions([]);
@@ -869,8 +934,8 @@ const PostIssue = () => {
       try {
         const res = await fetch(
           `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
-            englishText
-          )}&langpair=en|ta`
+            englishText,
+          )}&langpair=en|ta`,
         );
         const data = await res.json();
         let translated = data?.responseData?.translatedText || englishText;
@@ -911,7 +976,7 @@ const PostIssue = () => {
         t("minPhotosRequired", {
           minImages: dept.minImages,
           department: dept.name,
-        })
+        }),
       );
     }
 
@@ -940,7 +1005,9 @@ const PostIssue = () => {
 
   const handleVerificationSubmit = async () => {
     const requiredChecks = ["confirmImages", "confirmLocation", "acceptTerms"];
-    const allRequiredChecked = requiredChecks.every((check) => verificationChecks[check]);
+    const allRequiredChecked = requiredChecks.every(
+      (check) => verificationChecks[check],
+    );
 
     if (!allRequiredChecked) {
       return setError(t("confirmAllPoints"));
@@ -1053,7 +1120,7 @@ const PostIssue = () => {
         setArea(location.address);
         if (!district) {
           const found = DISTRICTS.find((d) =>
-            location.address.toLowerCase().includes(d.toLowerCase())
+            location.address.toLowerCase().includes(d.toLowerCase()),
           );
           if (found) setDistrict(found);
         }
@@ -1116,7 +1183,9 @@ const PostIssue = () => {
               className="text-red-600 dark:text-red-400 flex-shrink-0"
               size={18}
             />
-            <span className="text-red-700 dark:text-red-300 flex-1">{error}</span>
+            <span className="text-red-700 dark:text-red-300 flex-1">
+              {error}
+            </span>
             <X
               className="cursor-pointer flex-shrink-0 text-red-600 dark:text-red-400"
               onClick={() => setError("")}
@@ -1130,14 +1199,20 @@ const PostIssue = () => {
             <div
               ref={modalRef}
               className={`rounded-xl sm:rounded-2xl w-full max-w-[95%] sm:max-w-lg md:max-w-xl mx-auto shadow-2xl border max-h-[90vh] overflow-y-auto ${
-                isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+                isDark
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
               }`}
             >
               <div className="sticky top-0 bg-gradient-to-r from-red-600 to-red-700 text-white p-4 sm:p-6 rounded-t-xl sm:rounded-t-2xl">
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex-1">
-                    <h2 className="text-lg sm:text-xl font-bold">{t("finalConfirmation")}</h2>
-                    <p className="text-xs sm:text-sm mt-1 opacity-90">{t("falseComplaints")}</p>
+                    <h2 className="text-lg sm:text-xl font-bold">
+                      {t("finalConfirmation")}
+                    </h2>
+                    <p className="text-xs sm:text-sm mt-1 opacity-90">
+                      {t("falseComplaints")}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
@@ -1147,7 +1222,11 @@ const PostIssue = () => {
                     >
                       {language === "en" ? "தமிழ்" : "English"}
                     </button>
-                    <button type="button" onClick={() => setShowVerification(false)} className="p-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowVerification(false)}
+                      className="p-1"
+                    >
                       <X size={20} className="sm:w-7 sm:h-7" />
                     </button>
                   </div>
@@ -1157,8 +1236,13 @@ const PostIssue = () => {
               <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-600 p-3 sm:p-4 rounded-lg sm:rounded-xl">
                   <div className="flex gap-2 sm:gap-3">
-                    <AlertTriangle className="text-red-600 dark:text-red-400 mt-1 flex-shrink-0" size={16} />
-                    <div className={`text-xs sm:text-sm ${isDark ? "text-red-300" : "text-red-800"}`}>
+                    <AlertTriangle
+                      className="text-red-600 dark:text-red-400 mt-1 flex-shrink-0"
+                      size={16}
+                    />
+                    <div
+                      className={`text-xs sm:text-sm ${isDark ? "text-red-300" : "text-red-800"}`}
+                    >
                       <strong>{t("importantLegalNotice")}</strong>
                       <br />
                       {t("legalText")}
@@ -1168,31 +1252,55 @@ const PostIssue = () => {
 
                 <div
                   className={`border rounded-lg sm:rounded-xl p-3 sm:p-4 text-xs sm:text-sm ${
-                    isDark ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-200"
+                    isDark
+                      ? "bg-gray-700 border-gray-600"
+                      : "bg-gray-50 border-gray-200"
                   }`}
                 >
-                  <h3 className={`font-semibold mb-2 sm:mb-3 ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                  <h3
+                    className={`font-semibold mb-2 sm:mb-3 ${isDark ? "text-gray-200" : "text-gray-800"}`}
+                  >
                     {t("complaintSummary")}
                   </h3>
                   <div className="space-y-1.5 sm:space-y-2">
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>{t("departmentLabel")}</span>
-                      <span className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                      <span
+                        className={isDark ? "text-gray-400" : "text-gray-600"}
+                      >
+                        {t("departmentLabel")}
+                      </span>
+                      <span
+                        className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}
+                      >
                         {getDepartmentName(department)}
                         {department === "Other" && otherDetail && (
-                          <span className="ml-1 text-xs opacity-70">({otherDetail})</span>
+                          <span className="ml-1 text-xs opacity-70">
+                            ({otherDetail})
+                          </span>
                         )}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>{t("locationLabel")}</span>
-                      <span className={`font-medium break-words ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                      <span
+                        className={isDark ? "text-gray-400" : "text-gray-600"}
+                      >
+                        {t("locationLabel")}
+                      </span>
+                      <span
+                        className={`font-medium break-words ${isDark ? "text-gray-200" : "text-gray-800"}`}
+                      >
                         {area}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                      <span className={isDark ? "text-gray-400" : "text-gray-600"}>{t("photosLabel")}</span>
-                      <span className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                      <span
+                        className={isDark ? "text-gray-400" : "text-gray-600"}
+                      >
+                        {t("photosLabel")}
+                      </span>
+                      <span
+                        className={`font-medium ${isDark ? "text-gray-200" : "text-gray-800"}`}
+                      >
                         {images.length} {t("attached")}
                       </span>
                     </div>
@@ -1200,7 +1308,9 @@ const PostIssue = () => {
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
-                  <h3 className={`font-semibold text-sm sm:text-base ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                  <h3
+                    className={`font-semibold text-sm sm:text-base ${isDark ? "text-gray-200" : "text-gray-800"}`}
+                  >
                     {t("iHerebyDeclare")}
                   </h3>
 
@@ -1209,14 +1319,21 @@ const PostIssue = () => {
                       type="checkbox"
                       checked={verificationChecks.confirmImages}
                       onChange={(e) =>
-                        setVerificationChecks((p) => ({ ...p, confirmImages: e.target.checked }))
+                        setVerificationChecks((p) => ({
+                          ...p,
+                          confirmImages: e.target.checked,
+                        }))
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    <span
+                      className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                    >
                       <strong>{t("confirmImages")}</strong>
                       <br />
-                      <span className={`${isDark ? "text-gray-400" : "text-gray-600"} text-[10px] sm:text-xs`}>
+                      <span
+                        className={`${isDark ? "text-gray-400" : "text-gray-600"} text-[10px] sm:text-xs`}
+                      >
                         {t("confirmImagesDesc")}
                       </span>
                     </span>
@@ -1227,14 +1344,21 @@ const PostIssue = () => {
                       type="checkbox"
                       checked={verificationChecks.confirmLocation}
                       onChange={(e) =>
-                        setVerificationChecks((p) => ({ ...p, confirmLocation: e.target.checked }))
+                        setVerificationChecks((p) => ({
+                          ...p,
+                          confirmLocation: e.target.checked,
+                        }))
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    <span
+                      className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                    >
                       <strong>{t("confirmLocation")}</strong>
                       <br />
-                      <span className={`${isDark ? "text-gray-400" : "text-gray-600"} text-[10px] sm:text-xs break-words`}>
+                      <span
+                        className={`${isDark ? "text-gray-400" : "text-gray-600"} text-[10px] sm:text-xs break-words`}
+                      >
                         {t("confirmLocationDesc")} <strong>{area}</strong>
                       </span>
                     </span>
@@ -1248,22 +1372,33 @@ const PostIssue = () => {
                       type="checkbox"
                       checked={verificationChecks.acceptTerms}
                       onChange={(e) =>
-                        setVerificationChecks((p) => ({ ...p, acceptTerms: e.target.checked }))
+                        setVerificationChecks((p) => ({
+                          ...p,
+                          acceptTerms: e.target.checked,
+                        }))
                       }
                       className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 flex-shrink-0"
                     />
-                    <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      <strong className={`block text-sm sm:text-base ${isDark ? "text-red-400" : "text-red-700"}`}>
+                    <span
+                      className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                    >
+                      <strong
+                        className={`block text-sm sm:text-base ${isDark ? "text-red-400" : "text-red-700"}`}
+                      >
                         {t("acceptTerms")}
                       </strong>
-                      <span className={`mt-1 block text-[10px] sm:text-xs ${isDark ? "text-red-400/80" : "text-red-700"}`}>
+                      <span
+                        className={`mt-1 block text-[10px] sm:text-xs ${isDark ? "text-red-400/80" : "text-red-700"}`}
+                      >
                         {t("acceptTermsDesc")}
                       </span>
                     </span>
                   </label>
                 </div>
 
-                <div className={`flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                <div
+                  className={`flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}
+                >
                   <button
                     type="button"
                     onClick={() => setShowVerification(false)}
@@ -1278,7 +1413,9 @@ const PostIssue = () => {
                   <button
                     type="button"
                     onClick={handleVerificationSubmit}
-                    disabled={isSubmittingVerification || !checkVerificationComplete()}
+                    disabled={
+                      isSubmittingVerification || !checkVerificationComplete()
+                    }
                     className={`w-full sm:flex-1 py-3 sm:py-3.5 rounded-lg sm:rounded-xl font-bold text-white transition text-sm sm:text-base ${
                       checkVerificationComplete()
                         ? "bg-red-600 hover:bg-red-700"
@@ -1302,12 +1439,16 @@ const PostIssue = () => {
 
         {showThankYou && (
           <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-            <div className={`rounded-2xl p-6 text-center max-w-sm mx-auto ${isDark ? "bg-gray-800" : "bg-white"} shadow-2xl`}>
+            <div
+              className={`rounded-2xl p-6 text-center max-w-sm mx-auto ${isDark ? "bg-gray-800" : "bg-white"} shadow-2xl`}
+            >
               <div className="flex justify-center mb-4">
                 <Loader2 className="animate-spin text-green-500" size={40} />
               </div>
               <h3 className="text-xl font-bold mb-2">Thank You!</h3>
-              <p className="text-sm opacity-80">Thanks for improving our society!</p>
+              <p className="text-sm opacity-80">
+                Thanks for improving our society!
+              </p>
               <p className="text-xs opacity-60 mt-3">Redirecting to feed...</p>
             </div>
           </div>
@@ -1319,7 +1460,11 @@ const PostIssue = () => {
             onClick={() => setPreviewImage(null)}
           >
             <div className="relative max-w-full max-h-full">
-              <img src={previewImage} alt="Preview" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
+              <img
+                src={previewImage}
+                alt="Preview"
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              />
               <button
                 onClick={() => setPreviewImage(null)}
                 className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition"
@@ -1333,12 +1478,19 @@ const PostIssue = () => {
         {isCameraOpen && (
           <div className="fixed inset-0 bg-black z-50 flex flex-col">
             <div className="flex-1 relative">
-              <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+              />
               {isValidatingImage && (
                 <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
                   <div className="text-white text-center px-4">
                     <Loader2 className="w-8 h-8 sm:w-12 sm:h-12 animate-spin mx-auto mb-2 sm:mb-4" />
-                    <p className="text-sm sm:text-lg font-medium">{t("capturingLocation")}</p>
+                    <p className="text-sm sm:text-lg font-medium">
+                      {t("capturingLocation")}
+                    </p>
                   </div>
                 </div>
               )}
@@ -1374,7 +1526,10 @@ const PostIssue = () => {
                   onClick={takePhoto}
                   className="bg-white p-6 sm:p-8 rounded-full border-4 border-gray-200 shadow-2xl active:scale-95"
                 >
-                  <Circle size={60} className="sm:w-20 sm:h-20 text-black fill-white" />
+                  <Circle
+                    size={60}
+                    className="sm:w-20 sm:h-20 text-black fill-white"
+                  />
                 </button>
                 <button
                   type="button"
@@ -1422,19 +1577,27 @@ const PostIssue = () => {
             </select>
 
             {department && (
-              <div className={`mt-2 flex items-center gap-2 text-sm ${isDark ? "text-green-400" : "text-green-700"}`}>
+              <div
+                className={`mt-2 flex items-center gap-2 text-sm ${isDark ? "text-green-400" : "text-green-700"}`}
+              >
                 <Check size={16} className="flex-shrink-0" />
                 <span>
-                  <strong>Selected complaint:</strong> {getDepartmentName(department)}
-                  <span className="text-xs opacity-70 ml-1">({getDepartmentDetails(department).description})</span>
+                  <strong>Selected complaint:</strong>{" "}
+                  {getDepartmentName(department)}
+                  <span className="text-xs opacity-70 ml-1">
+                    ({getDepartmentDetails(department).description})
+                  </span>
                 </span>
               </div>
             )}
 
             {department === "Other" && (
               <div className="mt-3">
-                <label className={`block text-xs sm:text-sm font-medium mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  {t("otherDetailLabel")} <span className="text-red-600">*</span>
+                <label
+                  className={`block text-xs sm:text-sm font-medium mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                >
+                  {t("otherDetailLabel")}{" "}
+                  <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -1454,10 +1617,14 @@ const PostIssue = () => {
             {department && !cameraAllowed && (
               <div
                 className={`mt-3 sm:mt-4 p-3 sm:p-4 border rounded-lg sm:rounded-xl ${
-                  isDark ? "bg-blue-900/20 border-blue-800" : "bg-blue-50 border-blue-200"
+                  isDark
+                    ? "bg-blue-900/20 border-blue-800"
+                    : "bg-blue-50 border-blue-200"
                 }`}
               >
-                <p className={`font-medium text-sm sm:text-base ${isDark ? "text-blue-300" : "text-blue-800"}`}>
+                <p
+                  className={`font-medium text-sm sm:text-base ${isDark ? "text-blue-300" : "text-blue-800"}`}
+                >
                   {getDepartmentName(department)} {t("department")}{" "}
                   {language === "en" ? "selected" : "தேர்ந்தெடுக்கப்பட்டது"}
                 </p>
@@ -1466,13 +1633,17 @@ const PostIssue = () => {
                   onClick={confirmDepartmentSelection}
                   className="mt-2 sm:mt-3 px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base w-full sm:w-auto"
                 >
-                  {t("yesThisIsIssue", { department: getDepartmentName(department) })}
+                  {t("yesThisIsIssue", {
+                    department: getDepartmentName(department),
+                  })}
                 </button>
               </div>
             )}
 
             {validationMessage && (
-              <p className={`mt-1.5 sm:mt-2 text-xs sm:text-sm ${cameraAllowed ? (isDark ? "text-green-400" : "text-green-600") : (isDark ? "text-amber-400" : "text-amber-600")}`}>
+              <p
+                className={`mt-1.5 sm:mt-2 text-xs sm:text-sm ${cameraAllowed ? (isDark ? "text-green-400" : "text-green-600") : isDark ? "text-amber-400" : "text-amber-600"}`}
+              >
                 {validationMessage}
               </p>
             )}
@@ -1481,18 +1652,27 @@ const PostIssue = () => {
           {/* PHOTOS SECTION */}
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-              <label className={`text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <label
+                className={`text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              >
                 {t("photos")} <span className="text-red-600">*</span>
               </label>
-              <span className={`text-[10px] sm:text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                {images.length} / {getDepartmentDetails(department)?.maxImages || 4}
+              <span
+                className={`text-[10px] sm:text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {images.length} /{" "}
+                {getDepartmentDetails(department)?.maxImages || 4}
               </span>
             </div>
             <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={startCamera}
-                disabled={!cameraAllowed || images.length >= (getDepartmentDetails(department)?.maxImages || 4)}
+                disabled={
+                  !cameraAllowed ||
+                  images.length >=
+                    (getDepartmentDetails(department)?.maxImages || 4)
+                }
                 className={`aspect-square border-2 border-dashed rounded-lg sm:rounded-xl flex flex-col items-center justify-center p-2
                   ${
                     cameraAllowed
@@ -1500,8 +1680,8 @@ const PostIssue = () => {
                         ? "border-green-700 hover:bg-green-900/20"
                         : "border-green-400 hover:bg-green-50"
                       : isDark
-                      ? "border-gray-700 bg-gray-800 opacity-60"
-                      : "border-gray-300 bg-gray-50 opacity-60"
+                        ? "border-gray-700 bg-gray-800 opacity-60"
+                        : "border-gray-300 bg-gray-50 opacity-60"
                   }`}
               >
                 <Camera
@@ -1511,12 +1691,14 @@ const PostIssue = () => {
                         ? "text-green-400"
                         : "text-green-600"
                       : isDark
-                      ? "text-gray-500"
-                      : "text-gray-400"
+                        ? "text-gray-500"
+                        : "text-gray-400"
                   }
                   size={24}
                 />
-                <span className={`text-[10px] sm:text-xs mt-1 font-medium text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                <span
+                  className={`text-[10px] sm:text-xs mt-1 font-medium text-center ${isDark ? "text-gray-400" : "text-gray-600"}`}
+                >
                   {cameraAllowed ? t("takePhoto") : t("selectDeptFirst")}
                 </span>
               </button>
@@ -1553,7 +1735,9 @@ const PostIssue = () => {
           {/* LOCATION SECTION */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className={`block text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <label
+                className={`block text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              >
                 {t("location")} <span className="text-red-600">*</span>
               </label>
               <button
@@ -1561,10 +1745,16 @@ const PostIssue = () => {
                 onClick={fetchCurrentLocation}
                 disabled={isFetchingLocation}
                 className={`flex items-center gap-1 text-xs sm:text-sm ${
-                  isDark ? "text-green-400 hover:text-green-300" : "text-green-600 hover:text-green-700"
+                  isDark
+                    ? "text-green-400 hover:text-green-300"
+                    : "text-green-600 hover:text-green-700"
                 }`}
               >
-                {isFetchingLocation ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                {isFetchingLocation ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
                 <span>{t("getCurrentLocation")}</span>
               </button>
             </div>
@@ -1611,8 +1801,13 @@ const PostIssue = () => {
                     : "border-gray-300 bg-gray-50 hover:bg-gray-100"
                 }`}
               >
-                <MapPin className={`flex-shrink-0 ${isDark ? "text-green-400" : "text-green-600"}`} size={16} />
-                <span className={`text-sm sm:text-base truncate ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                <MapPin
+                  className={`flex-shrink-0 ${isDark ? "text-green-400" : "text-green-600"}`}
+                  size={16}
+                />
+                <span
+                  className={`text-sm sm:text-base truncate ${isDark ? "text-gray-300" : "text-gray-600"}`}
+                >
                   {area || t("clickToEnterLocation")}
                 </span>
               </div>
@@ -1621,7 +1816,9 @@ const PostIssue = () => {
 
           {/* DISTRICT */}
           <div>
-            <label className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <label
+              className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
               {t("district")} <span className="text-red-600">*</span>
             </label>
             <select
@@ -1644,7 +1841,9 @@ const PostIssue = () => {
 
           {/* REASON */}
           <div>
-            <label className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <label
+              className={`block text-xs sm:text-sm font-bold mb-1 sm:mb-1.5 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
               {t("reason")} <span className="text-red-600">*</span>
             </label>
             <select
@@ -1668,11 +1867,15 @@ const PostIssue = () => {
           {/* DESCRIPTION (with voice input and translation) */}
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
-              <label className={`block text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+              <label
+                className={`block text-xs sm:text-sm font-bold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              >
                 {t("description")} <span className="text-red-600">*</span>
               </label>
               <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                <div className={`flex rounded-lg p-1 text-xs sm:text-sm ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
+                <div
+                  className={`flex rounded-lg p-1 text-xs sm:text-sm ${isDark ? "bg-gray-700" : "bg-gray-100"}`}
+                >
                   <button
                     type="button"
                     onClick={() => setDescView("english")}
@@ -1682,8 +1885,8 @@ const PostIssue = () => {
                           ? "bg-gray-600 text-white shadow"
                           : "bg-white shadow font-medium"
                         : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                          ? "text-gray-400 hover:bg-gray-600"
+                          : "text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {t("english")}
@@ -1697,8 +1900,8 @@ const PostIssue = () => {
                           ? "bg-gray-600 text-white shadow"
                           : "bg-white shadow font-medium"
                         : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                          ? "text-gray-400 hover:bg-gray-600"
+                          : "text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {t("tamil")}
@@ -1712,8 +1915,8 @@ const PostIssue = () => {
                           ? "bg-gray-600 text-white shadow"
                           : "bg-white shadow font-medium"
                         : isDark
-                        ? "text-gray-400 hover:bg-gray-600"
-                        : "text-gray-600 hover:bg-gray-200"
+                          ? "text-gray-400 hover:bg-gray-600"
+                          : "text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {t("both")}
@@ -1722,11 +1925,15 @@ const PostIssue = () => {
               </div>
             </div>
 
-            <div className={`grid gap-4 sm:gap-6 ${descView === "both" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+            <div
+              className={`grid gap-4 sm:gap-6 ${descView === "both" ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}
+            >
               {(descView === "english" || descView === "both") && (
                 <div>
                   <div className="flex justify-between items-center mb-1 flex-wrap gap-2">
-                    <label className={`block text-[10px] sm:text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                    <label
+                      className={`block text-[10px] sm:text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-600"}`}
+                    >
                       {t("description")} ({t("english")})
                     </label>
                     <div className="flex items-center gap-2">
@@ -1754,12 +1961,16 @@ const PostIssue = () => {
                             isListening
                               ? "bg-red-500 text-white animate-pulse"
                               : isDark
-                              ? "text-green-400 hover:bg-gray-700"
-                              : "text-green-600 hover:bg-gray-100"
+                                ? "text-green-400 hover:bg-gray-700"
+                                : "text-green-600 hover:bg-gray-100"
                           }`}
                           title={t("voiceInput")}
                         >
-                          {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                          {isListening ? (
+                            <MicOff size={16} />
+                          ) : (
+                            <Mic size={16} />
+                          )}
                         </button>
                       )}
                     </div>
@@ -1778,13 +1989,20 @@ const PostIssue = () => {
                   {(isTranslating || isTranslatingVoice) && (
                     <div className="flex items-center gap-1 text-xs text-blue-500 mt-1">
                       <Loader2 size={12} className="animate-spin" />
-                      <span>{isTranslating ? "Translating to Tamil..." : t("translating")}</span>
+                      <span>
+                        {isTranslating
+                          ? "Translating to Tamil..."
+                          : t("translating")}
+                      </span>
                     </div>
                   )}
                   {isListening && (
                     <div className="flex items-center gap-1 text-xs text-red-500 mt-1">
                       <Mic size={12} className="animate-pulse" />
-                      <span>{t("listening")} ({voiceLanguage === "en" ? "English" : "Tamil"})</span>
+                      <span>
+                        {t("listening")} (
+                        {voiceLanguage === "en" ? "English" : "Tamil"})
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1792,7 +2010,9 @@ const PostIssue = () => {
 
               {(descView === "tamil" || descView === "both") && (
                 <div>
-                  <label className={`block text-[10px] sm:text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                  <label
+                    className={`block text-[10px] sm:text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}
+                  >
                     {t("descriptionTamil")}
                   </label>
                   <textarea
@@ -1813,7 +2033,10 @@ const PostIssue = () => {
 
           {/* HASHTAGS */}
           <div className="relative">
-            <Hash className={`absolute left-3 top-3 ${isDark ? "text-gray-500" : "text-gray-400"}`} size={16} />
+            <Hash
+              className={`absolute left-3 top-3 ${isDark ? "text-gray-500" : "text-gray-400"}`}
+              size={16}
+            />
             <input
               type="text"
               value={hashtags}
@@ -1828,7 +2051,9 @@ const PostIssue = () => {
             {suggestions.length > 0 && (
               <div
                 className={`absolute z-10 w-full border rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex flex-wrap gap-1 sm:gap-2 mt-1 max-h-40 overflow-y-auto ${
-                  isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+                  isDark
+                    ? "bg-gray-800 border-gray-700"
+                    : "bg-white border-gray-200"
                 }`}
               >
                 {suggestions.map((tag) => (
@@ -1857,7 +2082,11 @@ const PostIssue = () => {
               onChange={(e) => setAgree(e.target.checked)}
               className="mt-1 w-4 h-4 sm:w-5 sm:h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 flex-shrink-0"
             />
-            <span className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>{t("agreement")}</span>
+            <span
+              className={`text-xs sm:text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}
+            >
+              {t("agreement")}
+            </span>
           </label>
 
           {/* DRAFT BUTTONS */}
