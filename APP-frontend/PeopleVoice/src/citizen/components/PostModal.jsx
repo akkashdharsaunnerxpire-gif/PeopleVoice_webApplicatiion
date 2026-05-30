@@ -1,7 +1,7 @@
+// PostModal.jsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOutletContext } from "react-router-dom";
-import { MoreVertical } from "lucide-react";
 import axios from "axios";
 import {
   X,
@@ -9,12 +9,16 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageCircle,
-  Bookmark,
   Share2,
   Check,
   MapPin,
   Clock,
-  Loader2, // ✅ added for loading spinner
+  Loader2,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Copy,
+  CheckCheck,
 } from "lucide-react";
 import { useTheme } from "../../Context/ThemeContext";
 import { themeColors } from "./constants";
@@ -32,6 +36,7 @@ const PostModal = ({
   citizenId,
   setDisplayedIssues,
   isDark: propIsDark,
+  showToast,
 }) => {
   const { isDark: contextIsDark } = useTheme();
   const isDark = propIsDark !== undefined ? propIsDark : contextIsDark;
@@ -43,16 +48,42 @@ const PostModal = ({
   const { setCommentModalData } = useOutletContext();
   const [openMenuId, setOpenMenuId] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false); // ✅ loading state for delete
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    description_en: "",
+    description_ta: "",
+    area: "",
+    department: "",
+  });
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
 
-  const allImages = (localIssue?.images || []).map(img =>
+  const allImages = (localIssue?.images || []).map((img) =>
     typeof img === "string" ? img : img.url
   );
-  const totalImages = allImages.length; 
+  const totalImages = allImages.length;
   const comments = localIssue?.comments || [];
+  const canEdit = localIssue?.status === "send" && citizenId === localIssue?.citizenId;
+
+  useEffect(() => {
+    setLocalIssue(issue);
+    setCurrentImageIndex(0);
+  }, [issue]);
+
+  useEffect(() => {
+    if (editModal && localIssue) {
+      setEditForm({
+        description_en: localIssue.description_en || "",
+        description_ta: localIssue.description_ta || "",
+        area: localIssue.area || "",
+        department: localIssue.department || "",
+      });
+    }
+  }, [editModal, localIssue]);
 
   const nextImage = useCallback(
     (e) => {
@@ -60,7 +91,7 @@ const PostModal = ({
       if (currentImageIndex < totalImages - 1)
         setCurrentImageIndex((prev) => prev + 1);
     },
-    [currentImageIndex, totalImages],
+    [currentImageIndex, totalImages]
   );
 
   const prevImage = useCallback(
@@ -68,41 +99,8 @@ const PostModal = ({
       e?.stopPropagation();
       if (currentImageIndex > 0) setCurrentImageIndex((prev) => prev - 1);
     },
-    [currentImageIndex],
+    [currentImageIndex]
   );
-
-  const handleDeleteClick = (issueId, e) => {
-    e.stopPropagation();
-    setDeleteModal(issueId);
-  };
-
-  useEffect(() => {
-    setLocalIssue(issue);
-  }, [issue]);
-
-  const confirmDelete = async () => {
-    if (!deleteModal) return;
-
-    setIsDeleting(true); // ✅ start loading
-
-    try {
-      await axios.delete(`${APIURL}/issues/${deleteModal}`, {
-        data: { citizenId },
-      });
-
-      setDisplayedIssues?.((prev) =>
-        prev.filter((issue) => issue._id !== deleteModal),
-      );
-
-      onClose(); // modal close
-    } catch (err) {
-      console.error("Delete failed:", err);
-    } finally {
-      setIsDeleting(false); // ✅ stop loading
-      setDeleteModal(null);
-      setOpenMenuId(null);
-    }
-  };
 
   const handleTouchStart = (e) => (touchStartX.current = e.touches[0].clientX);
   const handleTouchMove = (e) => (touchEndX.current = e.touches[0].clientX);
@@ -132,39 +130,87 @@ const PostModal = ({
       const data = await res.json();
       if (data.success) {
         setDisplayedIssues?.((prev) =>
-          prev.map((i) =>
-            i._id === issue._id ? { ...i, likes: data.likes } : i,
-          ),
+          prev.map((i) => (i._id === issue._id ? { ...i, likes: data.likes } : i))
         );
       }
     } catch (err) {
       setLocalIssue((prev) => ({ ...prev, likes: issue.likes }));
+      showToast?.(err.message || "Failed to like", "error");
     } finally {
       setIsLiking(false);
     }
   };
 
   const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/issue/${localIssue._id}`;
     const shareData = {
       title: "Community Issue Report",
       text: localIssue.description_en,
-      url: window.location.href,
+      url: shareUrl,
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
+        showToast?.("Shared successfully!", "success");
       } catch (err) {
-        console.log("Share cancelled");
+        if (err.name !== "AbortError") showToast?.("Share cancelled", "error");
       }
     } else {
       try {
-        await navigator.clipboard.writeText(
-          `${shareData.text}\n\nView this issue at: ${shareData.url}`,
-        );
+        await navigator.clipboard.writeText(`${shareData.text}\n\nView this issue at: ${shareUrl}`);
+        setCopiedLink(true);
+        showToast?.("Link copied to clipboard!", "success");
+        setTimeout(() => setCopiedLink(false), 2000);
       } catch (err) {
-        console.error("Copy failed", err);
+        showToast?.("Failed to copy link", "error");
       }
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+    setIsDeleting(true);
+    try {
+      await axios.delete(`${APIURL}/issues/${deleteModal}`, {
+        data: { citizenId },
+      });
+      setDisplayedIssues?.((prev) => prev.filter((issue) => issue._id !== deleteModal));
+      showToast?.("Report deleted successfully", "success");
+      onClose();
+    } catch (err) {
+      console.error("Delete failed:", err);
+      showToast?.("Failed to delete report", "error");
+    } finally {
+      setIsDeleting(false);
+      setDeleteModal(null);
+      setOpenMenuId(null);
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editModal || !citizenId) return;
+    setIsEditing(true);
+    try {
+      const response = await axios.patch(`${APIURL}/issues/${editModal}`, {
+        ...editForm,
+        citizenId,
+      });
+      if (response.data.success) {
+        const updatedIssue = response.data.issue;
+        setLocalIssue(updatedIssue);
+        setDisplayedIssues?.((prev) =>
+          prev.map((i) => (i._id === updatedIssue._id ? updatedIssue : i))
+        );
+        showToast?.("Report updated successfully", "success");
+        setEditModal(null);
+      }
+    } catch (err) {
+      console.error("Edit failed:", err);
+      showToast?.("Failed to update report", "error");
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -250,11 +296,7 @@ const PostModal = ({
   };
 
   const getStageColor = (stage, isActive) => {
-    if (!isActive)
-      return isDark
-        ? "bg-gray-800 border-gray-700"
-        : "bg-white border-gray-200";
-
+    if (!isActive) return isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
     if (isDark) {
       switch (stage) {
         case "send":
@@ -286,7 +328,6 @@ const PostModal = ({
 
   const getStageTextColor = (stage, isActive) => {
     if (!isActive) return isDark ? "text-gray-600" : "text-gray-400";
-
     if (isDark) {
       switch (stage) {
         case "send":
@@ -364,16 +405,13 @@ const PostModal = ({
                       <button
                         onClick={nextImage}
                         className={`absolute right-4 p-2 bg-black/50 rounded-full text-white backdrop-blur-sm transition hover:bg-black/70 ${
-                          currentImageIndex === totalImages - 1
-                            ? "hidden"
-                            : "flex"
+                          currentImageIndex === totalImages - 1 ? "hidden" : "flex"
                         }`}
                       >
                         <ChevronRight size={20} />
                       </button>
                     </>
                   )}
-
                   {totalImages > 1 && (
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm">
                       {currentImageIndex + 1} / {totalImages}
@@ -418,9 +456,7 @@ const PostModal = ({
               }`}
             >
               {/* Header */}
-              <div
-                className={`flex items-center justify-between p-4 border-b ${theme.border}`}
-              >
+              <div className={`flex items-center justify-between p-4 border-b ${theme.border}`}>
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${
@@ -467,9 +503,7 @@ const PostModal = ({
               {/* Scrollable Content */}
               <div className="flex-1 overflow-y-auto">
                 {/* Description */}
-                <div
-                  className={`p-4 ${isDark ? "bg-white/5" : "bg-gray-50/50"}`}
-                >
+                <div className={`p-4 ${isDark ? "bg-white/5" : "bg-gray-50/50"}`}>
                   <p className={`text-sm leading-relaxed ${theme.text}`}>
                     {localIssue.description_en}
                   </p>
@@ -480,7 +514,6 @@ const PostModal = ({
                       {localIssue.description_ta}
                     </p>
                   )}
-
                   {localIssue.area && (
                     <div className="flex items-center gap-1 mt-3">
                       <MapPin size={12} className={theme.textMuted} />
@@ -489,7 +522,6 @@ const PostModal = ({
                       </span>
                     </div>
                   )}
-
                   <div
                     className={`mt-3 inline-block text-[10px] font-medium px-2 py-1 rounded ${
                       isDark
@@ -511,7 +543,7 @@ const PostModal = ({
                     </span>
                     <span
                       className={`text-[9px] font-bold px-3 py-1 rounded-md ${getStatusColor(
-                        localIssue.status,
+                        localIssue.status
                       )}`}
                     >
                       {getStatusDisplay(localIssue.status)}
@@ -524,7 +556,6 @@ const PostModal = ({
                         isDark ? "bg-gray-800" : "bg-gray-100"
                       } z-0`}
                     />
-
                     <motion.div
                       initial={false}
                       animate={{
@@ -534,50 +565,32 @@ const PostModal = ({
                         isDark ? "bg-purple-500" : "bg-green-500"
                       }`}
                     />
-
-                    {["send", "in progress", "resolved", "closed"].map(
-                      (stage, idx) => {
-                        const statusOrder = {
-                          send: 0,
-                          "in progress": 1,
-                          resolved: 2,
-                          closed: 3,
-                        };
-                        const currentStatus = normalizeStatus(
-                          localIssue.status,
-                        );
-                        const currentOrder = statusOrder[currentStatus] || 0;
-                        const isActive = idx <= currentOrder;
-
-                        return (
+                    {["send", "in progress", "resolved", "closed"].map((stage, idx) => {
+                      const statusOrder = { send: 0, "in progress": 1, resolved: 2, closed: 3 };
+                      const currentStatus = normalizeStatus(localIssue.status);
+                      const currentOrder = statusOrder[currentStatus] || 0;
+                      const isActive = idx <= currentOrder;
+                      return (
+                        <div key={idx} className="relative z-10 flex flex-col items-center gap-3">
                           <div
-                            key={idx}
-                            className="relative z-10 flex flex-col items-center gap-3"
+                            className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${getStageColor(
+                              stage,
+                              isActive
+                            )} ${isActive ? "shadow-lg" : ""}`}
                           >
-                            <div
-                              className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${getStageColor(
-                                stage,
-                                isActive,
-                              )} ${isActive ? "shadow-lg" : ""}`}
-                            >
-                              {isActive ? (
-                                <Check size={14} strokeWidth={3} />
-                              ) : (
-                                <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                              )}
-                            </div>
-                            <span
-                              className={`text-[9px] font-medium lowercase ${getStageTextColor(
-                                stage,
-                                isActive,
-                              )}`}
-                            >
-                              {stage === "in progress" ? "in progress" : stage}
-                            </span>
+                            {isActive ? <Check size={14} strokeWidth={3} /> : <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />}
                           </div>
-                        );
-                      },
-                    )}
+                          <span
+                            className={`text-[9px] font-medium lowercase ${getStageTextColor(
+                              stage,
+                              isActive
+                            )}`}
+                          >
+                            {stage === "in progress" ? "in progress" : stage}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -590,6 +603,7 @@ const PostModal = ({
                       <button
                         onClick={toggleLike}
                         className="transition hover:scale-110"
+                        disabled={isLiking}
                       >
                         <Heart
                           size={22}
@@ -600,7 +614,6 @@ const PostModal = ({
                           }
                         />
                       </button>
-
                       <span className={`text-sm font-semibold ${theme.text}`}>
                         {localIssue.likes?.length || 0}
                       </span>
@@ -627,29 +640,28 @@ const PostModal = ({
                       >
                         <MessageCircle size={22} className={theme.textMuted} />
                       </button>
-
                       <span className={`text-sm font-semibold ${theme.text}`}>
                         {comments.length}
                       </span>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 relative">
                     <button
                       onClick={handleShare}
-                      className={`p-2 rounded-full transition ${
-                        isDark ? "hover:bg-white/10" : "hover:bg-gray-100"
-                      }`}
+                      className="transition hover:scale-110"
                     >
-                      <Share2 size={20} className={theme.textMuted} />
+                      {copiedLink ? (
+                        <CheckCheck size={20} className="text-green-500" />
+                      ) : (
+                        <Share2 size={20} className={theme.textMuted} />
+                      )}
                     </button>
+                  </div>
 
+                  <div className="relative">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenMenuId(
-                          openMenuId === issue._id ? null : issue._id,
-                        );
+                        setOpenMenuId(openMenuId === issue._id ? null : issue._id);
                       }}
                       className={`p-2 rounded-full transition ${
                         isDark ? "hover:bg-white/10" : "hover:bg-gray-100"
@@ -664,17 +676,31 @@ const PostModal = ({
                           initial={{ opacity: 0, scale: 0.9, y: 5 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.9, y: 5 }}
-                          className={`absolute right-0 bottom-12 rounded-xl border z-50 min-w-[130px] shadow-xl ${
+                          className={`absolute right-0 bottom-12 rounded-xl border z-50 min-w-[140px] shadow-xl ${
                             isDark
                               ? "bg-gray-900 border-gray-700"
                               : "bg-white border-gray-200"
                           }`}
                         >
+                          {canEdit && (
+                            <button
+                              onClick={() => {
+                                setEditModal(issue._id);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              <Edit size={14} /> Edit Report
+                            </button>
+                          )}
                           <button
-                            onClick={(e) => handleDeleteClick(issue._id, e)}
-                            className="w-full text-left px-4 py-2 text-red-500 hover:bg-gray-100 text-sm"
+                            onClick={(e) => {
+                              setDeleteModal(issue._id);
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-red-500 flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800"
                           >
-                            🗑 Delete
+                            <Trash2 size={14} /> Delete
                           </button>
                         </motion.div>
                       )}
@@ -687,7 +713,7 @@ const PostModal = ({
         </motion.div>
       </AnimatePresence>
 
-      {/* Delete Confirmation Modal with Loading Spinner */}
+      {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {deleteModal && (
           <motion.div
@@ -705,11 +731,9 @@ const PostModal = ({
               }`}
             >
               <h2 className="text-lg font-bold mb-2">Delete Report</h2>
-
               <p className="text-sm opacity-70 mb-5">
-                Are you sure you want to delete this report?
+                Are you sure you want to delete this report? This action cannot be undone.
               </p>
-
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setDeleteModal(null)}
@@ -718,7 +742,6 @@ const PostModal = ({
                 >
                   Cancel
                 </button>
-
                 <button
                   onClick={confirmDelete}
                   disabled={isDeleting}
@@ -734,6 +757,112 @@ const PostModal = ({
                   )}
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Modal */}
+      <AnimatePresence>
+        {editModal && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setEditModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden ${
+                isDark ? "bg-gray-900 text-white" : "bg-white text-black"
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={`p-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+                <h2 className="text-lg font-bold">Edit Report</h2>
+                <p className="text-xs opacity-70 mt-1">Update your report details</p>
+              </div>
+              <form onSubmit={handleEditSubmit} className="p-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Description (English)</label>
+                  <textarea
+                    value={editForm.description_en}
+                    onChange={(e) => setEditForm({ ...editForm, description_en: e.target.value })}
+                    className={`w-full p-2 rounded-lg border text-sm ${
+                      isDark
+                        ? "bg-gray-800 border-gray-700 focus:border-purple-500"
+                        : "bg-gray-50 border-gray-200 focus:border-purple-500"
+                    } focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                    rows="3"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Description (Tamil)</label>
+                  <textarea
+                    value={editForm.description_ta}
+                    onChange={(e) => setEditForm({ ...editForm, description_ta: e.target.value })}
+                    className={`w-full p-2 rounded-lg border text-sm ${
+                      isDark
+                        ? "bg-gray-800 border-gray-700 focus:border-purple-500"
+                        : "bg-gray-50 border-gray-200 focus:border-purple-500"
+                    } focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                    rows="2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Area / Location</label>
+                  <input
+                    type="text"
+                    value={editForm.area}
+                    onChange={(e) => setEditForm({ ...editForm, area: e.target.value })}
+                    className={`w-full p-2 rounded-lg border text-sm ${
+                      isDark
+                        ? "bg-gray-800 border-gray-700 focus:border-purple-500"
+                        : "bg-gray-50 border-gray-200 focus:border-purple-500"
+                    } focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Department</label>
+                  <input
+                    type="text"
+                    value={editForm.department}
+                    onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                    className={`w-full p-2 rounded-lg border text-sm ${
+                      isDark
+                        ? "bg-gray-800 border-gray-700 focus:border-purple-500"
+                        : "bg-gray-50 border-gray-200 focus:border-purple-500"
+                    } focus:outline-none focus:ring-1 focus:ring-purple-500`}
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditModal(null)}
+                    className="flex-1 py-2 rounded-lg border border-gray-300 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isEditing}
+                    className="flex-1 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium disabled:opacity-70 flex items-center justify-center gap-2"
+                  >
+                    {isEditing ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
