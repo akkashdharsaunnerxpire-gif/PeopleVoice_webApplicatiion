@@ -456,6 +456,7 @@ const PostIssue = () => {
         recognition.start();
         recognitionRefEn.current = recognition;
       } else {
+        // Capacitor Android
         const permission = await SpeechRecognition.requestPermissions();
         if (!permission.speechRecognition) return;
 
@@ -463,24 +464,24 @@ const PostIssue = () => {
 
         const handleResults = async (data) => {
           console.log("VOICE DATA:", data);
-
           if (data.matches && data.matches.length > 0) {
             const finalText = data.matches[data.matches.length - 1];
-
             setDescEn((prev) => (prev ? `${prev} ${finalText}` : finalText));
-
             const translated = await translateEnglishToTamil(finalText);
-
             setDescTa((prev) => (prev ? `${prev} ${translated}` : translated));
 
-            // AUTO STOP
+            // Stop recognition after getting result
             await SpeechRecognition.stop();
             setIsListeningEn(false);
-            SpeechRecognition.removeAllListeners();
           }
         };
-
         SpeechRecognition.addListener("partialResults", handleResults);
+
+        SpeechRecognition.addListener("listeningState", (data) => {
+          if (data.status === "stopped") {
+            setIsListeningEn(false);
+          }
+        });
 
         await SpeechRecognition.start({
           language: "en-US",
@@ -488,8 +489,15 @@ const PostIssue = () => {
           partialResults: true,
           popup: true,
         });
+
+        // Auto-stop after 5 seconds if no result
+        setTimeout(async () => {
+          await SpeechRecognition.stop();
+          setIsListeningEn(false);
+        }, 5000);
+
         recognitionRefEn.current = {
-          removeListeners: () => {
+          removeListeners: async () => {
             SpeechRecognition.removeAllListeners();
           },
         };
@@ -504,7 +512,7 @@ const PostIssue = () => {
     if (Capacitor.getPlatform() === "android") {
       await SpeechRecognition.stop();
       if (recognitionRefEn.current?.removeListeners)
-        recognitionRefEn.current.removeListeners();
+        await recognitionRefEn.current.removeListeners();
     } else if (recognitionRefEn.current) {
       recognitionRefEn.current.abort();
     }
@@ -544,7 +552,6 @@ const PostIssue = () => {
         recognitionRefTa.current = recognition;
       } else {
         // Capacitor Android
-        // Capacitor Android
         const permission = await SpeechRecognition.requestPermissions();
         if (!permission.speechRecognition) return;
 
@@ -552,20 +559,15 @@ const PostIssue = () => {
 
         const handleResults = async (data) => {
           console.log("VOICE DATA:", data);
-
           if (data.matches && data.matches.length > 0) {
             const finalText = data.matches[data.matches.length - 1];
-
             setDescTa((prev) => (prev ? `${prev} ${finalText}` : finalText));
-
             const translated = await translateTamilToEnglish(finalText);
-
             setDescEn((prev) => (prev ? `${prev} ${translated}` : translated));
 
-            // AUTO STOP
+            // Stop recognition after getting result
             await SpeechRecognition.stop();
             setIsListeningTa(false);
-            SpeechRecognition.removeAllListeners();
           }
         };
 
@@ -577,8 +579,15 @@ const PostIssue = () => {
           partialResults: true,
           popup: true,
         });
+
+        // Auto-stop after 5 seconds if no result
+        setTimeout(async () => {
+          await SpeechRecognition.stop();
+          setIsListeningTa(false);
+        }, 5000);
+
         recognitionRefTa.current = {
-          removeListeners: () => {
+          removeListeners: async () => {
             SpeechRecognition.removeAllListeners();
           },
         };
@@ -593,7 +602,7 @@ const PostIssue = () => {
     if (Capacitor.getPlatform() === "android") {
       await SpeechRecognition.stop();
       if (recognitionRefTa.current?.removeListeners)
-        recognitionRefTa.current.removeListeners();
+        await recognitionRefTa.current.removeListeners();
     } else if (recognitionRefTa.current) {
       recognitionRefTa.current.abort();
     }
