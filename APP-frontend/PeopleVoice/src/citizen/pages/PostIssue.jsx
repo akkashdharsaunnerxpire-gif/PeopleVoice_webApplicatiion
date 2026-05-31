@@ -32,278 +32,100 @@ const APIURL = `${BACKEND_URL}/api`;
 
 /* ================= CONSTANTS ================= */
 const DEPARTMENTS = [
-  {
-    id: "Road",
-    name: "Road",
-    minImages: 1,
-    maxImages: 4,
-    description: "Potholes, road damage, accidents",
-  },
-  {
-    id: "Garbage",
-    name: "Garbage",
-    minImages: 1,
-    maxImages: 4,
-    description: "Garbage dumping, waste issues",
-  },
-  {
-    id: "Water",
-    name: "Water",
-    minImages: 1,
-    maxImages: 4,
-    description: "Leakage, pipeline, drainage",
-  },
-  {
-    id: "Electricity",
-    name: "Electricity",
-    minImages: 1,
-    maxImages: 3,
-    description: "Pole, wire, transformer issues",
-  },
-  {
-    id: "Drainage",
-    name: "Drainage",
-    minImages: 1,
-    maxImages: 4,
-    description: "Blockage, sewage overflow",
-  },
-  {
-    id: "Other",
-    name: "Other",
-    minImages: 1,
-    maxImages: 4,
-    description: "Other public complaints",
-  },
+  { id: "Road", name: "Road", minImages: 1, maxImages: 4, description: "Potholes, road damage, accidents" },
+  { id: "Garbage", name: "Garbage", minImages: 1, maxImages: 4, description: "Garbage dumping, waste issues" },
+  { id: "Water", name: "Water", minImages: 1, maxImages: 4, description: "Leakage, pipeline, drainage" },
+  { id: "Electricity", name: "Electricity", minImages: 1, maxImages: 3, description: "Pole, wire, transformer issues" },
+  { id: "Drainage", name: "Drainage", minImages: 1, maxImages: 4, description: "Blockage, sewage overflow" },
+  { id: "Other", name: "Other", minImages: 1, maxImages: 4, description: "Other public complaints" },
 ];
 
-const REASONS = [
-  "Public Safety Risk",
-  "Health Hazard",
-  "Traffic Issue",
-  "Environmental Issue",
-  "Public Convenience",
-  "Other",
-];
+const REASONS = ["Public Safety Risk", "Health Hazard", "Traffic Issue", "Environmental Issue", "Public Convenience", "Other"];
 
-// Comprehensive hashtags collection
 const ALL_TAGS = [
-  "#RoadIssue",
-  "#RoadDamage",
-  "#Pothole",
-  "#RoadSafety",
-  "#RoadAccident",
-  "#Garbage",
-  "#WasteManagement",
-  "#GarbageDumping",
-  "#CleanCity",
-  "#SwachhBharat",
-  "#WaterProblem",
-  "#WaterLeakage",
-  "#PipelineIssue",
-  "#Drainage",
-  "#SewageOverflow",
-  "#Electricity",
-  "#PowerCut",
-  "#TransformerIssue",
-  "#WireSnapping",
-  "#PoleDamage",
-  "#DrainageBlockage",
-  "#SewageProblem",
-  "#Flooding",
-  "#StagnantWater",
-  "#PublicIssue",
-  "#PeopleVoice",
-  "#CitizenReport",
-  "#CivicIssue",
-  "#Urgent",
-  "#Emergency",
-  "#HighPriority",
-  "#Dangerous",
-  "#SafetyHazard",
-  "#Chennai",
-  "#Nagercoil",
-  "#Coimbatore",
-  "#Madurai",
-  "#Tirunelveli",
-  "#Salem",
-  "#HealthHazard",
-  "#EnvironmentalIssue",
-  "#TrafficIssue",
-  "#PublicSafety",
-  "#IllegalDumping",
-  "#NoisePollution",
-  "#AirPollution",
-  "#StreetLightOutage",
-  "#FootpathIssue",
-  "#PedestrianSafety",
-  "#WaterLogging",
-  "#MosquitoBreeding",
+  "#RoadIssue", "#RoadDamage", "#Pothole", "#RoadSafety", "#RoadAccident", "#Garbage", "#WasteManagement",
+  "#GarbageDumping", "#CleanCity", "#SwachhBharat", "#WaterProblem", "#WaterLeakage", "#PipelineIssue",
+  "#Drainage", "#SewageOverflow", "#Electricity", "#PowerCut", "#TransformerIssue", "#WireSnapping",
+  "#PoleDamage", "#DrainageBlockage", "#SewageProblem", "#Flooding", "#StagnantWater", "#PublicIssue",
+  "#PeopleVoice", "#CitizenReport", "#CivicIssue", "#Urgent", "#Emergency", "#HighPriority", "#Dangerous",
+  "#SafetyHazard", "#Chennai", "#Nagercoil", "#Coimbatore", "#Madurai", "#Tirunelveli", "#Salem",
+  "#HealthHazard", "#EnvironmentalIssue", "#TrafficIssue", "#PublicSafety", "#IllegalDumping",
+  "#NoisePollution", "#AirPollution", "#StreetLightOutage", "#FootpathIssue", "#PedestrianSafety",
+  "#WaterLogging", "#MosquitoBreeding",
 ];
 
-/* ================= LANGUAGE CONSTANTS ================= */
 const TEXTS = {
   en: {
-    title: "Register Public Complaint",
-    department: "Department",
-    selectDepartment: "Select Department",
-    photos: "Photos",
-    takePhoto: "Take Photo",
-    selectDeptFirst: "Select Dept First",
-    location: "Location",
-    clickToEnterLocation: "Click to enter location manually",
-    district: "District",
-    selectDistrict: "Select District",
-    reason: "Reason",
-    selectReason: "Select Reason",
-    description: "Description",
-    describeIssue: "Describe the issue clearly...",
-    descriptionTamil: "Description (Tamil)",
-    hashtags: "Hashtags",
+    title: "Register Public Complaint", department: "Department", selectDepartment: "Select Department",
+    photos: "Photos", takePhoto: "Take Photo", selectDeptFirst: "Select Dept First",
+    location: "Location", clickToEnterLocation: "Click to enter location manually",
+    district: "District", selectDistrict: "Select District",
+    reason: "Reason", selectReason: "Select Reason",
+    description: "Description", describeIssue: "Describe the issue clearly...",
+    descriptionTamil: "Description (Tamil)", hashtags: "Hashtags",
     addHashtags: "Add hashtags (#Urgent #Chennai ...)",
-    agreement:
-      "I confirm this complaint is genuine and based on facts. False information may lead to legal action.",
-    proceed: "Proceed to Final Verification",
-    finalConfirmation: "Final Confirmation – Mandatory",
-    falseComplaints: "False complaints are punishable offences",
-    importantLegalNotice: "Important Legal Notice",
-    legalText:
-      "Submitting false, misleading or irrelevant information / photographs is a serious offence. Government authorities may impose fines and take legal action under Section 177 IPC and other applicable laws.",
-    complaintSummary: "Complaint Summary",
-    departmentLabel: "Department",
-    locationLabel: "Location",
-    photosLabel: "Photos",
-    attached: "attached",
-    iHerebyDeclare: "I hereby solemnly declare:",
-    confirmImages: "All photos genuinely show the reported issue.",
-    confirmImagesDesc: "No old, irrelevant or unrelated images used.",
-    confirmLocation: "The location is correct & accurate.",
-    confirmLocationDesc: "Issue location:",
-    acceptTerms: "THIS COMPLAINT IS TRUE AND GENUINE",
-    acceptTermsDesc:
-      "I understand that providing false information may result in government fines and legal action.",
-    goBackEdit: "Go Back & Edit",
-    iConfirmSubmit: "I Confirm → Submit Complaint",
-    submitting: "Submitting...",
-    capturingLocation: "Capturing precise location...",
-    cameraDenied: "Camera access denied or not available",
-    duplicatePhoto: "Duplicate photo detected",
-    fillAllFields: "Please fill all required fields",
-    minPhotosRequired: "Minimum {minImages} photo(s) required for {department}",
-    confirmAllPoints: "Please confirm all required points",
-    complaintRegistered:
-      "Complaint registered successfully! Authorities will review it soon.",
-    networkError: "Network error. Please try again.",
-    yesThisIsIssue: "✓ Yes, this is a {department} issue",
-    save: "Save",
-    cancel: "Cancel",
-    english: "English",
-    tamil: "தமிழ்",
-    both: "Both",
-    enterValidLocation: "Please enter valid location",
-    pleaseLogin: "Please login first",
-    searchHashtags: "Search hashtags...",
-    otherDetailLabel:
-      "What specific problem? (e.g., Road, Streetlight, Water, Footpath, etc.)",
-    otherDetailRequired: "Please specify the problem type",
-    voiceInput: "Voice Input",
-    listening: "Listening...",
-    micNotSupported: "Voice input not supported in this browser",
-    saveDraft: "Save Draft",
-    draftSaved: "Draft saved",
-    loadDraft: "Load Draft",
-    clearDraft: "Clear Draft",
-    getCurrentLocation: "Get Current Location",
-    locating: "Locating...",
-    draftCleared: "Draft cleared",
-    noDraft: "No saved draft",
-    voiceLangEnglish: "English",
-    voiceLangTamil: "Tamil",
-    translating: "Translating...",
+    agreement: "I confirm this complaint is genuine and based on facts. False information may lead to legal action.",
+    proceed: "Proceed to Final Verification", finalConfirmation: "Final Confirmation – Mandatory",
+    falseComplaints: "False complaints are punishable offences", importantLegalNotice: "Important Legal Notice",
+    legalText: "Submitting false, misleading or irrelevant information / photographs is a serious offence. Government authorities may impose fines and take legal action under Section 177 IPC and other applicable laws.",
+    complaintSummary: "Complaint Summary", departmentLabel: "Department", locationLabel: "Location",
+    photosLabel: "Photos", attached: "attached", iHerebyDeclare: "I hereby solemnly declare:",
+    confirmImages: "All photos genuinely show the reported issue.", confirmImagesDesc: "No old, irrelevant or unrelated images used.",
+    confirmLocation: "The location is correct & accurate.", confirmLocationDesc: "Issue location:",
+    acceptTerms: "THIS COMPLAINT IS TRUE AND GENUINE", acceptTermsDesc: "I understand that providing false information may result in government fines and legal action.",
+    goBackEdit: "Go Back & Edit", iConfirmSubmit: "I Confirm → Submit Complaint", submitting: "Submitting...",
+    capturingLocation: "Capturing precise location...", cameraDenied: "Camera access denied or not available",
+    duplicatePhoto: "Duplicate photo detected", fillAllFields: "Please fill all required fields",
+    minPhotosRequired: "Minimum {minImages} photo(s) required for {department}", confirmAllPoints: "Please confirm all required points",
+    complaintRegistered: "Complaint registered successfully! Authorities will review it soon.",
+    networkError: "Network error. Please try again.", yesThisIsIssue: "✓ Yes, this is a {department} issue",
+    save: "Save", cancel: "Cancel", english: "English", tamil: "தமிழ்", both: "Both",
+    enterValidLocation: "Please enter valid location", pleaseLogin: "Please login first",
+    searchHashtags: "Search hashtags...", otherDetailLabel: "What specific problem? (e.g., Road, Streetlight, Water, Footpath, etc.)",
+    otherDetailRequired: "Please specify the problem type", voiceInput: "Voice Input", listening: "Listening...",
+    micNotSupported: "Voice input not supported in this browser", saveDraft: "Save Draft", draftSaved: "Draft saved",
+    loadDraft: "Load Draft", clearDraft: "Clear Draft", getCurrentLocation: "Get Current Location",
+    locating: "Locating...", draftCleared: "Draft cleared", noDraft: "No saved draft",
+    voiceLangEnglish: "English", voiceLangTamil: "Tamil", translating: "Translating...",
   },
   ta: {
-    title: "பொது புகார் பதிவு",
-    department: "துறை",
-    selectDepartment: "துறையைத் தேர்ந்தெடுக்கவும்",
-    photos: "புகைப்படங்கள்",
-    takePhoto: "புகைப்படம் எடுக்கவும்",
-    selectDeptFirst: "முதலில் துறையைத் தேர்ந்தெடுக்கவும்",
-    location: "இடம்",
-    clickToEnterLocation: "கைமுறையாக இடத்தை உள்ளிட கிளிக் செய்யவும்",
-    district: "மாவட்டம்",
-    selectDistrict: "மாவட்டத்தைத் தேர்ந்தெடுக்கவும்",
-    reason: "காரணம்",
-    selectReason: "காரணத்தைத் தேர்ந்தெடுக்கவும்",
-    description: "விளக்கம்",
-    describeIssue: "பிரச்சினையை தெளிவாக விளக்கவும்...",
-    descriptionTamil: "விளக்கம் (தமிழ்)",
-    hashtags: "ஹேஷ்டேக்கள்",
+    title: "பொது புகார் பதிவு", department: "துறை", selectDepartment: "துறையைத் தேர்ந்தெடுக்கவும்",
+    photos: "புகைப்படங்கள்", takePhoto: "புகைப்படம் எடுக்கவும்", selectDeptFirst: "முதலில் துறையைத் தேர்ந்தெடுக்கவும்",
+    location: "இடம்", clickToEnterLocation: "கைமுறையாக இடத்தை உள்ளிட கிளிக் செய்யவும்",
+    district: "மாவட்டம்", selectDistrict: "மாவட்டத்தைத் தேர்ந்தெடுக்கவும்",
+    reason: "காரணம்", selectReason: "காரணத்தைத் தேர்ந்தெடுக்கவும்",
+    description: "விளக்கம்", describeIssue: "பிரச்சினையை தெளிவாக விளக்கவும்...",
+    descriptionTamil: "விளக்கம் (தமிழ்)", hashtags: "ஹேஷ்டேக்கள்",
     addHashtags: "ஹேஷ்டேக்களை சேர்க்கவும் (#அவசர #சென்னை ...)",
-    agreement:
-      "இந்தப் புகார் உண்மை மற்றும் உண்மையானது என உறுதிப்படுத்துகிறேன். பொய்த் தகவல்கள் சட்ட நடவடிக்கைக்கு வழிவகுக்கும்.",
-    proceed: "இறுதி சரிபார்ப்புக்குச் செல்லவும்",
-    finalConfirmation: "இறுதி உறுதிப்படுத்தல் – கட்டாயம்",
-    falseComplaints: "பொய் புகார்கள் தண்டனைக்குரிய குற்றங்கள்",
-    importantLegalNotice: "முக்கிய சட்ட அறிவிப்பு",
-    legalText:
-      "பொய், தவறான அல்லது தொடர்பில்லாத தகவல்/புகைப்படங்களை சமர்ப்பிப்பது கடுமையான குற்றமாகும். அரசு அதிகாரிகள் பிரிவு 177 IPC மற்றும் பிற சட்டங்களின் கீழ் அபராதம் விதிக்கலாம் மற்றும் சட்ட நடவடிக்கை எடுக்கலாம்.",
-    complaintSummary: "புகார் சுருக்கம்",
-    departmentLabel: "துறை",
-    locationLabel: "இடம்",
-    photosLabel: "புகைப்படங்கள்",
-    attached: "இணைக்கப்பட்டது",
-    iHerebyDeclare: "நான் இதன்மூலம் உறுதியளிக்கிறேன்:",
-    confirmImages:
-      "அனைத்து புகைப்படங்களும் புகாரளிக்கப்பட்ட பிரச்சினையை உண்மையாகக் காட்டுகின்றன.",
-    confirmImagesDesc:
-      "பழைய, தொடர்பில்லாத அல்லது தொடர்பில்லாத படங்கள் பயன்படுத்தப்படவில்லை.",
-    confirmLocation: "இடம் சரியானது & துல்லியமானது.",
-    confirmLocationDesc: "பிரச்சினை இடம்:",
-    acceptTerms: "இந்த புகார் உண்மை மற்றும் உண்மையானது",
-    acceptTermsDesc:
-      "பொய்த் தகவலை வழங்குவது அரசு அபராதம் மற்றும் சட்ட நடவடிக்கைக்கு வழிவகுக்கும் என்பதை நான் புரிந்துகொள்கிறேன்.",
-    goBackEdit: "திரும்பிச் சென்று திருத்தவும்",
-    iConfirmSubmit: "நான் உறுதிப்படுத்துகிறேன் → புகாரைச் சமர்ப்பிக்கவும்",
-    submitting: "சமர்ப்பிக்கிறது...",
-    capturingLocation: "துல்லியமான இடத்தைப் பிடிக்கிறது...",
-    cameraDenied: "கேமரா அணுகல் மறுக்கப்பட்டது அல்லது இல்லை",
-    duplicatePhoto: "நகல் புகைப்படம் கண்டறியப்பட்டது",
+    agreement: "இந்தப் புகார் உண்மை மற்றும் உண்மையானது என உறுதிப்படுத்துகிறேன். பொய்த் தகவல்கள் சட்ட நடவடிக்கைக்கு வழிவகுக்கும்.",
+    proceed: "இறுதி சரிபார்ப்புக்குச் செல்லவும்", finalConfirmation: "இறுதி உறுதிப்படுத்தல் – கட்டாயம்",
+    falseComplaints: "பொய் புகார்கள் தண்டனைக்குரிய குற்றங்கள்", importantLegalNotice: "முக்கிய சட்ட அறிவிப்பு",
+    legalText: "பொய், தவறான அல்லது தொடர்பில்லாத தகவல்/புகைப்படங்களை சமர்ப்பிப்பது கடுமையான குற்றமாகும். அரசு அதிகாரிகள் பிரிவு 177 IPC மற்றும் பிற சட்டங்களின் கீழ் அபராதம் விதிக்கலாம் மற்றும் சட்ட நடவடிக்கை எடுக்கலாம்.",
+    complaintSummary: "புகார் சுருக்கம்", departmentLabel: "துறை", locationLabel: "இடம்",
+    photosLabel: "புகைப்படங்கள்", attached: "இணைக்கப்பட்டது", iHerebyDeclare: "நான் இதன்மூலம் உறுதியளிக்கிறேன்:",
+    confirmImages: "அனைத்து புகைப்படங்களும் புகாரளிக்கப்பட்ட பிரச்சினையை உண்மையாகக் காட்டுகின்றன.",
+    confirmImagesDesc: "பழைய, தொடர்பில்லாத அல்லது தொடர்பில்லாத படங்கள் பயன்படுத்தப்படவில்லை.",
+    confirmLocation: "இடம் சரியானது & துல்லியமானது.", confirmLocationDesc: "பிரச்சினை இடம்:",
+    acceptTerms: "இந்த புகார் உண்மை மற்றும் உண்மையானது", acceptTermsDesc: "பொய்த் தகவலை வழங்குவது அரசு அபராதம் மற்றும் சட்ட நடவடிக்கைக்கு வழிவகுக்கும் என்பதை நான் புரிந்துகொள்கிறேன்.",
+    goBackEdit: "திரும்பிச் சென்று திருத்தவும்", iConfirmSubmit: "நான் உறுதிப்படுத்துகிறேன் → புகாரைச் சமர்ப்பிக்கவும்",
+    submitting: "சமர்ப்பிக்கிறது...", capturingLocation: "துல்லியமான இடத்தைப் பிடிக்கிறது...",
+    cameraDenied: "கேமரா அணுகல் மறுக்கப்பட்டது அல்லது இல்லை", duplicatePhoto: "நகல் புகைப்படம் கண்டறியப்பட்டது",
     fillAllFields: "தேவையான அனைத்து புலங்களையும் பூர்த்தி செய்யவும்",
-    minPhotosRequired:
-      "{department} க்கு குறைந்தபட்ச {minImages} புகைப்பட(ங்கள்) தேவை",
-    confirmAllPoints: "அனைத்து தேவையான புள்ளிகளையும் உறுதிப்படுத்தவும்",
-    complaintRegistered:
-      "புகார் வெற்றிகரமாக பதிவு செய்யப்பட்டது! அதிகாரிகள் விரைவில் மதிப்பாய்வு செய்வார்கள்.",
-    networkError: "பிணையப் பிழை. மீண்டும் முயற்சிக்கவும்.",
-    yesThisIsIssue: "✓ ஆம், இது ஒரு {department} பிரச்சினை",
-    save: "சேமிக்கவும்",
-    cancel: "ரத்து செய்யவும்",
-    english: "ஆங்கிலம்",
-    tamil: "தமிழ்",
-    both: "இரண்டும்",
-    enterValidLocation: "சரியான இடத்தை உள்ளிடவும்",
-    pleaseLogin: "முதலில் உள்நுழையவும்",
-    searchHashtags: "ஹேஷ்டேக்களைத் தேடுங்கள்...",
-    otherDetailLabel:
-      "குறிப்பிட்ட பிரச்சனை என்ன? (எ.கா. சாலை, தெருவிளக்கு, நீர், நடைபாதை, முதலியன)",
-    otherDetailRequired: "தயவுசெய்து பிரச்சனை வகையைக் குறிப்பிடவும்",
-    voiceInput: "குரல் உள்ளீடு",
-    listening: "கேட்கிறது...",
-    micNotSupported: "இந்த உலாவியில் குரல் உள்ளீடு ஆதரிக்கப்படவில்லை",
-    saveDraft: "வரைவைச் சேமி",
-    draftSaved: "வரைவு சேமிக்கப்பட்டது",
-    loadDraft: "வரைவை ஏற்று",
-    clearDraft: "வரைவை நீக்கு",
-    getCurrentLocation: "தற்போதைய இருப்பிடத்தைப் பெறுக",
-    locating: "இருப்பிடம் தேடப்படுகிறது...",
-    draftCleared: "வரைவு நீக்கப்பட்டது",
-    noDraft: "சேமித்த வரைவு இல்லை",
-    voiceLangEnglish: "ஆங்கிலம்",
-    voiceLangTamil: "தமிழ்",
-    translating: "மொழிபெயர்க்கிறது...",
+    minPhotosRequired: "{department} க்கு குறைந்தபட்ச {minImages} புகைப்பட(ங்கள்) தேவை", confirmAllPoints: "அனைத்து தேவையான புள்ளிகளையும் உறுதிப்படுத்தவும்",
+    complaintRegistered: "புகார் வெற்றிகரமாக பதிவு செய்யப்பட்டது! அதிகாரிகள் விரைவில் மதிப்பாய்வு செய்வார்கள்.",
+    networkError: "பிணையப் பிழை. மீண்டும் முயற்சிக்கவும்.", yesThisIsIssue: "✓ ஆம், இது ஒரு {department} பிரச்சினை",
+    save: "சேமிக்கவும்", cancel: "ரத்து செய்யவும்", english: "ஆங்கிலம்", tamil: "தமிழ்", both: "இரண்டும்",
+    enterValidLocation: "சரியான இடத்தை உள்ளிடவும்", pleaseLogin: "முதலில் உள்நுழையவும்",
+    searchHashtags: "ஹேஷ்டேக்களைத் தேடுங்கள்...", otherDetailLabel: "குறிப்பிட்ட பிரச்சனை என்ன? (எ.கா. சாலை, தெருவிளக்கு, நீர், நடைபாதை, முதலியன)",
+    otherDetailRequired: "தயவுசெய்து பிரச்சனை வகையைக் குறிப்பிடவும்", voiceInput: "குரல் உள்ளீடு",
+    listening: "கேட்கிறது...", micNotSupported: "இந்த உலாவியில் குரல் உள்ளீடு ஆதரிக்கப்படவில்லை",
+    saveDraft: "வரைவைச் சேமி", draftSaved: "வரைவு சேமிக்கப்பட்டது", loadDraft: "வரைவை ஏற்று",
+    clearDraft: "வரைவை நீக்கு", getCurrentLocation: "தற்போதைய இருப்பிடத்தைப் பெறுக",
+    locating: "இருப்பிடம் தேடப்படுகிறது...", draftCleared: "வரைவு நீக்கப்பட்டது", noDraft: "சேமித்த வரைவு இல்லை",
+    voiceLangEnglish: "ஆங்கிலம்", voiceLangTamil: "தமிழ்", translating: "மொழிபெயர்க்கிறது...",
   },
 };
 
-/* ================= MAIN COMPONENT ================= */
 const PostIssue = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
@@ -314,7 +136,6 @@ const PostIssue = () => {
   const recognitionRefEn = useRef(null);
   const recognitionRefTa = useRef(null);
 
-  // Form states
   const [district, setDistrict] = useState("");
   const [area, setArea] = useState("");
   const [department, setDepartment] = useState("");
@@ -325,8 +146,6 @@ const PostIssue = () => {
   const [hashtags, setHashtags] = useState("#peoplevoice ");
   const [images, setImages] = useState([]);
   const [agree, setAgree] = useState(false);
-
-  // UI states
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -335,43 +154,22 @@ const PostIssue = () => {
   const [validationMessage, setValidationMessage] = useState("");
   const [isValidatingImage, setIsValidatingImage] = useState(false);
   const { addNewIssue } = useUserValues();
-
-  // Voice input states
   const [isListeningEn, setIsListeningEn] = useState(false);
   const [isListeningTa, setIsListeningTa] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
   const [isTranslatingVoice, setIsTranslatingVoice] = useState(false);
-
-  // Location fetching state
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
-
-  // Description view toggle
   const [descView, setDescView] = useState("both");
-
-  // Verification modal
   const [showVerification, setShowVerification] = useState(false);
   const [verificationChecks, setVerificationChecks] = useState({
-    confirmImages: false,
-    confirmLocation: false,
-    confirmDepartment: false,
-    confirmDescription: false,
-    acceptTerms: false,
+    confirmImages: false, confirmLocation: false, confirmDepartment: false, confirmDescription: false, acceptTerms: false,
   });
-  const [isSubmittingVerification, setIsSubmittingVerification] =
-    useState(false);
-
-  // Language state
+  const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
   const [language, setLanguage] = useState("en");
-
-  // Additional states
   const [isTranslating, setIsTranslating] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
-
-  // Draft message
   const [draftMessage, setDraftMessage] = useState("");
-
-  // Camera zoom states
   const [zoomLevel, setZoomLevel] = useState(1);
   const [minZoom, setMinZoom] = useState(1);
   const [maxZoom, setMaxZoom] = useState(1);
@@ -380,9 +178,7 @@ const PostIssue = () => {
 
   const t = (key, params = {}) => {
     let text = TEXTS[language][key] || key;
-    Object.keys(params).forEach((param) => {
-      text = text.replace(`{${param}}`, params[param]);
-    });
+    Object.keys(params).forEach((param) => { text = text.replace(`{${param}}`, params[param]); });
     return text;
   };
 
@@ -392,146 +188,73 @@ const PostIssue = () => {
 
   const translateEnglishToTamil = async (englishText) => {
     try {
-      const res = await fetch(
-        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
-          englishText,
-        )}&langpair=en|ta`,
-      );
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(englishText)}&langpair=en|ta`);
       const data = await res.json();
       return data?.responseData?.translatedText || englishText;
-    } catch {
-      return englishText;
-    }
+    } catch { return englishText; }
   };
 
-  // Helper: translate text from Tamil to English using MyMemory
   const translateTamilToEnglish = async (tamilText) => {
     try {
-      const res = await fetch(
-        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
-          tamilText,
-        )}&langpair=ta|en`,
-      );
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(tamilText)}&langpair=ta|en`);
       const data = await res.json();
       let translated = data?.responseData?.translatedText || tamilText;
       translated = translated.replace(/&#39;/g, "'").replace(/&quot;/g, '"');
       return translated;
-    } catch (err) {
-      console.error("Translation error:", err);
-      return tamilText;
-    }
+    } catch (err) { return tamilText; }
   };
 
   // -------------------- VOICE: ENGLISH --------------------
   const startEnglishVoice = async () => {
     if (isListeningEn) return;
-    // Stop Tamil mic if active
     if (isListeningTa) await stopTamilVoice();
-
     try {
       if (Capacitor.getPlatform() === "web") {
-        const SpeechRecognitionAPI =
-          window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognitionAPI) {
-          alert("Speech Recognition not supported");
-          return;
-        }
+        const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognitionAPI) { alert("Speech Recognition not supported"); return; }
         const recognition = new SpeechRecognitionAPI();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = "en-US";
+        recognition.continuous = false; recognition.interimResults = false; recognition.lang = "en-US";
         recognition.onstart = () => setIsListeningEn(true);
         recognition.onend = () => setIsListeningEn(false);
         recognition.onresult = async (event) => {
           const text = event.results[0][0].transcript;
-          // Append to English description
           setDescEn((prev) => prev + " " + text);
           setIsTranslatingVoice(true);
-          try {
-            const translated = await translateEnglishToTamil(text);
-            setDescTa((prev) => prev + " " + translated);
-          } finally {
-            setIsTranslatingVoice(false);
-          }
+          const translated = await translateEnglishToTamil(text);
+          setDescTa((prev) => prev + " " + translated);
+          setIsTranslatingVoice(false);
         };
         recognition.start();
         recognitionRefEn.current = recognition;
       } else {
-        // Capacitor Android - fixed version
-        // Request permissions
         const permission = await SpeechRecognition.requestPermissions();
-        if (!permission.speechRecognition) {
-          console.log("Speech recognition permission denied");
-          return;
-        }
-
-        // Remove any existing listeners to avoid duplicates
+        if (!permission.speechRecognition) return;
         await SpeechRecognition.removeAllListeners();
-
         setIsListeningEn(true);
-
-        // Listen for partial results (final results also come here with isFinal=true)
         const handleResults = (data) => {
-          console.log("Voice result (English):", data);
           if (data.matches && data.matches.length > 0) {
-            // Get the best match (usually last)
             const finalText = data.matches[data.matches.length - 1];
-            // Update English description
             setDescEn((prev) => (prev ? `${prev} ${finalText}` : finalText));
-            // Translate to Tamil and update Tamil description
             setIsTranslatingVoice(true);
-            translateEnglishToTamil(finalText)
-              .then((translated) => {
-                setDescTa((prev) => (prev ? `${prev} ${translated}` : translated));
-              })
-              .finally(() => setIsTranslatingVoice(false));
-
-            // If this is a final result (no more interim), stop listening
-            if (data.isFinal) {
-              SpeechRecognition.stop();
-              setIsListeningEn(false);
-            }
+            translateEnglishToTamil(finalText).then(translated => {
+              setDescTa((prev) => (prev ? `${prev} ${translated}` : translated));
+            }).finally(() => setIsTranslatingVoice(false));
+            if (data.isFinal) { SpeechRecognition.stop(); setIsListeningEn(false); }
           }
         };
-
         SpeechRecognition.addListener("partialResults", handleResults);
-        SpeechRecognition.addListener("listeningState", (data) => {
-          console.log("Listening state:", data);
-          if (data.status === "stopped") {
-            setIsListeningEn(false);
-          }
-        });
-
-        // Start recognition
-        await SpeechRecognition.start({
-          language: "en-US",
-          maxResults: 1,
-          partialResults: true,
-          popup: false, // Turn off popup to avoid interference
-        });
-
-        // Store reference for cleanup
-        recognitionRefEn.current = {
-          removeListeners: async () => {
-            await SpeechRecognition.removeAllListeners();
-          },
-        };
+        SpeechRecognition.addListener("listeningState", (data) => { if (data.status === "stopped") setIsListeningEn(false); });
+        await SpeechRecognition.start({ language: "en-US", maxResults: 1, partialResults: true, popup: false });
+        recognitionRefEn.current = { removeListeners: async () => { await SpeechRecognition.removeAllListeners(); } };
       }
-    } catch (err) {
-      console.error("English voice error:", err);
-      setIsListeningEn(false);
-      setError("Voice input failed. Please check microphone permissions.");
-    }
+    } catch (err) { console.error(err); setIsListeningEn(false); setError("Voice input failed. Check microphone permissions."); }
   };
 
   const stopEnglishVoice = async () => {
     if (Capacitor.getPlatform() === "android") {
       await SpeechRecognition.stop();
-      if (recognitionRefEn.current?.removeListeners)
-        await recognitionRefEn.current.removeListeners();
-    } else if (recognitionRefEn.current) {
-      recognitionRefEn.current.abort();
-    }
+      if (recognitionRefEn.current?.removeListeners) await recognitionRefEn.current.removeListeners();
+    } else if (recognitionRefEn.current) recognitionRefEn.current.abort();
     setIsListeningEn(false);
   };
 
@@ -539,119 +262,71 @@ const PostIssue = () => {
   const startTamilVoice = async () => {
     if (isListeningTa) return;
     if (isListeningEn) await stopEnglishVoice();
-
     try {
       if (Capacitor.getPlatform() === "web") {
-        const SpeechRecognitionAPI =
-          window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognitionAPI) {
-          alert("Speech Recognition not supported");
-          return;
-        }
+        const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognitionAPI) { alert("Speech Recognition not supported"); return; }
         const recognition = new SpeechRecognitionAPI();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = "ta-IN";
+        recognition.continuous = false; recognition.interimResults = false; recognition.lang = "ta-IN";
         recognition.onstart = () => setIsListeningTa(true);
         recognition.onend = () => setIsListeningTa(false);
         recognition.onresult = async (event) => {
           const text = event.results[0][0].transcript;
           setDescTa((prev) => prev + " " + text);
           setIsTranslatingVoice(true);
-          try {
-            const translated = await translateTamilToEnglish(text);
-            setDescEn((prev) => prev + " " + translated);
-          } finally {
-            setIsTranslatingVoice(false);
-          }
+          const translated = await translateTamilToEnglish(text);
+          setDescEn((prev) => prev + " " + translated);
+          setIsTranslatingVoice(false);
         };
         recognition.start();
         recognitionRefTa.current = recognition;
       } else {
-        // Capacitor Android - fixed version
         const permission = await SpeechRecognition.requestPermissions();
-        if (!permission.speechRecognition) {
-          console.log("Speech recognition permission denied");
-          return;
-        }
-
+        if (!permission.speechRecognition) return;
         await SpeechRecognition.removeAllListeners();
-
         setIsListeningTa(true);
-
         const handleResults = (data) => {
-          console.log("Voice result (Tamil):", data);
           if (data.matches && data.matches.length > 0) {
             const finalText = data.matches[data.matches.length - 1];
             setDescTa((prev) => (prev ? `${prev} ${finalText}` : finalText));
             setIsTranslatingVoice(true);
-            translateTamilToEnglish(finalText)
-              .then((translated) => {
-                setDescEn((prev) => (prev ? `${prev} ${translated}` : translated));
-              })
-              .finally(() => setIsTranslatingVoice(false));
-
-            if (data.isFinal) {
-              SpeechRecognition.stop();
-              setIsListeningTa(false);
-            }
+            translateTamilToEnglish(finalText).then(translated => {
+              setDescEn((prev) => (prev ? `${prev} ${translated}` : translated));
+            }).finally(() => setIsTranslatingVoice(false));
+            if (data.isFinal) { SpeechRecognition.stop(); setIsListeningTa(false); }
           }
         };
-
         SpeechRecognition.addListener("partialResults", handleResults);
-        SpeechRecognition.addListener("listeningState", (data) => {
-          console.log("Listening state:", data);
-          if (data.status === "stopped") {
-            setIsListeningTa(false);
-          }
-        });
-
-        await SpeechRecognition.start({
-          language: "ta-IN",
-          maxResults: 1,
-          partialResults: true,
-          popup: false,
-        });
-
-        recognitionRefTa.current = {
-          removeListeners: async () => {
-            await SpeechRecognition.removeAllListeners();
-          },
-        };
+        SpeechRecognition.addListener("listeningState", (data) => { if (data.status === "stopped") setIsListeningTa(false); });
+        await SpeechRecognition.start({ language: "ta-IN", maxResults: 1, partialResults: true, popup: false });
+        recognitionRefTa.current = { removeListeners: async () => { await SpeechRecognition.removeAllListeners(); } };
       }
-    } catch (err) {
-      console.error("Tamil voice error:", err);
-      setIsListeningTa(false);
-      setError("Voice input failed. Please check microphone permissions.");
-    }
+    } catch (err) { console.error(err); setIsListeningTa(false); setError("Voice input failed. Check microphone permissions."); }
   };
 
   const stopTamilVoice = async () => {
     if (Capacitor.getPlatform() === "android") {
       await SpeechRecognition.stop();
-      if (recognitionRefTa.current?.removeListeners)
-        await recognitionRefTa.current.removeListeners();
-    } else if (recognitionRefTa.current) {
-      recognitionRefTa.current.abort();
-    }
+      if (recognitionRefTa.current?.removeListeners) await recognitionRefTa.current.removeListeners();
+    } else if (recognitionRefTa.current) recognitionRefTa.current.abort();
     setIsListeningTa(false);
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (recognitionRefEn.current) {
         if (Capacitor.getPlatform() === "web") recognitionRefEn.current.abort();
-        else if (recognitionRefEn.current.removeListeners)
-          recognitionRefEn.current.removeListeners();
+        else if (recognitionRefEn.current.removeListeners) recognitionRefEn.current.removeListeners();
       }
       if (recognitionRefTa.current) {
         if (Capacitor.getPlatform() === "web") recognitionRefTa.current.abort();
-        else if (recognitionRefTa.current.removeListeners)
-          recognitionRefTa.current.removeListeners();
+        else if (recognitionRefTa.current.removeListeners) recognitionRefTa.current.removeListeners();
       }
     };
   }, []);
+
+
+
 
   // Save draft with images (compressed base64 fits within localStorage limits)
   const saveDraft = useCallback(() => {
@@ -1098,30 +773,37 @@ const PostIssue = () => {
   };
 
   const autoTranslateToTamil = (englishText) => {
-    if (!englishText.trim()) {
-      setDescTa("");
-      return;
-    }
-    if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
-    translateTimeoutRef.current = setTimeout(async () => {
-      setIsTranslating(true);
-      try {
-        const res = await fetch(
-          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
-            englishText,
-          )}&langpair=en|ta`,
-        );
-        const data = await res.json();
-        let translated = data?.responseData?.translatedText || englishText;
-        translated = translated.replace(/&#39;/g, "'").replace(/&quot;/g, '"');
-        setDescTa(translated);
-      } catch (err) {
-        console.error("Auto translation error:", err);
-      } finally {
-        setIsTranslating(false);
+  if (!englishText.trim()) {
+    setDescTa("");
+    return;
+  }
+  if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
+  translateTimeoutRef.current = setTimeout(async () => {
+    setIsTranslating(true);
+    try {
+      const res = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(englishText)}&langpair=en|ta`
+      );
+      const data = await res.json();
+      let translated = data?.responseData?.translatedText;
+      
+      // ✅ Reject API error messages
+      if (!translated || translated.includes("NO QUERY SPECIFIED") || translated.includes("EXAMPLE REQUEST")) {
+        console.warn("Translation API error:", translated);
+        setDescTa(prev => prev || "[Translation unavailable]");
+        return;
       }
-    }, 800);
-  };
+      
+      translated = translated.replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      setDescTa(translated);
+    } catch (err) {
+      console.error("Auto translation error:", err);
+      // Don't show error in UI
+    } finally {
+      setIsTranslating(false);
+    }
+  }, 800);
+};
 
   const handleDescEnChange = (e) => {
     const newValue = e.target.value;
