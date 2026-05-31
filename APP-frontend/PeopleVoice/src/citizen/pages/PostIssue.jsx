@@ -461,17 +461,22 @@ const PostIssue = () => {
 
         setIsListeningEn(true);
 
-        const handleResults = (data) => {
-          console.log("English Results:", data);
+        const handleResults = async (data) => {
+          console.log("VOICE DATA:", data);
 
-          if (data.matches?.length > 0) {
-            const finalText = data.matches[0];
+          if (data.matches && data.matches.length > 0) {
+            const finalText = data.matches[data.matches.length - 1];
 
-            setDescEn((prev) => prev + " " + finalText);
+            setDescEn((prev) => (prev ? `${prev} ${finalText}` : finalText));
 
-            translateEnglishToTamil(finalText).then((translated) => {
-              setDescTa((prev) => prev + " " + translated);
-            });
+            const translated = await translateEnglishToTamil(finalText);
+
+            setDescTa((prev) => (prev ? `${prev} ${translated}` : translated));
+
+            // AUTO STOP
+            await SpeechRecognition.stop();
+            setIsListeningEn(false);
+            SpeechRecognition.removeAllListeners();
           }
         };
 
@@ -481,9 +486,8 @@ const PostIssue = () => {
           language: "en-US",
           maxResults: 1,
           partialResults: true,
-          prompt: "Speak now (English)",
+          popup: true,
         });
-
         recognitionRefEn.current = {
           removeListeners: () => {
             SpeechRecognition.removeAllListeners();
@@ -546,17 +550,22 @@ const PostIssue = () => {
 
         setIsListeningTa(true);
 
-        const handleResults = (data) => {
-          console.log("Tamil Results:", data);
+        const handleResults = async (data) => {
+          console.log("VOICE DATA:", data);
 
-          if (data.matches?.length > 0) {
-            const finalText = data.matches[0];
+          if (data.matches && data.matches.length > 0) {
+            const finalText = data.matches[data.matches.length - 1];
 
-            setDescTa((prev) => prev + " " + finalText);
+            setDescTa((prev) => (prev ? `${prev} ${finalText}` : finalText));
 
-            translateTamilToEnglish(finalText).then((translated) => {
-              setDescEn((prev) => prev + " " + translated);
-            });
+            const translated = await translateTamilToEnglish(finalText);
+
+            setDescEn((prev) => (prev ? `${prev} ${translated}` : translated));
+
+            // AUTO STOP
+            await SpeechRecognition.stop();
+            setIsListeningTa(false);
+            SpeechRecognition.removeAllListeners();
           }
         };
 
@@ -566,9 +575,8 @@ const PostIssue = () => {
           language: "ta-IN",
           maxResults: 1,
           partialResults: true,
-          prompt: "தமிழில் பேசுங்கள்",
+          popup: true,
         });
-
         recognitionRefTa.current = {
           removeListeners: () => {
             SpeechRecognition.removeAllListeners();
