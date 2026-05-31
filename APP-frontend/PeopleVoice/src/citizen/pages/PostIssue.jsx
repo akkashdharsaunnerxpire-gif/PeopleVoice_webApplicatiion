@@ -426,7 +426,8 @@ const PostIssue = () => {
   const startEnglishVoice = async () => {
     if (isListeningEn) return;
     // Stop Tamil mic if active
-    if (isListeningTa) stopTamilVoice();
+    if (isListeningTa) await stopTamilVoice();
+
     try {
       if (Capacitor.getPlatform() === "web") {
         const SpeechRecognitionAPI =
@@ -456,55 +457,70 @@ const PostIssue = () => {
         recognition.start();
         recognitionRefEn.current = recognition;
       } else {
-        // Capacitor Android
+        // Capacitor Android - fixed version
+        // Request permissions
         const permission = await SpeechRecognition.requestPermissions();
-        if (!permission.speechRecognition) return;
+        if (!permission.speechRecognition) {
+          console.log("Speech recognition permission denied");
+          return;
+        }
+
+        // Remove any existing listeners to avoid duplicates
+        await SpeechRecognition.removeAllListeners();
 
         setIsListeningEn(true);
 
-        const handleResults = async (data) => {
-          console.log("VOICE DATA:", data);
+        // Listen for partial results (final results also come here with isFinal=true)
+        const handleResults = (data) => {
+          console.log("Voice result (English):", data);
           if (data.matches && data.matches.length > 0) {
+            // Get the best match (usually last)
             const finalText = data.matches[data.matches.length - 1];
+            // Update English description
             setDescEn((prev) => (prev ? `${prev} ${finalText}` : finalText));
-            const translated = await translateEnglishToTamil(finalText);
-            setDescTa((prev) => (prev ? `${prev} ${translated}` : translated));
+            // Translate to Tamil and update Tamil description
+            setIsTranslatingVoice(true);
+            translateEnglishToTamil(finalText)
+              .then((translated) => {
+                setDescTa((prev) => (prev ? `${prev} ${translated}` : translated));
+              })
+              .finally(() => setIsTranslatingVoice(false));
 
-            // Stop recognition after getting result
-            await SpeechRecognition.stop();
-            setIsListeningEn(false);
+            // If this is a final result (no more interim), stop listening
+            if (data.isFinal) {
+              SpeechRecognition.stop();
+              setIsListeningEn(false);
+            }
           }
         };
-        SpeechRecognition.addListener("partialResults", handleResults);
 
+        SpeechRecognition.addListener("partialResults", handleResults);
         SpeechRecognition.addListener("listeningState", (data) => {
+          console.log("Listening state:", data);
           if (data.status === "stopped") {
             setIsListeningEn(false);
           }
         });
 
+        // Start recognition
         await SpeechRecognition.start({
           language: "en-US",
           maxResults: 1,
           partialResults: true,
-          popup: true,
+          popup: false, // Turn off popup to avoid interference
         });
 
-        // Auto-stop after 5 seconds if no result
-        setTimeout(async () => {
-          await SpeechRecognition.stop();
-          setIsListeningEn(false);
-        }, 5000);
-
+        // Store reference for cleanup
         recognitionRefEn.current = {
           removeListeners: async () => {
-            SpeechRecognition.removeAllListeners();
+            await SpeechRecognition.removeAllListeners();
           },
         };
       }
     } catch (err) {
-      console.error(err);
+      console.error("English voice error:", err);
       setIsListeningEn(false);
+      setError("Voice input failed. Please check microphone permissions.");
     }
   };
 
@@ -522,7 +538,8 @@ const PostIssue = () => {
   // -------------------- VOICE: TAMIL --------------------
   const startTamilVoice = async () => {
     if (isListeningTa) return;
-    if (isListeningEn) stopEnglishVoice();
+    if (isListeningEn) await stopEnglishVoice();
+
     try {
       if (Capacitor.getPlatform() === "web") {
         const SpeechRecognitionAPI =
@@ -551,50 +568,61 @@ const PostIssue = () => {
         recognition.start();
         recognitionRefTa.current = recognition;
       } else {
-        // Capacitor Android
+        // Capacitor Android - fixed version
         const permission = await SpeechRecognition.requestPermissions();
-        if (!permission.speechRecognition) return;
+        if (!permission.speechRecognition) {
+          console.log("Speech recognition permission denied");
+          return;
+        }
+
+        await SpeechRecognition.removeAllListeners();
 
         setIsListeningTa(true);
 
-        const handleResults = async (data) => {
-          console.log("VOICE DATA:", data);
+        const handleResults = (data) => {
+          console.log("Voice result (Tamil):", data);
           if (data.matches && data.matches.length > 0) {
             const finalText = data.matches[data.matches.length - 1];
             setDescTa((prev) => (prev ? `${prev} ${finalText}` : finalText));
-            const translated = await translateTamilToEnglish(finalText);
-            setDescEn((prev) => (prev ? `${prev} ${translated}` : translated));
+            setIsTranslatingVoice(true);
+            translateTamilToEnglish(finalText)
+              .then((translated) => {
+                setDescEn((prev) => (prev ? `${prev} ${translated}` : translated));
+              })
+              .finally(() => setIsTranslatingVoice(false));
 
-            // Stop recognition after getting result
-            await SpeechRecognition.stop();
-            setIsListeningTa(false);
+            if (data.isFinal) {
+              SpeechRecognition.stop();
+              setIsListeningTa(false);
+            }
           }
         };
 
         SpeechRecognition.addListener("partialResults", handleResults);
+        SpeechRecognition.addListener("listeningState", (data) => {
+          console.log("Listening state:", data);
+          if (data.status === "stopped") {
+            setIsListeningTa(false);
+          }
+        });
 
         await SpeechRecognition.start({
           language: "ta-IN",
           maxResults: 1,
           partialResults: true,
-          popup: true,
+          popup: false,
         });
-
-        // Auto-stop after 5 seconds if no result
-        setTimeout(async () => {
-          await SpeechRecognition.stop();
-          setIsListeningTa(false);
-        }, 5000);
 
         recognitionRefTa.current = {
           removeListeners: async () => {
-            SpeechRecognition.removeAllListeners();
+            await SpeechRecognition.removeAllListeners();
           },
         };
       }
     } catch (err) {
-      console.error(err);
+      console.error("Tamil voice error:", err);
       setIsListeningTa(false);
+      setError("Voice input failed. Please check microphone permissions.");
     }
   };
 
